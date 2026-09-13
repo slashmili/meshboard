@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.pnpm-store/
+coverage/
+test-results/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Native toolchains (added in a later checkpoint).
+.gradle/
+.kotlin/
+build/
+target/
+local.properties
+

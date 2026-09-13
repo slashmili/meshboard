@@ -1,0 +1,18 @@
+[tools]
+# Web package: TS + Yjs + y-webrtc
+node = "22"
+pnpm = "9"
+
+# CRDT core: yrs (Rust) + native WebRTC bindings
+rust = "stable"
+
+# Native package: Kotlin Multiplatform + Compose Multiplatform
+java = "temurin-21"     # Gradle/Kotlin toolchain requires a JDK
+kotlin = "2.2"
+gradle = "8"
+
+# General
+just = "latest"          # task runner, optional but handy for a polyglot monorepo
+
+[settings]
+experimental = true       # needed for some plugins (kotlin/gradle) depending on mise version

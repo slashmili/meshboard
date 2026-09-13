@@ -1,0 +1,14 @@
+{
+  "name": "meshboard",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.9",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "pnpm --filter @meshboard/web dev",
+    "build": "pnpm --filter @meshboard/web build",
+    "check": "pnpm --filter @meshboard/web check",
+    "test": "pnpm --filter @meshboard/web test",
+    "test:e2e": "pnpm --filter @meshboard/web test:e2e"
+  }
+}
