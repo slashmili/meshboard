@@ -6,9 +6,9 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
 
 ## Phase 1
 
-1. **Local web canvas — current checkpoint.** Pen, whole-object eraser, shapes,
+1. **Local web canvas — accepted.** Pen, whole-object eraser, shapes,
    colors, widths, pan/zoom, mouse/pen/touch. Validate drawing feel and layout.
-2. **Two web peers.** Introduce the signaling relay and naive WebRTC data-channel
+2. **Two web peers — current checkpoint.** Introduce the signaling relay and naive WebRTC data-channel
    drawing sync, joining via link/QR, and TURN configuration plus a test that
    forces relay-only connections. Confirm that actual board payloads never use
    signaling. Label the security status accurately before Phase 3; do not claim

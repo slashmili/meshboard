@@ -96,6 +96,20 @@ kbd { font-family: inherit; color: #8a967c; padding: 2px 5px; border: 1px solid 
 .local-notice { background: #f4f7ee; border-radius: 10px; padding: 15px; margin: 20px 0; }
 .local-notice strong { font-size: 12px; font-weight: 600; }
 .local-notice p { font-size: 11px; margin: 6px 0 0; }
+.share-button { padding: 9px 13px; gap: 7px; }
+.share-dialog { width: 450px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+.share-dialog .invite-qr { display: block; margin: 10px auto 15px; max-width: 100%; height: auto; }
+.invite-label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 7px; }
+.invite-copy { display: flex; gap: 7px; }
+.invite-copy input { min-width: 0; flex: 1; border: 1px solid #dfe6d7; background: #f9fbf6; border-radius: 8px; padding: 10px; color: #536b46; font: inherit; font-size: 11px; }
+.invite-copy input:focus { outline: 2px solid #7b9867; outline-offset: 2px; }
+.copy-status { font-size: 10px; color: #5f7950; margin-top: 6px; }
+.share-dialog .local-link-note { font-size: 11px; margin: 9px 0; }
+.share-dialog .local-notice { margin: 12px 0; }
+.share-dialog .session-lifetime { font-size: 11px; margin: 12px 0 8px; }
+.leave-button { color: #947662; padding-left: 0; }
+.connection-error { position: absolute; z-index: 3; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100% - 40px); width: max-content; border: 1px solid #e0c89e; background: #fff9ee; color: #7f6338; padding: 10px 13px; border-radius: 8px; font-size: 11px; box-shadow: 0 3px 10px #72592912; }
+.connection-error button { flex-shrink: 0; background: transparent; border: 0; text-decoration: underline; color: #705330; font-size: 11px; }
 @media (max-width: 800px) {
   .header { height: 66px; padding: 0 18px; gap: 18px; }
   .brand { font-size: 21px; }
@@ -119,6 +133,10 @@ kbd { font-family: inherit; color: #8a967c; padding: 2px 5px; border: 1px solid 
   .board-title, .header-divider, .clear-button span { display: none; }
   .clear-button { padding: 8px; }
   .local-badge { font-size: 10px; padding: 6px 8px; }
+  .header .local-badge { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  .share-button { padding: 8px; }
+  .share-button span { display: none; }
+  .connection-error { top: 126px; }
   .header-actions { gap: 5px; }
   .tool-panel { top: 16px; left: 50%; transform: translateX(-50%); flex-direction: row; padding: 5px; gap: 3px; border-radius: 12px; }
   .tool-button { width: 43px; height: 43px; }

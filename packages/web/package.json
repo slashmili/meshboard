@@ -12,12 +12,16 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@meshboard/shared-protocol": "workspace:*",
     "lucide-react": "^1.45.0",
+    "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@meshboard/signaling": "workspace:*",
     "@playwright/test": "^1.63.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",

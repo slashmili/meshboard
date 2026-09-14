@@ -3,14 +3,8 @@ export type View = Point & { zoom: number }
 export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line'
 export type Tool = DrawingTool | 'eraser' | 'hand'
 
-// Plain document data, independent of React and the eventual sync provider.
-export type BoardElement = {
-  id: string
-  type: DrawingTool
-  color: string
-  width: number
-  points: Point[]
-}
+import type { BoardElement } from '@meshboard/shared-protocol'
+export type { BoardElement } from '@meshboard/shared-protocol'
 
 export const MIN_ZOOM = 0.25
 export const MAX_ZOOM = 4

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Pencil, Plus, RotateCcw, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
 import { MAX_ZOOM, MIN_ZOOM, type Tool } from './board'
 import { useBoard } from './useBoard'
+import { BoardDocument } from './sync/BoardDocument'
+import { useSession } from './sync/useSession'
+import { ShareDialog } from './ShareDialog'
 
 const TOOLS: { id: Tool; label: string; key: string; icon: LucideIcon }[] = [
   { id: 'pen', label: 'Pen', key: 'P', icon: Pencil },
@@ -33,9 +36,13 @@ export function App() {
   const [tool, setTool] = useState<Tool>('pen')
   const [color, setColor] = useState(COLORS[0].value)
   const [width, setWidth] = useState(3)
-  const board = useBoard(tool, color, width)
+  const [document] = useState(() => new BoardDocument())
+  const session = useSession(document)
+  const board = useBoard(tool, color, width, document, session.preview)
+  const [sharing, setSharing] = useState(false)
   const helpDialog = useRef<HTMLDialogElement>(null)
   const clearDialog = useRef<HTMLDialogElement>(null)
+  const leaveDialog = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -54,7 +61,9 @@ export function App() {
   const { x, y, zoom } = board.view
   const currentTool = TOOLS.find(item => item.id === tool)!
   const drawing = tool !== 'hand' && tool !== 'eraser'
-  const empty = board.elements.length === 0 && !board.draft
+  const remoteDrafts = session.drafts.filter(draft => !board.elements.some(element => element.id === draft.id))
+  const empty = board.elements.length === 0 && !board.draft && remoteDrafts.length === 0
+  const connectionLabel = !session.room ? 'Local only' : session.status.connected ? `${session.status.connected} peer${session.status.connected === 1 ? '' : 's'} connected` : session.status.connecting ? 'Connecting…' : session.status.signaling ? 'Waiting for a peer' : 'Joining…'
 
   return (
     <main className="app">
@@ -66,12 +75,14 @@ export function App() {
         <span className="header-divider" />
         <div className="board-title">Untitled board <span>A space for ideas</span></div>
         <div className="header-actions">
-          <span className="local-badge"><span className="status-dot" /> Local only</span>
+          <span className="local-badge" role="status" data-testid="connection-status"><span className="status-dot" /> {connectionLabel}</span>
+          <button className="primary-button share-button" aria-label="Share board" onClick={() => { session.share(); setSharing(true) }}><Share2 size={15} /><span>Share</span></button>
           <button className="quiet-button clear-button" aria-label="Clear board" disabled={board.elements.length === 0} onClick={() => clearDialog.current?.showModal()}><Trash2 size={16} /><span>Clear board</span></button>
         </div>
       </header>
 
       <section className="workspace" aria-label="Whiteboard workspace">
+        {session.error && <div className="connection-error" role="alert"><span>{session.error}</span>{session.room && <button onClick={session.retry}>Retry</button>}</div>}
         <svg ref={board.svgRef} className={`canvas ${board.spaceDown || tool === 'hand' ? 'canvas-pan' : tool === 'eraser' ? 'canvas-eraser' : ''}`} aria-label="Drawing canvas" aria-describedby="canvas-instructions" tabIndex={0} {...board.pointerHandlers} onContextMenu={event => event.preventDefault()}>
           <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill="#cbd3ca" /></pattern></defs>
           <rect width="100%" height="100%" fill="url(#grid)" pointerEvents="none" />
@@ -79,6 +90,7 @@ export function App() {
             {board.elements.map(element => <Element key={element.id} element={element} />)}
             {board.draft && <Element element={board.draft} />}
           </g>
+          <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} />)}</g>
         </svg>
 
         <div className="tool-panel" role="toolbar" aria-label="Drawing tools">
@@ -107,7 +119,7 @@ export function App() {
           <span className="start-hint"><currentTool.icon size={14} /> {tool === 'pen' ? 'Your pen is ready' : `${currentTool.label} selected`}</span>
         </div>}
 
-        <div className="session-note"><span className="note-dot" /><span>Just this tab, just for now.<br /><strong>Refreshing clears your board.</strong></span></div>
+        <div className="session-note"><span className="note-dot" /><span>{session.room ? 'Shared live. Never saved.' : 'Just this tab, just for now.'}<br /><strong>{session.room ? 'Gone when everyone leaves.' : 'Refreshing clears your board.'}</strong></span></div>
 
         <div className="canvas-footer">
           <div className="zoom-panel" role="group" aria-label="Canvas view">
@@ -124,7 +136,7 @@ export function App() {
 
       <footer className="status-bar">
         <div id="canvas-instructions"><span className="active-tool">{board.spaceDown ? 'Pan' : currentTool.label}</span><span className="tool-hint">{board.spaceDown ? 'Drag to move around the board.' : HINTS[tool]}</span></div>
-        <span className="checkpoint-label">FIRST SKETCH <span>/</span> 01</span>
+        <span className="checkpoint-label" data-testid="connection-route">{session.status.connected ? session.status.relay ? 'VIA RELAY' : 'DIRECT CONNECTION' : 'DRAW TOGETHER'} <span>/</span> 02</span>
       </footer>
 
       <dialog ref={helpDialog} className="dialog help-dialog" aria-labelledby="help-title">
@@ -133,15 +145,21 @@ export function App() {
         <h2 id="help-title">A few handy shortcuts</h2>
         <div className="shortcuts">{TOOLS.map(item => <div key={item.id}><span>{item.label}</span><kbd>{item.key}</kbd></div>)}<div><span>Temporary pan</span><kbd>Space + drag</kbd></div><div><span>Square, circle, snapped line</span><kbd>Shift + drag</kbd></div></div>
         <p>Scroll to pan. Use Ctrl/⌘ + scroll to zoom, or pinch with two fingers on a touch screen. The eraser removes whole strokes and shapes.</p>
-        <div className="local-notice"><strong>Your first local sketch</strong><p>This checkpoint runs in this tab only. Drawing stays in memory and disappears on refresh or when you close the tab. Sharing, sync, export, and encryption are coming in later checkpoints.</p></div>
+        <div className="local-notice"><strong>A board that lives in the moment</strong><p>Use Share to invite another browser. Strokes and erasing sync live. Refreshing a shared board restores it from a connected participant; once everyone leaves, it is gone. This connection prototype does not yet authenticate invites or implement application-layer encryption.</p></div>
         <button className="primary-button" onClick={() => helpDialog.current?.close()}>Back to the board <ArrowUpRight size={17} /></button>
       </dialog>
 
       <dialog ref={clearDialog} className="dialog" aria-labelledby="clear-title">
         <span className="eyebrow">A FRESH START</span>
         <h2 id="clear-title">Clear this board?</h2>
-        <p>This removes all your strokes and shapes. There’s no undo in this first version.</p>
+        <p>{session.room ? 'This removes the strokes and shapes you currently see for everyone on the board.' : 'This removes all your strokes and shapes.'} There’s no undo in this version.</p>
         <div className="dialog-actions"><button className="quiet-button" autoFocus onClick={() => clearDialog.current?.close()}><ArrowDownLeft size={16} /> Keep drawing</button><button className="danger-button" onClick={() => { board.clear(); clearDialog.current?.close() }}>Clear board</button></div>
+      </dialog>
+      <ShareDialog open={sharing} invite={session.invite} onClose={() => setSharing(false)} onLeave={() => { setSharing(false); leaveDialog.current?.showModal() }} />
+      <dialog ref={leaveDialog} className="dialog" aria-labelledby="leave-title">
+        <span className="eyebrow">UNTIL NEXT TIME</span><h2 id="leave-title">Leave this board?</h2>
+        <p>Your copy will be discarded. Other connected participants can keep drawing. If you’re the last one, the board is gone.</p>
+        <div className="dialog-actions"><button className="quiet-button" autoFocus onClick={() => leaveDialog.current?.close()}>Stay here</button><button className="danger-button" onClick={session.leave}>Leave board</button></div>
       </dialog>
     </main>
   )

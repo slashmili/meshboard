@@ -1,0 +1,26 @@
+{
+  "name": "@meshboard/signaling",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@meshboard/shared-protocol": "workspace:*",
+    "tsx": "^4.23.13",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "@types/ws": "^8.18.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
