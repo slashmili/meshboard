@@ -135,6 +135,9 @@ any time with zero impact on the others.
   in a new session (new QR/link/key, since the old session is gone
   once peers disconnect).
 - Presence indicators: show connected peers, live cursors/names.
+- support Pressure-sensitive stylus in all platforms
+- store session and metadata(keys and certificartes) in localstorage
+for web and local storage on native platform to resume the drawing
 
 ## 6. Open Questions for Implementation
 
