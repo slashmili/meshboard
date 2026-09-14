@@ -8,10 +8,9 @@ test-results/
 .env.*
 !.env.example
 
-# Native toolchains (added in a later checkpoint).
+# Native toolchains and generated app bundles.
 .gradle/
 .kotlin/
 build/
 target/
 local.properties
-

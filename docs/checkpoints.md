@@ -8,12 +8,14 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
 
 1. **Local web canvas — accepted.** Pen, whole-object eraser, shapes,
    colors, widths, pan/zoom, mouse/pen/touch. Validate drawing feel and layout.
-2. **Two web peers — current checkpoint.** Introduce the signaling relay and naive WebRTC data-channel
+2. **Two web peers — accepted.** Introduce the signaling relay and naive WebRTC data-channel
    drawing sync, joining via link/QR, and TURN configuration plus a test that
    forces relay-only connections. Confirm that actual board payloads never use
    signaling. Label the security status accurately before Phase 3; do not claim
    application encryption or authenticated invitations yet.
-3. **Web ↔ native desktop.** Set up KMP/Compose and native WebRTC. Define and test
+3. **Web ↔ native desktop — current checkpoint.** KMP with Compose Desktop on the
+   JVM is the approved stack; the desktop bundle includes a Java runtime.
+   Set up KMP/Compose and native WebRTC. Define and test
    a versioned wire format against the web implementation. Test a real session
    between the web app and Linux desktop with TURN fallback, with both web
    and native taking turns creating the session. Any platform can create a board.

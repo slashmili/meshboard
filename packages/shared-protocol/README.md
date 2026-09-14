@@ -6,11 +6,16 @@ must replace it with Yjs/yrs and validate y-webrtc compatibility. Every current
 message and frame carries `v: 1`; unknown versions and extra fields are rejected.
 Executable schemas and limits are in `src/index.ts`.
 
+The Kotlin counterpart is `../native/src/commonMain/kotlin/meshboard/Wire.kt`.
+Both test suites consume `fixtures/board-messages.json`; real browser ↔ desktop
+tests additionally exercise encoding in both directions, large framed snapshots,
+previews, deletion, rejoining, creator departure, and relay-only drawing.
+
 ## Invitations
 
 An invitation is `https://app.example/#room=<random UUID v4>`. This room ID is
 sent to signaling to discover peers. It is not an encryption key, and no key or
-certificate fingerprint is generated at this stage. Any browser with the link
+certificate fingerprint is generated at this stage. Any supported client with the link
 can join; there is no access revocation or participant identity verification.
 
 ## Signaling: `/signal`

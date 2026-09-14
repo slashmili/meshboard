@@ -170,10 +170,20 @@ export class MeshSession {
     peer.channel = channel
     channel.bufferedAmountLowThreshold = 64 * 1024
     channel.onbufferedamountlow = () => this.flush(id, peer)
-    channel.onopen = () => {
+    let initialized = false
+    const opened = () => {
+      if (initialized || this.peers.get(id) !== peer) return
+      initialized = true
       clearTimeout(peer.timeout)
       this.attempts.set(id, 0)
-      this.send(id, peer, this.document.snapshot())
+      // Finish incoming-channel setup before sending. Chromium can otherwise leave
+      // bufferedAmount stuck at the bytes sent during the opening event, preventing
+      // large snapshots from resuming after the first backpressure limit.
+      const timer = setTimeout(() => {
+        this.timers.delete(timer)
+        if (this.peers.get(id) === peer) this.send(id, peer, this.document.snapshot())
+      }, 0)
+      this.timers.add(timer)
       void this.updateRoute(peer)
       this.report({ error: null })
     }
@@ -194,6 +204,9 @@ export class MeshSession {
     }
     channel.onclose = () => this.failPeer(id, peer)
     channel.onerror = () => this.failPeer(id, peer)
+    channel.onopen = opened
+    // An incoming channel can already be open when its datachannel event is handled.
+    if (channel.readyState === 'open') opened()
   }
 
   private send(id: string, peer: Peer, message: BoardMessage) {

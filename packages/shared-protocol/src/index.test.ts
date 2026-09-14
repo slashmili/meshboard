@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { boardMessageSchema, clientSignalSchema, elementSchema } from './index'
+import fixtures from '../fixtures/board-messages.json'
+
+describe('shared TypeScript/Kotlin fixtures', () => {
+  for (const [index, message] of fixtures.valid.entries()) {
+    it(`accepts valid fixture ${index}`, () => expect(boardMessageSchema.safeParse(message).success).toBe(true))
+  }
+  for (const [index, message] of fixtures.invalid.entries()) {
+    it(`rejects invalid fixture ${index}`, () => expect(boardMessageSchema.safeParse(message).success).toBe(false))
+  }
+})
 
 describe('protocol boundaries', () => {
   const element = { id: 'shape-1', type: 'pen', color: '#293b36', width: 3, points: [{ x: 1, y: 2 }] }

@@ -3,7 +3,7 @@
 A session-only whiteboard, working toward peer-to-peer collaboration on web,
 mobile, and desktop. Product requirements live in [AGENTS.md](AGENTS.md).
 
-## Current checkpoint: 02 — shared web boards
+## Current checkpoint: 03 — web ↔ Linux desktop
 
 This is part of Phase 1, **not** the Phase 1 exit milestone. You can
 draw with a pen, erase whole objects, create rectangles/ellipses/lines, choose
@@ -20,13 +20,13 @@ opening the same link afterward starts empty. An unshared board stays local.
 
 This is a **connection prototype**: WebRTC encrypts transport with DTLS, but
 invites are not authenticated and application-layer encryption is not implemented.
-Use test drawings. Yjs/yrs, native apps, export, undo, and production security are
+Use test drawings. Yjs/yrs, mobile apps, export, undo, and production security are
 still pending. There are no accounts, analytics, or board persistence.
 
 ## Run
 
-Use Node 22.12+ and pnpm 9 (configured in the existing `mise.toml`). Only the
-web tools are needed for this checkpoint; Java/Kotlin/Rust can wait.
+Use Node 22.12+ and pnpm 9 (configured in the existing `mise.toml`). The desktop
+app additionally needs JDK 21; its Gradle wrapper downloads the build tools.
 
 ```sh
 mise install node pnpm
@@ -57,6 +57,9 @@ pnpm check       # TypeScript
 pnpm test        # Protocol, signaling, document, framing, and geometry tests
 pnpm build      # TypeScript + production bundle
 pnpm test:e2e    # Browser tests, including real relay-only connections; run pnpm turn first
+pnpm native      # Launch the Kotlin Multiplatform / Compose desktop app (Linux x86_64)
+pnpm test:native # Kotlin model, shared wire fixtures, and Compose UI tests
+pnpm test:interop # Real JVM/libwebrtc ↔ Chromium tests; run pnpm turn first
 ```
 
 To install the test browser: `pnpm --filter @meshboard/web exec playwright install chromium`.
@@ -65,15 +68,24 @@ existing Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 
 ## Try this checkpoint
 
-1. Draw something, select **Share**, and copy the invite into another tab/browser.
-2. Wait for **1 peer connected**. The second peer should see your existing drawing.
-3. Draw from both sides. Unfinished strokes appear faintly on the other peer,
-   then become solid when finished. Try shapes and erasing too.
-4. Clear the board from either peer. This removes the objects currently visible
+1. Keep `pnpm dev` and `pnpm turn` running, then launch `pnpm native`.
+2. Draw in the browser, select **Share**, and copy the invite. In the desktop
+   window, select **Join**, paste the full link, and select **Join board**.
+3. Wait for **1 peer connected**. Try drawing, shapes, and erasing from both sides.
+   Unfinished strokes appear faintly on the other peer, then become solid.
+4. Also try creating from desktop: leave the current board, draw locally, select
+   **Share → Create invite**, and open its link in the browser. Both platforms can create.
+5. Clear the board from either peer. This removes the objects currently visible
    to that peer for everyone. A concurrently drawn, unseen object may survive.
-5. Join a third tab and close the creator's tab. The remaining two can keep drawing.
+6. Join a third peer and close the creator. The remaining two can keep drawing.
    Refresh one while the other stays open; its drawing should return.
-6. Leave every shared tab, then reopen the invite. The board should be empty.
+7. Leave every shared peer, then reopen the invite. The board should be empty.
+
+Desktop uses **Compose on the JVM**, with native libwebrtc accessed through Java
+bindings. It is not a Kotlin/Native machine-code executable. The app bundle includes
+a Java runtime. Only Linux x86_64 is wired and validated at this checkpoint;
+macOS, Windows, Android, and iOS remain the next platform checkpoints.
+See [desktop setup and architecture](packages/native/README.md).
 
 Scroll or use the hand tool to pan. Ctrl/⌘ + scroll zooms around the pointer;
 the +/− buttons zoom around the canvas center. Two-finger touch gestures pan
@@ -93,6 +105,11 @@ packages/web/                React + TypeScript + Vite
   e2e/                      Canvas and shared-session browser tests
 packages/signaling/          WebSocket membership/SDP/ICE relay; no board state
 packages/shared-protocol/    Versioned Phase 1 schemas and protocol notes
+  fixtures/                 Messages accepted/rejected by both TypeScript and Kotlin
+packages/native/             Kotlin Multiplatform + Compose desktop (JVM)
+  src/commonMain/           Drawing model, protocol, controller contract, and UI
+  src/desktopMain/          Native libwebrtc transport, QR encoding, and JVM entry point
+packages/web/interop/        Browser ↔ real desktop transport tests
 infra/turn/dev.conf          Loopback-only Coturn configuration
 scripts/turn.mjs             Local TURN container launcher
 docs/checkpoints.md          Incremental delivery and manual review gates
@@ -126,8 +143,8 @@ temporary insert/delete protocol is **not Yjs or y-webrtc compatible**; Phase 2
 replaces it. Network reconnection performs a fresh state exchange, but prolonged
 partitions and cross-platform convergence remain Phase 2 validation work.
 
-The next checkpoint introduces `packages/native` and a web ↔ native desktop
-session. See [protocol notes](packages/shared-protocol/README.md).
+The next checkpoint expands native platform coverage. See
+[delivery checkpoints](docs/checkpoints.md) and [protocol notes](packages/shared-protocol/README.md).
 
 Tooling references: [Vite guide](https://vite.dev/guide/) and
 [React documentation](https://react.dev/learn).

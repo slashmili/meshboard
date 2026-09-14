@@ -11,6 +11,9 @@
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @meshboard/web test:e2e",
     "turn": "node scripts/turn.mjs",
-    "signaling": "pnpm --filter @meshboard/signaling start"
+    "signaling": "pnpm --filter @meshboard/signaling start",
+    "native": "./packages/native/gradlew -p packages/native run",
+    "test:native": "./packages/native/gradlew -p packages/native desktopTest",
+    "test:interop": "./packages/native/gradlew -p packages/native prepareInterop && pnpm --filter @meshboard/web exec playwright test -c playwright.native.config.ts"
   }
 }
