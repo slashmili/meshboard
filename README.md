@@ -3,12 +3,13 @@
 A session-only whiteboard, working toward peer-to-peer collaboration on web,
 mobile, and desktop. Product requirements live in [AGENTS.md](AGENTS.md).
 
-## Current checkpoint: 04a — Android local canvas
+## Current checkpoint: 04b — Android peer connections
 
-The web ↔ Linux desktop checkpoint is accepted. The next runnable increment adds
-an Android touch canvas using the shared Kotlin model: pen, shapes, eraser,
-colors/widths, and two-finger pan/zoom. It is local only; Android peer connections
-come after this review. See [Android setup and controls](packages/native/androidApp/README.md).
+The Android local canvas is accepted. Android now creates and joins shared boards
+with web and Linux desktop, including link/QR creation, live drawing previews,
+late-join snapshots, and TURN fallback. Its touch canvas retains pen, shapes,
+eraser, colors/widths, and two-finger pan/zoom.
+See [Android setup and controls](packages/native/androidApp/README.md).
 
 With the local Android emulator running, use `pnpm android` to build, install,
 and open the app. `pnpm test:android` runs its emulator tests. The existing web and
@@ -29,7 +30,7 @@ opening the same link afterward starts empty. An unshared board stays local.
 
 This is a **connection prototype**: WebRTC encrypts transport with DTLS, but
 invites are not authenticated and application-layer encryption is not implemented.
-Use test drawings. Yjs/yrs, mobile apps, export, undo, and production security are
+Use test drawings. Yjs/yrs, iOS, export, undo, and production security are
 still pending. There are no accounts, analytics, or board persistence.
 
 ## Run
@@ -60,6 +61,8 @@ computer's `127.0.0.1` address, even via QR code. Other devices need a reachable
 HTTPS app origin, WSS signaling, and a TURN server reachable by all participants.
 Simply exposing HTTP on a LAN address is insufficient for secure-context browser
 APIs used by this app.
+The debug Android app in a local emulator translates loopback destinations to
+the emulator's host alias automatically; the same invite works there too.
 
 ```sh
 pnpm check       # TypeScript
@@ -69,6 +72,9 @@ pnpm test:e2e    # Browser tests, including real relay-only connections; run pnp
 pnpm native      # Launch the Kotlin Multiplatform / Compose desktop app (Linux x86_64)
 pnpm test:native # Kotlin model, shared wire fixtures, and Compose UI tests
 pnpm test:interop # Real JVM/libwebrtc ↔ Chromium tests; run pnpm turn first
+pnpm android     # Build, install, and launch in the running Android emulator
+pnpm test:android # Android touch and invite UI tests
+pnpm test:interop:android # Android ↔ web ↔ desktop; run pnpm turn first
 ```
 
 To install the test browser: `pnpm --filter @meshboard/web exec playwright install chromium`.
@@ -77,13 +83,14 @@ existing Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 
 ## Try this checkpoint
 
-1. Keep `pnpm dev` and `pnpm turn` running, then launch `pnpm native`.
-2. Draw in the browser, select **Share**, and copy the invite. In the desktop
-   window, select **Join**, paste the full link, and select **Join board**.
+1. Keep `pnpm dev` and `pnpm turn` running, then launch `pnpm android` with the
+   emulator running. Optionally launch `pnpm native` for a desktop participant.
+2. Draw in the browser, select **Share**, and copy the invite. In Android (or desktop),
+   select **Join**, paste the full link, and select **Join board**.
 3. Wait for **1 peer connected**. Try drawing, shapes, and erasing from both sides.
    Unfinished strokes appear faintly on the other peer, then become solid.
-4. Also try creating from desktop: leave the current board, draw locally, select
-   **Share → Create invite**, and open its link in the browser. Both platforms can create.
+4. Also try creating from Android: leave the current board, draw locally, select
+   **Share → Create invite**, and open its link in the browser. All three platforms can create.
 5. Clear the board from either peer. This removes the objects currently visible
    to that peer for everyone. A concurrently drawn, unseen object may survive.
 6. Join a third peer and close the creator. The remaining two can keep drawing.
@@ -93,7 +100,8 @@ existing Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 Desktop uses **Compose on the JVM**, with native libwebrtc accessed through Java
 bindings. It is not a Kotlin/Native machine-code executable. The app bundle includes
 a Java runtime. Only Linux x86_64 is wired and validated at this checkpoint;
-macOS, Windows, iOS, and Android networking remain later platform checkpoints.
+macOS, Windows, and iOS remain later platform checkpoints. Android networking is
+validated on the local Android 15 x86_64 emulator, not yet on physical hardware.
 See [desktop setup and architecture](packages/native/README.md).
 
 Scroll or use the hand tool to pan. Ctrl/⌘ + scroll zooms around the pointer;
@@ -118,7 +126,8 @@ packages/shared-protocol/    Versioned Phase 1 schemas and protocol notes
 packages/native/             Kotlin Multiplatform + Compose desktop (JVM)
   src/commonMain/           Drawing model, protocol, controller contract, and UI
   src/desktopMain/          Native libwebrtc transport, QR encoding, and JVM entry point
-packages/web/interop/        Browser ↔ real desktop transport tests
+  androidApp/              Android activity, libwebrtc transport, and instrumented tests
+packages/web/interop/        Browser ↔ real desktop/Android transport tests
 infra/turn/dev.conf          Loopback-only Coturn configuration
 scripts/turn.mjs             Local TURN container launcher
 docs/checkpoints.md          Incremental delivery and manual review gates

@@ -4,13 +4,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalTestApi::class)
 class CanvasTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    // Queue UI work: the default unconfined dispatcher can run a remeasure on the
+    // session executor when its StateFlow emits while Android is laying out.
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>(effectContext = StandardTestDispatcher())
     private fun canvas() = rule.onNodeWithTag("mobile-canvas")
-    private fun count(value: Int) = canvas().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "$value objects"))
+    private fun count(value: Int) {
+        rule.waitUntil(5000) { canvas().fetchSemanticsNode().config[SemanticsProperties.StateDescription] == "$value objects" }
+    }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
     @Test fun drawShapesEraseAndConfirmClear() {
@@ -52,5 +58,18 @@ class CanvasTest {
         rule.onNodeWithTag("mobile-help").performClick()
         rule.onNodeWithText("Back to the board").performClick()
         count(1)
+    }
+
+    @Test fun sharingControlsValidateInvitesWithoutDiscardingDrawing() {
+        draw(); count(1)
+        rule.onNodeWithTag("mobile-share").performClick()
+        rule.onNodeWithTag("mobile-app-address").assertTextContains("http://127.0.0.1:5173")
+        rule.onNodeWithText("Done").performClick()
+        rule.onNodeWithTag("mobile-join").performClick()
+        rule.onNodeWithTag("mobile-invite-input").performTextInput("https://example.com/#room=invalid")
+        rule.onNodeWithTag("mobile-confirm-join").performClick()
+        count(1)
+        rule.waitUntil(5000) { rule.onAllNodesWithText("This invite has an invalid room ID.").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("mobile-connection-status").assertTextEquals("Local only")
     }
 }

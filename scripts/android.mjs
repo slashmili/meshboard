@@ -7,8 +7,8 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const sdk = process.env.ANDROID_HOME || resolve(root, '.android-sdk')
 const windows = process.platform === 'win32'
 const mode = process.argv[2] ?? 'run'
-const tasks = { build: ':androidApp:assembleDebug', test: ':androidApp:connectedDebugAndroidTest', run: ':androidApp:installDebug' }
-if (!(mode in tasks)) throw new Error('Usage: node scripts/android.mjs [build|test|run]')
+const tasks = { build: [':androidApp:assembleDebug'], test: [':androidApp:connectedDebugAndroidTest'], run: [':androidApp:installDebug'], interop: [':androidApp:installDebug', ':androidApp:installDebugAndroidTest', 'prepareInterop'] }
+if (!(mode in tasks)) throw new Error('Usage: node scripts/android.mjs [build|test|run|interop]')
 if (!existsSync(join(sdk, 'platforms/android-35/android.jar'))) throw new Error('Install Android SDK platform 35 and set ANDROID_HOME. See packages/native/androidApp/README.md.')
 const env = { ...process.env, ANDROID_HOME: sdk }
 function run(command, args) {
@@ -25,5 +25,6 @@ if (mode !== 'build') {
   // Gradle's connected tests run on all devices; require an unambiguous test target.
   if (online.length !== 1) throw new Error('Keep only the intended test device connected for this command.')
 }
-run(join(root, 'packages/native', windows ? 'gradlew.bat' : 'gradlew'), ['-p', 'packages/native', '-Pmeshboard.android=true', tasks[mode]])
+run(join(root, 'packages/native', windows ? 'gradlew.bat' : 'gradlew'), ['-p', 'packages/native', '-Pmeshboard.android=true', ...tasks[mode]])
 if (mode === 'run') run(adb, ['-s', serial, 'shell', 'am', 'start', '-n', 'dev.meshboard.android/.MainActivity'])
+if (mode === 'interop') run('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.android.config.ts', ...process.argv.slice(3)])

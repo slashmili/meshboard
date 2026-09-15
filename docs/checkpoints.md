@@ -24,14 +24,22 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    this checkpoint by platform where useful. This completes Phase 1 only once
    all its platform and connectivity requirements are met.
 
-   **4a — Android local canvas, current checkpoint.** Share the Kotlin drawing
+   **4a — Android local canvas, accepted.** Share the Kotlin drawing
    model and wire codec; add a touch layout with pen, shapes, whole-object erasing,
    color/width controls, two-finger pan/zoom, and clear confirmation. Keep the board
    in a ViewModel across screen recreation. Build and test on a local Android 15
    emulator, then pause for drawing feedback. No Android sharing yet.
 
-   **4b — Android peer connections, next.** Add Android libwebrtc and signaling,
-   link/QR creation and joining, web/desktop interoperability, and actual TURN tests.
+   **4b — Android peer connections, current checkpoint.** Android libwebrtc and
+   signaling, link/QR creation, joining by pasted invite, and web/desktop full-mesh
+   interoperability. Emulator tests cover bidirectional drawing/previews/erasing,
+   large snapshots, creator departure/rejoin, and actual relay-only TURN traffic.
+   Pause for the user to try sharing in the local Android emulator. QR camera
+   scanning/deep links and physical-device validation remain pending.
+
+   **4c — Remaining platform validation, next.** Choose the next available target
+   with the user. iOS/macOS need a Mac/Xcode environment; Windows needs Windows
+   build/runtime validation. Physical Android testing can be a separate checkpoint.
 
 ## Phase 2
 

@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +35,7 @@ private fun mobilePaint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16
 
 /** Touch layout shared by mobile targets; transport is deliberately independent. */
 @Composable
-fun MobileBoardApp(controller: DrawingController) {
+fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https://", qrImage: (String) -> ImageBitmap) {
     val state by controller.state.collectAsState()
     val latest by rememberUpdatedState(state)
     var toolName by rememberSaveable { mutableStateOf(Tool.Pen.name) }
@@ -46,6 +48,10 @@ fun MobileBoardApp(controller: DrawingController) {
     var widthMenu by remember { mutableStateOf(false) }
     var cancelled by remember { mutableIntStateOf(0) }
     var canvasSize by remember { mutableStateOf(Size.Zero) }
+    var origin by remember { mutableStateOf(defaultOrigin) }
+    var inviteInput by remember { mutableStateOf("") }
+    var copied by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     val density = LocalDensity.current.density.toDouble()
     fun cancel() { draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2, canvasSize.height / density / 2), view.zoom * factor) }
@@ -55,11 +61,15 @@ fun MobileBoardApp(controller: DrawingController) {
             Row(Modifier.fillMaxWidth().height(60.dp).background(Color.White).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("meshboard.", color = MobileGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                Text("Local only", fontSize = 11.sp, color = MobileMuted)
                 TextButton(onClick = { cancel(); dialog = "clear" }, enabled = state.elements.isNotEmpty(), modifier = Modifier.testTag("mobile-clear")) { Text("Clear") }
                 TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.testTag("mobile-help")) { Text("Help") }
             }
             HorizontalDivider(color = MobileBorder)
+            Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(state.connectionLabel, Modifier.weight(1f).testTag("mobile-connection-status"), fontSize = 12.sp, color = MobileGreen)
+                TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.testTag("mobile-join")) { Text("Join") }
+                TextButton(onClick = { cancel(); copied = false; dialog = "share" }, modifier = Modifier.testTag("mobile-share")) { Text("Share") }
+            }
             Row(Modifier.fillMaxWidth().background(Color.White).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 Tool.entries.forEach { item ->
                     val label = when (item) { Tool.Rectangle -> "Rect"; Tool.Ellipse -> "Oval"; else -> item.label }
@@ -168,6 +178,7 @@ fun MobileBoardApp(controller: DrawingController) {
                     }
                     withTransform({ scale(d, d, Offset.Zero); translate(view.x.toFloat(), view.y.toFloat()); scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero) }) {
                         state.elements.forEach { mobileElement(it) }
+                        state.previews.forEach { mobileElement(it, .65f) }
                         draft?.let { mobileElement(it) }
                     }
                 }
@@ -188,19 +199,53 @@ fun MobileBoardApp(controller: DrawingController) {
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { cancel(); view = View() }) { Text("Reset view", fontSize = 12.sp) }
             }
-            Text("Local canvas · sharing comes next", Modifier.fillMaxWidth().background(Color.White).padding(start = 16.dp, bottom = 8.dp), color = MobileMuted, fontSize = 10.sp)
+            Text(if (state.invite.isEmpty()) "Session-only canvas · not saved" else if (state.relayed > 0) "VIA RELAY · prototype / unverified peers" else "WebRTC · prototype / unverified peers",
+                Modifier.fillMaxWidth().background(Color.White).padding(start = 16.dp, bottom = 8.dp).testTag("mobile-connection-route"), color = MobileMuted, fontSize = 10.sp)
         }
-        if (dialog == "clear") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Clear this board?") }, text = { Text("Remove every object? There’s no undo in this version.") },
+        if (dialog == "clear") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Clear this board?") }, text = { Text("Remove every object${if (state.invite.isNotEmpty()) " for everyone" else ""}? There’s no undo in this version.") },
             confirmButton = { Button(onClick = { controller.remove(state.elements.map { it.id }); dialog = null }, modifier = Modifier.testTag("mobile-confirm-clear")) { Text("Clear board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
         if (dialog == "help") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A little space for ideas") }, text = {
-            Text("Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nThis first Android checkpoint is local only. Rotating keeps your board, but closing the activity or the system ending the app can discard it. Sharing, export, and saving are not available yet.")
+            Text("Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nConnection prototype: WebRTC transport encryption only. Invites and peers are not authenticated; application encryption comes later. Don’t use for sensitive content.")
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
+        if (dialog == "join") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Join a board") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Joining replaces your current canvas. Paste the full invite, including #room=…")
+                OutlinedTextField(inviteInput, { inviteInput = it }, label = { Text("Board invite") }, modifier = Modifier.testTag("mobile-invite-input"))
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        }, confirmButton = { Button(enabled = inviteInput.isNotBlank(), onClick = { controller.join(inviteInput); view = View(); dialog = null }, modifier = Modifier.testTag("mobile-confirm-join")) { Text("Join board") } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
+        if (dialog == "share") AlertDialog(onDismissRequest = { dialog = null }, title = { Text(if (state.invite.isEmpty()) "Share this board" else "Invite someone") }, text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (state.invite.isEmpty()) {
+                    Text("Your drawing stays on this board. Use the address of your running Meshboard web app.")
+                    OutlinedTextField(origin, { origin = it }, label = { Text("App address") }, modifier = Modifier.testTag("mobile-app-address"))
+                    Text("In the local emulator, the default address connects to this computer.", fontSize = 12.sp)
+                    Button(onClick = { controller.share(origin) }, modifier = Modifier.testTag("mobile-create-invite")) { Text("Create invite") }
+                } else {
+                    val qr = remember(state.invite) { qrImage(state.invite) }
+                    Image(qr, "Board invite QR code", Modifier.size(180.dp))
+                    OutlinedTextField(state.invite, {}, readOnly = true, label = { Text("Board invite") }, modifier = Modifier.testTag("mobile-board-invite"))
+                    Button(onClick = { clipboard.setText(AnnotatedString(state.invite)); copied = true }) { Text(if (copied) "Copied" else "Copy invite") }
+                    Text(state.connectionLabel, fontSize = 12.sp)
+                    Row {
+                        TextButton(onClick = { controller.retry() }) { Text("Retry") }
+                        TextButton(onClick = { dialog = "leave" }) { Text("Leave board") }
+                    }
+                }
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Text("Prototype: transport encryption only; peers are not authenticated. Don’t share sensitive content.", fontSize = 12.sp)
+            }
+        }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
+        if (dialog == "leave") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Leave this board?") }, text = { Text("Your local copy will be discarded. Other connected participants can keep drawing.") },
+            confirmButton = { Button(onClick = { controller.leave(); view = View(); dialog = null }) { Text("Leave board") } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
     }
 }
 
-private fun DrawScope.mobileElement(element: BoardElement) {
-    val color = mobilePaint(element.color)
+private fun DrawScope.mobileElement(element: BoardElement, alpha: Float = 1f) {
+    val color = mobilePaint(element.color).copy(alpha = alpha)
     val a = element.points.first(); val b = element.points.last()
     if (element.points.size == 1) { drawCircle(color, element.width.toFloat() / 2, Offset(a.x.toFloat(), a.y.toFloat())); return }
     val style = Stroke(element.width.toFloat(), cap = StrokeCap.Round, join = StrokeJoin.Round)
