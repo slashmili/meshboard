@@ -69,8 +69,8 @@ export function App() {
     <main className="app">
       <header className="header">
         <div className="brand" aria-label="Meshboard">
-          <svg className="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="11" /><path d="M9 25V12l9 9 9-9v13" /></svg>
-          <span>meshboard<span className="brand-dot">.</span></span>
+          <img className="brand-mark" src="/meshboard-icon.svg" alt="" data-testid="brand-logo" />
+          <span>Meshboard</span>
         </div>
         <span className="header-divider" />
         <div className="board-title">Untitled board <span>A space for ideas</span></div>

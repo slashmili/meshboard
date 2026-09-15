@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vector translation of icons/meshboard-mark.svg, inset for the adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="1024" android:viewportHeight="1024">
+    <group android:scaleX="0.84" android:scaleY="0.84" android:pivotX="512" android:pivotY="512">
+        <path android:pathData="M278,310 L278,675 M278,310 L512,520 L746,310 M278,675 L512,520 L746,675 M746,310 L746,675"
+            android:fillColor="@android:color/transparent" android:strokeWidth="34" android:strokeLineCap="round" android:strokeLineJoin="round">
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="278" android:startY="0" android:endX="746" android:endY="0">
+                    <item android:offset="0" android:color="#31d7f3" />
+                    <item android:offset="0.45" android:color="#4d8cff" />
+                    <item android:offset="0.55" android:color="#7776ff" />
+                    <item android:offset="1" android:color="#bc49f4" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M233,310 A45,45 0,1 0,323 310 A45,45 0,1 0,233 310 Z M233,675 A45,45 0,1 0,323 675 A45,45 0,1 0,233 675 Z M469,520 A43,43 0,1 0,555 520 A43,43 0,1 0,469 520 Z M701,310 A45,45 0,1 0,791 310 A45,45 0,1 0,701 310 Z M701,675 A45,45 0,1 0,791 675 A45,45 0,1 0,701 675 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="278" android:startY="0" android:endX="746" android:endY="0">
+                    <item android:offset="0" android:color="#31d7f3" />
+                    <item android:offset="0.45" android:color="#4d8cff" />
+                    <item android:offset="0.55" android:color="#7776ff" />
+                    <item android:offset="1" android:color="#bc49f4" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>

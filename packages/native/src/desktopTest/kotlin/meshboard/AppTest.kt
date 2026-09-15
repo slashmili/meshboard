@@ -39,6 +39,8 @@ class AppTest {
     }
     @Test fun drawingToolsAndEraserWorkThroughPointerInput() {
         val controller = LocalController(); render(controller)
+        rule.onNodeWithText("Meshboard", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Meshboard logo").assertIsDisplayed()
         drag()
         rule.runOnIdle { assertEquals("pen", controller.state.value.elements.single().type) }
         rule.onNodeWithTag("tool-rectangle").performClick(); drag()

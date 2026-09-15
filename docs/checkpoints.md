@@ -35,7 +35,8 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    interoperability. Emulator tests cover bidirectional drawing/previews/erasing,
    large snapshots, creator departure/rejoin, and actual relay-only TURN traffic.
    Sharing accepted by the user; current follow-up is a compact Android header
-   with Clear/Help in an overflow menu. Pause for layout feedback. QR camera
+   with Clear/Help in an overflow menu and the supplied Meshboard branding on
+   web, desktop, and Android. Pause for visual feedback. QR camera
    scanning/deep links and physical-device validation remain pending.
 
    **4c — Remaining platform validation, next.** Choose the next available target

@@ -18,10 +18,7 @@ button:disabled:hover { background: transparent; }
 .app { height: 100dvh; min-height: 400px; display: flex; flex-direction: column; overflow: hidden; }
 .header { height: 80px; flex: 0 0 auto; display: flex; align-items: center; padding: 0 28px; gap: 27px; background: #fff; border-bottom: 1px solid #e3e7df; z-index: 2; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #264331; font-weight: 750; font-size: 24px; letter-spacing: -1.15px; }
-.brand-dot { color: #92ad6c; }
-.brand-mark { width: 36px; height: 36px; }
-.brand-mark rect { fill: #254d3c; }
-.brand-mark path { fill: none; stroke: #d8f29a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.brand-mark { width: 36px; height: 36px; flex-shrink: 0; }
 .header-divider { height: 29px; width: 1px; background: #e6e9e3; }
 .board-title { font-size: 13px; font-weight: 600; line-height: 1.6; }
 .board-title > span { display: block; color: #8a938a; font-weight: 400; font-size: 11px; }

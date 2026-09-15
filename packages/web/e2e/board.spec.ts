@@ -13,6 +13,12 @@ test('pen, colors, widths, shapes, erasing, and clear confirmation', async ({ pa
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
+  await expect(page.locator('.brand')).toHaveText('Meshboard')
+  await expect(page.getByTestId('brand-logo')).toBeVisible()
+  await expect.poll(() => page.getByTestId('brand-logo').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0)
+  const favicon = await page.locator('link[rel="icon"]').getAttribute('href')
+  expect(favicon).toBe('/meshboard-icon.svg')
+  expect((await page.request.get(favicon!)).ok()).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('desktop.png') })
   await page.getByRole('radio', { name: 'Blue', exact: true }).click()
   await page.getByRole('radio', { name: 'Bold stroke' }).click()

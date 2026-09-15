@@ -70,8 +70,8 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             if (next != null) { cancel(); tool = next; true } else false
         }) {
             Row(Modifier.fillMaxWidth().height(76.dp).background(Color.White).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.size(36.dp).background(Green, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) { Text("M", color = Color(0xffd8f29a), fontSize = 23.sp, fontWeight = FontWeight.Medium) }
-                Text("meshboard.", color = Green, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                MeshboardLogo(Modifier.size(36.dp))
+                Text("Meshboard", color = Green, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 VerticalDivider(Modifier.height(28.dp))
                 Column { Text("Untitled board", fontSize = 13.sp, fontWeight = FontWeight.Medium); Text("Desktop · a space for ideas", color = Muted, fontSize = 10.sp) }
                 Spacer(Modifier.weight(1f))

@@ -25,6 +25,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            implementation(compose.components.resources)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
         }
@@ -54,15 +55,32 @@ if (androidEnabled) extensions.configure<com.android.build.gradle.LibraryExtensi
     }
 }
 
+// Keep the supplied PNG in icons/ as the single source for native UI resources.
+val prepareBranding by tasks.registering(Sync::class) {
+    from(rootProject.file("../../icons/meshboard-icon-1024.png")) {
+        into("drawable")
+        rename { "meshboard_icon.png" }
+    }
+    into(layout.buildDirectory.dir("generated/branding"))
+}
+compose.resources {
+    packageOfResClass = "meshboard.resources"
+    customDirectory(sourceSetName = "commonMain", directoryProvider = prepareBranding.map { layout.buildDirectory.dir("generated/branding").get() })
+}
+
 compose.desktop {
     application {
         mainClass = "meshboard.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Deb)
-            packageName = "meshboard"
+            packageName = "Meshboard"
             packageVersion = "0.1.0"
             description = "A session-only collaborative whiteboard"
             vendor = "Meshboard"
+            linux {
+                packageName = "meshboard" // Debian package identifiers stay lowercase.
+                iconFile.set(rootProject.file("../../icons/meshboard-icon-1024.png"))
+            }
             modules("java.net.http", "jdk.unsupported", "java.desktop", "java.logging")
         }
     }

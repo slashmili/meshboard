@@ -62,8 +62,8 @@ stdin/stdout adapter, against the real browser app. The adapter is not packaged.
 Compose tests exercise drawing and invite controls and save a layout image to
 `build/test-artifacts/desktop-board.png`.
 
-The generated application folder is `build/compose/binaries/main/app/meshboard/`.
-Run `bin/meshboard` inside it. The entire folder, including its bundled runtime and
+The generated application folder is `build/compose/binaries/main/app/Meshboard/`.
+Run `bin/Meshboard` inside it. The entire folder, including its bundled runtime and
 libraries, must stay together. Native installers and other OS builds are separate
 checkpoints; the current WebRTC artifact is explicitly Linux x86_64.
 
@@ -82,6 +82,14 @@ The desktop controller serializes document changes and JNI operations on its own
 executor. Native callbacks copy borrowed buffers and enqueue work before returning.
 Each peer has a reliable ordered data channel, bounded send queue, initial snapshot,
 live previews, and connection retries. Board payloads never use the signaling socket.
+
+Branding comes from the supplied root `icons/` assets. Gradle packages the PNG
+as a shared Compose resource for desktop/Android headers and uses it for the
+desktop window and Linux distribution icon. Android's adaptive launcher layers
+are vector translations of the supplied SVG gradients and mark, with safe-zone
+insets; update those XML drawables if the source artwork changes. The Android
+header remains 52 dp tall at the default font size. Display names use **Meshboard**;
+package IDs and the wire protocol remain lowercase and unchanged.
 
 References: [Compose Desktop](https://github.com/JetBrains/compose-multiplatform),
 [webrtc-java](https://github.com/devopvoid/webrtc-java),

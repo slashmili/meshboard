@@ -61,8 +61,10 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
     MaterialTheme(colorScheme = lightColorScheme(primary = MobileGreen, onPrimary = Color.White, surface = Color.White, onSurface = MobileInk, background = MobilePaper, outline = MobileBorder)) {
         Column(Modifier.fillMaxSize().background(MobilePaper)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).background(Color.White).padding(start = 16.dp, end = 4.dp).testTag("mobile-header"), verticalAlignment = Alignment.CenterVertically) {
+                MeshboardLogo(Modifier.size(28.dp))
+                Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
-                    Text("meshboard.", color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Meshboard", color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(state.connectionLabel, Modifier.testTag("mobile-connection-status"), fontSize = 10.sp, lineHeight = 14.sp, color = MobileMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-join"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Join", fontSize = 13.sp) }

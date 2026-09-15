@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="mesh" x1="278" y1="0" x2="746" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#31d7f3"/>
+      <stop offset="45%" stop-color="#4d8cff"/>
+      <stop offset="55%" stop-color="#7776ff"/>
+      <stop offset="100%" stop-color="#bc49f4"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#mesh)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M278 310 L278 675"/>
+    <path d="M278 310 L512 520 L746 310"/>
+    <path d="M278 675 L512 520 L746 675"/>
+    <path d="M746 310 L746 675"/>
+  </g>
+  <g fill="url(#mesh)">
+    <circle cx="278" cy="310" r="45"/>
+    <circle cx="278" cy="675" r="45"/>
+    <circle cx="512" cy="520" r="43"/>
+    <circle cx="746" cy="310" r="45"/>
+    <circle cx="746" cy="675" r="45"/>
+  </g>
+</svg>

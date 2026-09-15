@@ -128,6 +128,7 @@ packages/native/             Kotlin Multiplatform + Compose desktop (JVM)
   src/desktopMain/          Native libwebrtc transport, QR encoding, and JVM entry point
   androidApp/              Android activity, libwebrtc transport, and instrumented tests
 packages/web/interop/        Browser ↔ real desktop/Android transport tests
+icons/                      Supplied Meshboard artwork; web public assets and native icon source
 infra/turn/dev.conf          Loopback-only Coturn configuration
 scripts/turn.mjs             Local TURN container launcher
 docs/checkpoints.md          Incremental delivery and manual review gates

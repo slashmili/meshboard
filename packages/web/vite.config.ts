@@ -18,5 +18,5 @@ export default defineConfig(({ mode }) => {
       server.httpServer.on('close', relay.close)
     },
   }
-  return { plugins: [react(), signaling], server: { port: 5173, strictPort: true } }
+  return { publicDir: '../../icons', plugins: [react(), signaling], server: { port: 5173, strictPort: true } }
 })

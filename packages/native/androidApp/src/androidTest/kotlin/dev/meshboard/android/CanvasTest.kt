@@ -78,6 +78,8 @@ class CanvasTest {
     }
 
     @Test fun compactHeaderKeepsSharingVisibleAndSecondaryActionsInMenu() {
+        rule.onNodeWithText("Meshboard").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Meshboard logo").assertIsDisplayed()
         rule.onNodeWithTag("mobile-header").assertHeightIsEqualTo(52.dp)
         rule.onNodeWithTag("mobile-join").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         rule.onNodeWithTag("mobile-share").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
