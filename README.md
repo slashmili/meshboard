@@ -194,3 +194,25 @@ Tooling references: [Vite guide](https://vite.dev/guide/) and
 [React documentation](https://react.dev/learn).
 Transport references: [WebRTC TURN setup](https://webrtc.org/getting-started/turn-server)
 and [Coturn configuration](https://github.com/coturn/coturn/blob/master/examples/etc/turnserver.conf).
+
+## License
+
+Meshboard is licensed under the [Mozilla Public License 2.0](LICENSE)
+(`MPL-2.0`). This applies to all first-party files in this repository, including
+the web and native apps, signaling server, shared protocol, scripts,
+configuration, documentation, and supplied artwork, unless a file explicitly
+states otherwise. For files without an inline notice, this is their license
+notice:
+
+> This Source Code Form is subject to the terms of the Mozilla Public
+> License, v. 2.0. If a copy of the MPL was not distributed with this
+> file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+Third-party code and dependencies retain their own licenses; this includes the
+Apache-2.0-licensed Gradle wrapper. Existing copyright and license notices must
+be preserved. MPL-2.0 does not grant trademark rights to the Meshboard name or logo.
+
+Licensing notices are kept here and in the root `LICENSE`; per-file headers are
+not required by this project's convention. When distributing binaries or
+minified web assets, provide recipients with the license notice and a way to
+obtain the matching MPL-covered source code, including any modifications.
