@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+APPIMAGE_BASE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$APPIMAGE_BASE/usr/lib/meshboard/bin/Meshboard" "$@"

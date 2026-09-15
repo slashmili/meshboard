@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Meshboard
+Comment=Collaborative session-only whiteboard
+Exec=Meshboard %U
+Icon=meshboard
+Categories=Graphics;
+Terminal=false
