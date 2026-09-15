@@ -1,0 +1,137 @@
+name: ${COMPOSE_PROJECT_NAME:-meshboard}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  signaling:
+    image: ${MESHBOARD_IMAGE_PREFIX:-meshboard}-signaling:${MESHBOARD_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infra/deploy/Dockerfile
+      target: signaling
+    # Linux host networking keeps TURN's relay addresses correct and leaves the
+    # signaling listener bound to loopback only. No Docker-published ports.
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    pids_limit: 128
+    environment:
+      HOST: 127.0.0.1
+      PORT: "4444"
+      MESHBOARD_TRUST_PROXY: "true"
+      MESHBOARD_TURN_SECRET: ${TURN_SECRET:?Set TURN_SECRET in the deployment env file}
+      MESHBOARD_TURN_TTL_SECONDS: ${TURN_TTL_SECONDS:-86400}
+      MESHBOARD_TURN_URLS: "turn:${TURN_DOMAIN:?Set TURN_DOMAIN}:3478?transport=udp,turn:${TURN_DOMAIN}:3478?transport=tcp,turns:${TURN_DOMAIN}:${TURN_TLS_PORT:-5349}?transport=tcp"
+      MESHBOARD_RELAY_ONLY: ${MESHBOARD_RELAY_ONLY:-false}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4444/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging: *logging
+
+  web:
+    image: ${MESHBOARD_IMAGE_PREFIX:-meshboard}-web:${MESHBOARD_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infra/deploy/Dockerfile
+      target: web
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 128
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+      TURN_DOMAIN: ${TURN_DOMAIN:?Set TURN_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+      WEB_BIND_IP: ${WEB_BIND_IP:-0.0.0.0}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - acme_webroot:/var/www/acme:ro
+    depends_on:
+      signaling:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8081/health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  turn:
+    image: docker.io/coturn/coturn:4.18.0-r0-alpine
+    network_mode: host
+    # Read Certbot's root-owned private key; no container capabilities except
+    # binding privileged ports (needed only for the optional second-IP :443).
+    user: "0:0"
+    entrypoint: [/bin/sh, /etc/coturn/start.sh]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    pids_limit: 256
+    environment:
+      TURN_SECRET: ${TURN_SECRET:?Set TURN_SECRET}
+      TURN_DOMAIN: ${TURN_DOMAIN:?Set TURN_DOMAIN}
+      TURN_PUBLIC_IP: ${TURN_PUBLIC_IP:?Set TURN_PUBLIC_IP to the public IPv4 assigned to the server}
+      TURN_TLS_PORT: ${TURN_TLS_PORT:-5349}
+      WEB_BIND_IP: ${WEB_BIND_IP:-0.0.0.0}
+      TURN_MIN_PORT: ${TURN_MIN_PORT:-49160}
+      TURN_MAX_PORT: ${TURN_MAX_PORT:-49259}
+      TURN_TOTAL_QUOTA: ${TURN_TOTAL_QUOTA:-100}
+      TURN_MAX_BPS: ${TURN_MAX_BPS:-1000000}
+      TURN_BPS_CAPACITY: ${TURN_BPS_CAPACITY:-20000000}
+    volumes:
+      - ./infra/deploy/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./infra/deploy/turn-start.sh:/etc/coturn/start.sh:ro
+      - turn_certs:/etc/letsencrypt:ro
+    # This probes the listener, not a real allocation; do the external relay
+    # acceptance test in docs/deployment.md before calling deployment healthy.
+    healthcheck:
+      test: [CMD-SHELL, 'nc -z -w 3 "$$TURN_PUBLIC_IP" "$$TURN_TLS_PORT"']
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging: *logging
+
+  certbot:
+    image: docker.io/certbot/certbot:v5.8.0
+    profiles: [tools]
+    volumes:
+      - acme_webroot:/var/www/acme
+      - turn_certs:/etc/letsencrypt
+      - ./infra/deploy/certbot.sh:/opt/certbot.sh:ro
+    environment:
+      TURN_DOMAIN: ${TURN_DOMAIN:?Set TURN_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    entrypoint: [/bin/sh, /opt/certbot.sh]
+    command: [issue]
+    # Work/log files need not survive; certificates and renewal config do.
+    tmpfs: [/var/lib/letsencrypt, /var/log/letsencrypt, /tmp]
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  acme_webroot:
+  turn_certs:
