@@ -22,6 +22,37 @@ For merge enforcement, select these checks in the repository's branch protection
 or ruleset after their first run. Running CI alone does not prevent merging a
 failed pull request.
 
+## CI caches
+
+- pnpm dependencies are cached by the Node setup action.
+- Gradle saves its downloaded dependencies, wrapper, compiled build scripts and
+  local task-output cache through `setup-gradle` in every job, including PRs.
+  CI enables Gradle's build cache; its configuration cache remains disabled.
+- The iOS job caches `~/.konan` (Kotlin/Native compiler, native dependencies and
+  compiler caches), keyed by OS, CPU architecture, Xcode/SDK builds and Gradle
+  configuration, including the Kotlin version.
+- The iOS job also caches `packages/native/build/SourcePackages`, matching the
+  Swift package checkout and binary-artifact directory used by `scripts/ios.mjs`.
+  Its key includes OS/architecture, Xcode/SDK builds, `Package.resolved` and the
+  Xcode project. Simulator and physical-device builds use that same directory.
+
+The first successful run populates the new iOS caches. Later runs of the same PR
+can restore them; a successful `main` run seeds caches that other branches and
+releases can read. GitHub isolates PR-created caches from `main`, releases and
+other PRs. No extra token permissions or repository secrets are needed.
+
+Cache keys invalidate when the relevant toolchain or dependency configuration
+changes. The iOS dependency caches deliberately have no broad fallback keys
+that could restore a different toolchain. Xcode DerivedData, simulator state,
+signing credentials and final app packages are not cached. Builds and tests still
+run through the same commands; cache hits do not bypass a workflow step, though
+Gradle can reuse cacheable task outputs with matching inputs. Cold builds,
+simulator boot and uncached work still take time, so compare the next two runs
+rather than expecting the first run to be faster.
+
+See [GitHub cache isolation](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache)
+and [Gradle action caching](https://github.com/gradle/actions/blob/v5/docs/setup-gradle.md#caching-build-state-between-jobs).
+
 ## Configure a deployment for release builds
 
 In GitHub, open **Settings → Secrets and variables → Actions → Variables** and
