@@ -112,7 +112,7 @@ class DesktopController(private val forceRelay: Boolean = false) : BoardControll
                     // Data only: do not open audio hardware or access microphone/camera.
                     audio = HeadlessAudioDeviceModule()
                     factory = PeerConnectionFactory(audio)
-                } catch (e: LinkageError) { report("Native WebRTC could not load. Check the Linux libraries listed in the README."); return@post }
+                } catch (e: LinkageError) { report("Native WebRTC could not load. Check the platform requirements in the native README."); return@post }
             }
             connectSocket(current)
         } }

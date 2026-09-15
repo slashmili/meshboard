@@ -3,17 +3,17 @@
 A session-only whiteboard, working toward peer-to-peer collaboration on web,
 mobile, and desktop. Product requirements live in [AGENTS.md](AGENTS.md).
 
-## Current checkpoint: 04b — Android peer connections
+Start with [delivery checkpoints](docs/checkpoints.md) for current progress and next
+steps, then use the platform guide: [desktop](packages/native/README.md),
+[Android](packages/native/androidApp/README.md), or [iPad/iPhone](packages/native/iosApp/README.md).
 
-The Android local canvas is accepted. Android now creates and joins shared boards
-with web and Linux desktop, including link/QR creation, live drawing previews,
-late-join snapshots, and TURN fallback. Its touch canvas retains pen, shapes,
-eraser, colors/widths, and two-finger pan/zoom.
-See [Android setup and controls](packages/native/androidApp/README.md).
+## Current checkpoint: 04c — iOS sharing preview
 
-Start the landscape tablet emulator with `pnpm emulator:android`, then use `pnpm android` to build, install,
-and open the app. `pnpm test:android` runs its emulator tests. The existing web and
-desktop sharing workflow below continues to work.
+Web, Linux desktop, macOS, Android emulator, and iOS simulator support shared
+boards with link/QR invites, live previews, late-join snapshots, and TURN fallback.
+The iOS sharing preview is ready for feedback. Physical-device networking and
+Pencil validation, Intel Mac execution, and Windows validation remain pending.
+See [delivery checkpoints](docs/checkpoints.md) for the validation record.
 
 This is part of Phase 1, **not** the Phase 1 exit milestone. You can
 draw with a pen, erase whole objects, create rectangles/ellipses/lines, choose
@@ -30,8 +30,27 @@ opening the same link afterward starts empty. An unshared board stays local.
 
 This is a **connection prototype**: WebRTC encrypts transport with DTLS, but
 invites are not authenticated and application-layer encryption is not implemented.
-Use test drawings. Yjs/yrs, iOS, export, undo, and production security are
+Use test drawings. Yjs/yrs, export, undo, and production security are
 still pending. There are no accounts, analytics, or board persistence.
+
+## Switching between development machines
+
+Commit and push source changes before switching, then pull them on the other
+machine. Read [AGENTS.md](AGENTS.md), [delivery checkpoints](docs/checkpoints.md),
+and the relevant platform README. Update the checkpoints after validation so the
+next session knows what passed and what remains.
+
+Keep toolchains and generated files local: do not copy `node_modules`, Gradle or
+Kotlin caches, native build outputs, `.android-sdk`, or `.android-avd` between
+Linux and macOS. Install the pinned tools with `mise install node pnpm java`, use
+the checked-in Gradle wrapper, and run `pnpm install --frozen-lockfile`. A separate
+system Gradle/Kotlin installation is unnecessary; Rust is for the later yrs phase.
+Install Playwright Chromium on each machine and do not carry over a
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` pointing to another machine's browser.
+
+Keep credentials and local `.env` files out of Git. Recheck service addresses when
+moving machines: localhost refers to the device using the link, not the previous
+development host. Cross-device sessions need reachable HTTPS, WSS, and TURN.
 
 ## Run
 
@@ -40,11 +59,12 @@ app additionally needs JDK 21; its Gradle wrapper downloads the build tools.
 
 ```sh
 mise install node pnpm
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-In another terminal, start the local TURN relay (Podman or Docker required):
+In another terminal, start the local TURN relay (Podman/Docker on Linux, native
+Coturn on macOS; see the platform guides):
 
 ```sh
 pnpm turn
@@ -69,12 +89,14 @@ pnpm check       # TypeScript
 pnpm test        # Protocol, signaling, document, framing, and geometry tests
 pnpm build      # TypeScript + production bundle
 pnpm test:e2e    # Browser tests, including real relay-only connections; run pnpm turn first
-pnpm native      # Launch the Kotlin Multiplatform / Compose desktop app (Linux x86_64)
+pnpm native      # Launch Compose desktop on Linux or macOS
 pnpm test:native # Kotlin model, shared wire fixtures, and Compose UI tests
 pnpm test:interop # Real JVM/libwebrtc ↔ Chromium tests; run pnpm turn first
 pnpm android     # Build, install, and launch in the running Android emulator
 pnpm test:android # Android touch and invite UI tests
 pnpm test:interop:android # Android ↔ web ↔ desktop; run pnpm turn first
+pnpm ios         # Build, install, and launch in an iPad simulator (macOS)
+pnpm test:interop:ios # iOS ↔ web ↔ macOS, including TURN; run pnpm turn first
 ```
 
 To install the test browser: `pnpm --filter @meshboard/web exec playwright install chromium`.
@@ -99,8 +121,9 @@ existing Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 
 Desktop uses **Compose on the JVM**, with native libwebrtc accessed through Java
 bindings. It is not a Kotlin/Native machine-code executable. The app bundle includes
-a Java runtime. Only Linux x86_64 is wired and validated at this checkpoint;
-macOS, Windows, and iOS remain later platform checkpoints. Android networking is
+a Java runtime. Linux x86_64 and Apple Silicon macOS have been validated; Intel
+Mac and Windows execution remain pending. iOS uses Kotlin/Native with a SwiftUI
+host and native Apple WebRTC, validated in the simulator. Android networking is
 validated on the local Android 15 x86_64 emulator, not yet on physical hardware.
 See [desktop setup and architecture](packages/native/README.md).
 
@@ -127,10 +150,12 @@ packages/native/             Kotlin Multiplatform + Compose desktop (JVM)
   src/commonMain/           Drawing model, protocol, controller contract, and UI
   src/desktopMain/          Native libwebrtc transport, QR encoding, and JVM entry point
   androidApp/              Android activity, libwebrtc transport, and instrumented tests
-packages/web/interop/        Browser ↔ real desktop/Android transport tests
+  iosApp/                  SwiftUI/Xcode host and Apple WebRTC transport
+  src/iosMain/             Kotlin/Native controller and Compose entry point
+packages/web/interop/        Browser ↔ real desktop/Android/iOS transport tests
 icons/                      Supplied Meshboard artwork; web public assets and native icon source
 infra/turn/dev.conf          Loopback-only Coturn configuration
-scripts/turn.mjs             Local TURN container launcher
+scripts/turn.mjs             Local TURN launcher (native Coturn on macOS, containers on Linux)
 docs/checkpoints.md          Incremental delivery and manual review gates
 ```
 

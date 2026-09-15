@@ -4,6 +4,23 @@ Pause for the user to try the app after each runnable checkpoint. Do not continu
 into the next checkpoint until the user provides feedback or says to continue.
 Keep [AGENTS.md](../AGENTS.md) as the product specification.
 
+## Working decisions
+
+- Keep Kotlin Multiplatform and Compose Multiplatform. Desktop uses the JVM with
+  a bundled Java runtime; iOS uses Kotlin/Native with a SwiftUI/Xcode host.
+- Prioritize macOS and iPad/iPhone before Windows. A Windows VM on Linux can be
+  used for later validation; do not mark Phase 1 complete before required
+  platforms and connectivity have been validated.
+- Preserve the **Meshboard** display name and supplied `icons/` artwork.
+- Preserve the compact mobile header: logo/name/status, Join/Share, and Clear/Help
+  in the overflow menu. Do not restore a separate tall branding bar.
+- Use the landscape Pixel Tablet for Android testing. Keep all Android commands
+  in `scripts/android.mjs`, including emulator management.
+
+Setup and machine-switching guidance live in the [root README](../README.md),
+[desktop README](../packages/native/README.md), [Android README](../packages/native/androidApp/README.md),
+and [iOS README](../packages/native/iosApp/README.md).
+
 ## Phase 1
 
 1. **Local web canvas — accepted.** Pen, whole-object eraser, shapes,
@@ -30,21 +47,48 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    in a ViewModel across screen recreation. Build and test on a local Android 15
    emulator, then pause for drawing feedback. No Android sharing yet.
 
-   **4b — Android peer connections, current checkpoint.** Android libwebrtc and
+   **4b — Android peer connections, sharing accepted.** Android libwebrtc and
    signaling, link/QR creation, joining by pasted invite, and web/desktop full-mesh
    interoperability. Emulator tests cover bidirectional drawing/previews/erasing,
    large snapshots, creator departure/rejoin, and actual relay-only TURN traffic.
-   Sharing accepted by the user; current follow-up is a compact Android header
-   with Clear/Help in an overflow menu and the supplied Meshboard branding on
-   web, desktop, and Android. Pause for visual feedback. QR camera
+   The compact Android header with Clear/Help in an overflow menu and supplied
+   Meshboard branding is implemented. Five touch/header/invite UI tests passed
+   on the Linux-hosted tablet emulator; explicit Android visual feedback remains pending. QR camera
    scanning/deep links and physical-device validation remain pending.
    Use the landscape Pixel Tablet emulator (`pnpm emulator:android`) for Android
    testing by default, as requested by the user; retain the phone profile for
    optional phone-specific checks.
 
-   **4c — Remaining platform validation, next.** Choose the next available target
-   with the user. iOS/macOS need a Mac/Xcode environment; Windows needs Windows
-   build/runtime validation. Physical Android testing can be a separate checkpoint.
+   **4c — Apple platforms, iOS sharing preview ready for feedback.** macOS and
+   iPad local drawing are accepted. Physical Apple/Android testing and Windows
+   validation remain separate steps.
+   Apple Silicon now builds a branded macOS app with a bundled Java runtime.
+   The initial Mac validation passed nine native tests and two direct sharing
+   tests on Apple Silicon/macOS 26.5.2 with Temurin 21, including
+   large snapshots, reconnect, and creator departure. The packaged app and DMG build successfully; the app launches.
+   macOS feedback accepted; continued to the iPad local-canvas checkpoint.
+   iPad now has a SwiftUI/Xcode host and ARM64 Kotlin framework with the shared
+   touch UI. The iPad Air simulator runs it; five iOS model tests and ten desktop
+   tests pass. Drawing, rectangle, erasing, zoom/reset, rotation, and Clear were
+   checked in the simulator. Local iPad drawing accepted by the user.
+   **iOS sharing preview ready for feedback:** native WebRTC/URLSession with
+   link/QR, full mesh, snapshots, previews, and reconnect. Four interop tests pass
+   across iOS simulator/web/macOS, including real forced TURN and creator departure.
+   Eight iOS tests and ten desktop tests pass; the unsigned device app builds.
+   Physical-device/Pencil/network validation, Intel execution, and distribution
+   signing remain pending. See [iPad setup](../packages/native/iosApp/README.md).
+
+## Next steps
+
+1. Get feedback on the iOS sharing preview.
+2. Configure reachable HTTPS/WSS and TURN for physical-device sharing, then
+   validate a real iPad/iPhone (including Pencil behavior). Simulator success
+   and an unsigned device build do not prove physical-device behavior.
+3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
+
+Current sync is custom v1, not Yjs/yrs or y-webrtc compatible. There is no
+application-layer encryption, authenticated admission, save/export, persistence,
+undo, or pressure-sensitive stroke width yet.
 
 ## Phase 2
 

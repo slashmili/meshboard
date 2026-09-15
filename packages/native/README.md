@@ -1,4 +1,4 @@
-# Meshboard desktop
+# Meshboard desktop (macOS and Linux)
 
 Checkpoint 03: Kotlin Multiplatform with Compose Desktop **on the JVM**, running
 on Linux x86_64. Native WebRTC uses `webrtc-java`'s libwebrtc JNI bindings. The
@@ -7,6 +7,11 @@ include a Java runtime. This is the approved desktop architecture.
 
 Checkpoint 04b adds [Android sharing](androidApp/README.md), using the shared model,
 wire codec, and mobile Compose layout with Android-native WebRTC and OkHttp signaling.
+
+The [iPad/iPhone app](iosApp/README.md) adds a SwiftUI/Xcode host for the
+same touch UI and native Apple WebRTC sharing. Use `pnpm ios` on an Apple Silicon Mac, or open its Xcode project
+to configure signing and run on your iPad. Physical devices need reachable HTTPS,
+WSS, and TURN addresses.
 
 ## Run on Linux
 
@@ -23,6 +28,38 @@ The Gradle wrapper downloads Gradle and Maven dependencies on first use. A graph
 Linux session and the normal desktop libraries (X11, OpenGL/Mesa, ALSA, fontconfig)
 are required. WebRTC uses a headless audio module and never requests microphone or
 camera access. The TURN launcher needs Podman or Docker.
+
+## Run on macOS
+
+Use the pinned tools, even if your shell has another Java/Node version:
+
+```sh
+mise exec node@22 pnpm@9 -- pnpm install --frozen-lockfile
+mise exec node@22 pnpm@9 -- pnpm dev
+# In another terminal:
+mise exec java@temurin-21 node@22 pnpm@9 -- pnpm native
+```
+
+The build selects WebRTC JNI for the running JVM's OS and architecture, including
+Apple Silicon and Intel Macs. Apple Silicon has been validated; Intel Mac builds
+remain untested. No Android SDK is needed. Local drawing works without the server;
+sharing needs the web/signaling service. The macOS TURN launcher uses native Coturn (`brew install coturn`), with
+`TURNSERVER_PATH` available for a custom executable. The loopback relay was verified
+with forced-TURN browser/iOS tests; physical devices need a reachable TURN service.
+
+Build a standalone app with its own Java runtime:
+
+```sh
+mise exec java@temurin-21 -- ./packages/native/gradlew -p packages/native createDistributable
+open packages/native/build/compose/binaries/main/app/Meshboard.app
+# Optional local disk image:
+mise exec java@temurin-21 -- ./packages/native/gradlew -p packages/native packageDmg
+```
+
+The DMG is written under `build/compose/binaries/main/dmg/`. These are local
+development bundles, without Developer ID signing or notarization. The macOS
+packaging version is `1.0.0` because Compose's Apple version validator requires a
+positive major number; the project remains the Phase 1 prototype at `0.1.0`.
 
 Use **Share → Create invite** to include your local drawing in a new shared board.
 Use **Join** to paste an invite from either desktop or web. Both can create a session;
@@ -64,8 +101,8 @@ Compose tests exercise drawing and invite controls and save a layout image to
 
 The generated application folder is `build/compose/binaries/main/app/Meshboard/`.
 Run `bin/Meshboard` inside it. The entire folder, including its bundled runtime and
-libraries, must stay together. Native installers and other OS builds are separate
-checkpoints; the current WebRTC artifact is explicitly Linux x86_64.
+libraries, must stay together. On macOS the output is `Meshboard.app` instead.
+Windows and Intel Mac execution remain separate validation checkpoints.
 
 ## Layout
 
@@ -90,6 +127,8 @@ are vector translations of the supplied SVG gradients and mark, with safe-zone
 insets; update those XML drawables if the source artwork changes. The Android
 header remains 52 dp tall at the default font size. Display names use **Meshboard**;
 package IDs and the wire protocol remain lowercase and unchanged.
+The macOS distribution uses `icons/meshboard.icns`, generated from the same supplied
+PNG with Apple's `sips` and `iconutil` (16–512 point sizes at 1× and 2×).
 
 References: [Compose Desktop](https://github.com/JetBrains/compose-multiplatform),
 [webrtc-java](https://github.com/devopvoid/webrtc-java),
