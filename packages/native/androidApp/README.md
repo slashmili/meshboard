@@ -3,7 +3,8 @@
 This Android app uses the shared Kotlin Multiplatform drawing model and a Compose
 touch interface. It supports pen, rectangle/ellipse/line, whole-object eraser,
 six colors, three widths, and pan/zoom. Minimum Android version: 8.0 (API 26).
-The first validated device is an Android 15 (API 35) x86_64 Pixel 6 emulator.
+The default test device is an Android 15 (API 35) x86_64 Pixel Tablet in landscape.
+The earlier Pixel 6 phone profile remains available for phone-specific checks.
 
 Android can create an invite link/QR or join a web/desktop invite. Native
 `org.webrtc` data channels carry drawings, live previews, erasing, and snapshots;
@@ -19,16 +20,23 @@ the emulator, and a compatible system image. Set `ANDROID_HOME` to your SDK fold
 the scripts also recognize an ignored `.android-sdk` folder in the repository root.
 Accept the Android SDK licenses through the SDK manager before building.
 
-Start your emulator using Android Studio's Device Manager. For the project-local
-emulator created during development, run from the repository root:
+Start the project-local tablet from the repository root:
 
 ```sh
-ANDROID_AVD_HOME="$PWD/.android-avd" .android-sdk/emulator/emulator \
-  -avd meshboard-api35 -no-snapshot -no-audio -gpu software \
-  -camera-back none -camera-front none
+pnpm emulator:android
 ```
 
-Then:
+This creates `meshboard-tablet-api35` from the Pixel Tablet hardware profile on
+first use and reuses it afterward. It uses the installed
+`system-images;android-35;default;x86_64` image, software graphics, and emulator
+port 5554. No extra image download is needed if the phone setup is already installed.
+The display is 2560 × 1600 at 320 dpi (1280 × 800 dp), so Android uses its
+tablet configuration rather than a magnified phone screen.
+The helper refuses to replace another running emulator; close the phone emulator
+first. Its in-memory board is lost unless another participant still holds a copy.
+Keep this terminal open. You can also use Android Studio's Device Manager.
+
+Once the tablet has booted, in another terminal:
 
 ```sh
 pnpm android       # Build, install, and open Meshboard on emulator-5554
@@ -36,6 +44,11 @@ pnpm build:android # Build only
 pnpm test:android  # Instrumented drawing, pinch, clear, recreation, and invite UI tests
 pnpm test:interop:android # Real Android/web/desktop sessions; run pnpm turn first
 ```
+
+All Android commands use one script, `scripts/android.mjs`, with modes for
+`emulator`, `run`, `build`, `test`, and `interop`. Start the emulator once, then
+use the app commands repeatedly; rebuilding does not restart Android. The app
+commands also work with a device started from Android Studio or a connected phone.
 
 Set `ANDROID_SERIAL` for a different device. Keep only the intended device online
 when using these scripts. The APK is

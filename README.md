@@ -11,7 +11,7 @@ late-join snapshots, and TURN fallback. Its touch canvas retains pen, shapes,
 eraser, colors/widths, and two-finger pan/zoom.
 See [Android setup and controls](packages/native/androidApp/README.md).
 
-With the local Android emulator running, use `pnpm android` to build, install,
+Start the landscape tablet emulator with `pnpm emulator:android`, then use `pnpm android` to build, install,
 and open the app. `pnpm test:android` runs its emulator tests. The existing web and
 desktop sharing workflow below continues to work.
 

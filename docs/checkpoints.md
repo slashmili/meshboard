@@ -38,6 +38,9 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    with Clear/Help in an overflow menu and the supplied Meshboard branding on
    web, desktop, and Android. Pause for visual feedback. QR camera
    scanning/deep links and physical-device validation remain pending.
+   Use the landscape Pixel Tablet emulator (`pnpm emulator:android`) for Android
+   testing by default, as requested by the user; retain the phone profile for
+   optional phone-specific checks.
 
    **4c — Remaining platform validation, next.** Choose the next available target
    with the user. iOS/macOS need a Mac/Xcode environment; Windows needs Windows
