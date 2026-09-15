@@ -45,6 +45,9 @@ kotlin {
     }
     jvmToolchain(21)
     sourceSets {
+        if (providers.gradleProperty("meshboard.iosInterop").orNull == "true") {
+            matching { it.name == "iosMain" }.configureEach { kotlin.srcDir("src/iosInterop/kotlin") }
+        }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)

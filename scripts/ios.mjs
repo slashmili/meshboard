@@ -34,6 +34,7 @@ if (!deviceBuild) {
 const output = join(root, 'packages/native/build', deviceBuild ? 'ios-device' : 'ios')
 run('xcodebuild', ['-project', 'packages/native/iosApp/Meshboard.xcodeproj', '-scheme', 'Meshboard',
   '-configuration', 'Debug', '-destination', deviceBuild ? 'generic/platform=iOS' : `platform=iOS Simulator,id=${simulator.udid}`,
+  '-clonedSourcePackagesDirPath', join(root, 'packages/native/build/SourcePackages'),
   '-derivedDataPath', output, 'build', 'CODE_SIGNING_ALLOWED=NO'])
 if (action === 'run') {
   if (simulator.state !== 'Booted') run('xcrun', ['simctl', 'boot', simulator.udid])

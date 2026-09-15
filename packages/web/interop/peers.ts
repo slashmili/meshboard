@@ -76,3 +76,36 @@ export async function androidPeer(relay = false) {
     }
   } catch (error) { await close(); throw error }
 }
+
+/** The debug-only iOS adapter listens on simulator loopback; no device/Release listener exists. */
+export async function iosPeer(relay = false) {
+  const serial = process.env.MESHBOARD_IOS_SIMULATOR
+  if (!serial) throw new Error('Set MESHBOARD_IOS_SIMULATOR to the running iPad simulator UUID.')
+  const root = fileURLToPath(new URL('../../../', import.meta.url))
+  spawnSyncIos(['simctl', 'terminate', serial, 'dev.meshboard.ios'], false)
+  spawnSyncIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : [])])
+  function spawnSyncIos(args: string[], required = true) {
+    try { return execFileSync('xcrun', args, { cwd: root, encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] }) }
+    catch (error) { if (required) throw error }
+  }
+  let state: NativeState | undefined
+  let socket: Socket | undefined
+  const deadline = Date.now() + 20_000
+  while (!state && Date.now() < deadline) {
+    if (socket && !socket.destroyed) { await new Promise(resolve => setTimeout(resolve, 100)); continue }
+    socket = createConnection({ host: '127.0.0.1', port: 18766 })
+    socket.on('error', () => {})
+    const lines = createInterface({ input: socket })
+    lines.on('error', () => {})
+    lines.on('line', line => { if (line.startsWith('MESHBOARD ')) state = JSON.parse(line.slice(10)) })
+    await new Promise(resolve => setTimeout(resolve, 250))
+    if (socket.destroyed) lines.close()
+  }
+  if (!state || !socket) throw new Error('iOS debug adapter did not start. Build and install the Debug simulator app first.')
+  const connection = socket
+  return {
+    send(message: unknown) { if (connection.destroyed) throw new Error('iOS adapter disconnected'); connection.write(JSON.stringify(message) + '\n') },
+    state() { if (!state || connection.destroyed) throw new Error('iOS adapter disconnected'); if (state.error) throw new Error(`iOS peer: ${state.error}`); return state },
+    async close() { connection.end(); spawnSyncIos(['simctl', 'terminate', serial, 'dev.meshboard.ios'], false) },
+  }
+}
