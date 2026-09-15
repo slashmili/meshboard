@@ -5,6 +5,9 @@ on Linux x86_64. Native WebRTC uses `webrtc-java`'s libwebrtc JNI bindings. The
 desktop application is not a Kotlin/Native executable; packaged distributions
 include a Java runtime. This is the approved desktop architecture.
 
+Checkpoint 04a adds an [Android local canvas](androidApp/README.md), built from
+the shared model and a mobile Compose layout. Android networking comes next.
+
 ## Run on Linux
 
 Install JDK 21 (`mise install java` with the repository's configuration), then from
@@ -67,9 +70,10 @@ checkpoints; the current WebRTC artifact is explicitly Linux x86_64.
 ## Layout
 
 - `commonMain`: board geometry, in-memory insert/delete document, strict v1 JSON
-  codec/framing, controller contract, Compose UI.
-- `desktopMain`: JVM launcher, QR generator, native WebRTC controller and Java
+  codec/framing, controller contracts, local controller, and mobile Compose UI.
+- `desktopMain`: desktop Compose UI, JVM launcher, QR generator, native WebRTC controller and Java
   HTTP/WebSocket signaling client.
+- `androidApp`: Android activity, ViewModel, manifest, and instrumented touch tests.
 - `commonTest` / `desktopTest`: geometry, deletion/snapshot behavior, size and frame
   boundaries, cross-language fixtures, interface tests, interop process adapter.
 

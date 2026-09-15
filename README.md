@@ -3,7 +3,16 @@
 A session-only whiteboard, working toward peer-to-peer collaboration on web,
 mobile, and desktop. Product requirements live in [AGENTS.md](AGENTS.md).
 
-## Current checkpoint: 03 — web ↔ Linux desktop
+## Current checkpoint: 04a — Android local canvas
+
+The web ↔ Linux desktop checkpoint is accepted. The next runnable increment adds
+an Android touch canvas using the shared Kotlin model: pen, shapes, eraser,
+colors/widths, and two-finger pan/zoom. It is local only; Android peer connections
+come after this review. See [Android setup and controls](packages/native/androidApp/README.md).
+
+With the local Android emulator running, use `pnpm android` to build, install,
+and open the app. `pnpm test:android` runs its emulator tests. The existing web and
+desktop sharing workflow below continues to work.
 
 This is part of Phase 1, **not** the Phase 1 exit milestone. You can
 draw with a pen, erase whole objects, create rectangles/ellipses/lines, choose
@@ -84,7 +93,7 @@ existing Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 Desktop uses **Compose on the JVM**, with native libwebrtc accessed through Java
 bindings. It is not a Kotlin/Native machine-code executable. The app bundle includes
 a Java runtime. Only Linux x86_64 is wired and validated at this checkpoint;
-macOS, Windows, Android, and iOS remain the next platform checkpoints.
+macOS, Windows, iOS, and Android networking remain later platform checkpoints.
 See [desktop setup and architecture](packages/native/README.md).
 
 Scroll or use the hand tool to pan. Ctrl/⌘ + scroll zooms around the pointer;

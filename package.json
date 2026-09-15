@@ -13,6 +13,9 @@
     "turn": "node scripts/turn.mjs",
     "signaling": "pnpm --filter @meshboard/signaling start",
     "native": "./packages/native/gradlew -p packages/native run",
+    "android": "node scripts/android.mjs run",
+    "build:android": "node scripts/android.mjs build",
+    "test:android": "node scripts/android.mjs test",
     "test:native": "./packages/native/gradlew -p packages/native desktopTest",
     "test:interop": "./packages/native/gradlew -p packages/native prepareInterop && pnpm --filter @meshboard/web exec playwright test -c playwright.native.config.ts"
   }

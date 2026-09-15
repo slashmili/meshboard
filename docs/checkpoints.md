@@ -13,7 +13,7 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    forces relay-only connections. Confirm that actual board payloads never use
    signaling. Label the security status accurately before Phase 3; do not claim
    application encryption or authenticated invitations yet.
-3. **Web ↔ native desktop — current checkpoint.** KMP with Compose Desktop on the
+3. **Web ↔ native desktop — accepted.** KMP with Compose Desktop on the
    JVM is the approved stack; the desktop bundle includes a Java runtime.
    Set up KMP/Compose and native WebRTC. Define and test
    a versioned wire format against the web implementation. Test a real session
@@ -23,6 +23,15 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    macOS, and Windows, with device/build validation on each platform. Split
    this checkpoint by platform where useful. This completes Phase 1 only once
    all its platform and connectivity requirements are met.
+
+   **4a — Android local canvas, current checkpoint.** Share the Kotlin drawing
+   model and wire codec; add a touch layout with pen, shapes, whole-object erasing,
+   color/width controls, two-finger pan/zoom, and clear confirmation. Keep the board
+   in a ViewModel across screen recreation. Build and test on a local Android 15
+   emulator, then pause for drawing feedback. No Android sharing yet.
+
+   **4b — Android peer connections, next.** Add Android libwebrtc and signaling,
+   link/QR creation and joining, web/desktop interoperability, and actual TURN tests.
 
 ## Phase 2
 

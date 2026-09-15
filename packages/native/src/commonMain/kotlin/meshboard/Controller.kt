@@ -16,12 +16,15 @@ data class BoardState(
     }
 }
 
-interface BoardController {
+interface DrawingController {
     val state: StateFlow<BoardState>
     fun newId(): String
     fun put(element: BoardElement)
     fun remove(ids: List<String>)
     fun preview(element: BoardElement?)
+}
+
+interface BoardController : DrawingController {
     fun share(origin: String)
     fun join(invite: String)
     fun retry()

@@ -4,10 +4,20 @@ plugins {
     kotlin("multiplatform") version "2.2.21"
     id("org.jetbrains.compose") version "1.9.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.2.21"
+    id("com.android.library") version "8.9.3" apply false
+    id("com.android.application") version "8.9.3" apply false
+    kotlin("android") version "2.2.21" apply false
 }
+
+// Desktop builds do not require an Android SDK. Android scripts opt in explicitly.
+val androidEnabled = providers.gradleProperty("meshboard.android").orNull == "true"
+if (androidEnabled) apply(plugin = "com.android.library")
 
 kotlin {
     jvm("desktop")
+    if (androidEnabled) androidTarget {
+        compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) }
+    }
     jvmToolchain(21)
     sourceSets {
         commonMain.dependencies {
@@ -31,6 +41,16 @@ kotlin {
         val desktopTest by getting {
             dependencies { implementation(compose.desktop.uiTestJUnit4) }
         }
+    }
+}
+
+if (androidEnabled) extensions.configure<com.android.build.gradle.LibraryExtension> {
+    namespace = "dev.meshboard.shared"
+    compileSdk = 35
+    defaultConfig { minSdk = 26 }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 }
 
