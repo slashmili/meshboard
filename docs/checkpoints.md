@@ -51,8 +51,13 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    Apple Silicon now builds a branded macOS app with a bundled Java runtime.
    Nine native tests and two direct web/macOS sharing tests pass, including
    large snapshots, reconnect, and creator departure. The packaged app launches.
-   Pause for macOS drawing feedback. TURN on macOS, Intel execution, distribution
-   signing, and all iOS implementation/device validation remain pending.
+   macOS feedback accepted; continued to the iPad local-canvas checkpoint.
+   iPad now has a SwiftUI/Xcode host and ARM64 Kotlin framework with the shared
+   touch UI. The iPad Air simulator runs it; five iOS model tests and ten desktop
+   tests pass. Drawing, rectangle, erasing, zoom/reset, rotation, and Clear were
+   checked in the simulator. Pause for iPad drawing feedback. iOS networking,
+   physical-device/Pencil validation, Mac TURN, Intel execution, and distribution
+   signing remain pending. See [iPad setup](../packages/native/iosApp/README.md).
 
 ## Phase 2
 

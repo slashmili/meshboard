@@ -165,3 +165,19 @@ Suggested opening instruction for the next development session:
 > macOS desktop support first, then iPad/iPhone. Inspect this Mac's architecture
 > and toolchain before changing dependencies. Keep the approved KMP/Compose stack
 > and pause at every runnable checkpoint for me to test. Windows can wait.
+
+## iPad local canvas follow-up
+
+Added `packages/native/iosApp/Meshboard.xcodeproj`, an ARM64 Kotlin framework,
+SwiftUI host, and `pnpm ios` launcher. The shared touch canvas uses its local-only
+controller; iOS has no Join/Share until native transport is added. The app runs on
+iPad Air 11-inch / iOS 26.5 with Xcode 26.6 and the existing Kotlin/Compose pins.
+Five iOS model tests and ten desktop tests pass. Simulator checks cover drawing,
+rectangle, erasing, zoom/reset, rotation retention, and Clear cancel/confirm.
+
+Resolved initial disk exhaustion, Xcode requesting an unsupported Intel simulator
+architecture, and a launch crash caused by the missing Compose-required
+`CADisableMinimumFrameDurationOnPhone` plist entry. ARM64 is explicit in Xcode.
+Physical-device setup is documented in [the iOS README](../packages/native/iosApp/README.md).
+The unsigned ARM64 device build also succeeds. No signing team or account is stored in Git. Pause for local-canvas feedback;
+iOS peer connections and physical iPad/Pencil validation remain next.

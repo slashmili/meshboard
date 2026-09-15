@@ -36,7 +36,8 @@ private fun mobilePaint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16
 
 /** Touch layout shared by mobile targets; transport is deliberately independent. */
 @Composable
-fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https://", qrImage: (String) -> ImageBitmap) {
+fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https://", qrImage: ((String) -> ImageBitmap)? = null) {
+    val sharing = controller as? BoardController
     val state by controller.state.collectAsState()
     val latest by rememberUpdatedState(state)
     var toolName by rememberSaveable { mutableStateOf(Tool.Pen.name) }
@@ -67,8 +68,10 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
                     Text("Meshboard", color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(state.connectionLabel, Modifier.testTag("mobile-connection-status"), fontSize = 10.sp, lineHeight = 14.sp, color = MobileMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-join"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Join", fontSize = 13.sp) }
-                TextButton(onClick = { cancel(); copied = false; dialog = "share" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-share"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Share", fontSize = 13.sp) }
+                if (sharing != null && qrImage != null) {
+                    TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-join"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Join", fontSize = 13.sp) }
+                    TextButton(onClick = { cancel(); copied = false; dialog = "share" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-share"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Share", fontSize = 13.sp) }
+                }
                 Box {
                     IconButton(onClick = { cancel(); boardMenu = true }, modifier = Modifier.size(48.dp).testTag("mobile-more").semantics { contentDescription = "Board options" }) {
                         Canvas(Modifier.size(20.dp)) {
@@ -218,23 +221,23 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
             confirmButton = { Button(onClick = { controller.remove(state.elements.map { it.id }); dialog = null }, modifier = Modifier.testTag("mobile-confirm-clear")) { Text("Clear board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
         if (dialog == "help") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A little space for ideas") }, text = {
-            Text("Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nConnection prototype: WebRTC transport encryption only. Invites and peers are not authenticated; application encryption comes later. Don’t use for sensitive content.")
+            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nConnection prototype: WebRTC transport encryption only. Invites and peers are not authenticated; application encryption comes later. Don’t use for sensitive content.")
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
-        if (dialog == "join") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Join a board") }, text = {
+        if (dialog == "join" && sharing != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Join a board") }, text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Joining replaces your current canvas. Paste the full invite, including #room=…")
                 OutlinedTextField(inviteInput, { inviteInput = it }, label = { Text("Board invite") }, modifier = Modifier.testTag("mobile-invite-input"))
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
-        }, confirmButton = { Button(enabled = inviteInput.isNotBlank(), onClick = { controller.join(inviteInput); view = View(); dialog = null }, modifier = Modifier.testTag("mobile-confirm-join")) { Text("Join board") } },
+        }, confirmButton = { Button(enabled = inviteInput.isNotBlank(), onClick = { sharing.join(inviteInput); view = View(); dialog = null }, modifier = Modifier.testTag("mobile-confirm-join")) { Text("Join board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
-        if (dialog == "share") AlertDialog(onDismissRequest = { dialog = null }, title = { Text(if (state.invite.isEmpty()) "Share this board" else "Invite someone") }, text = {
+        if (dialog == "share" && sharing != null && qrImage != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text(if (state.invite.isEmpty()) "Share this board" else "Invite someone") }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (state.invite.isEmpty()) {
                     Text("Your drawing stays on this board. Use the address of your running Meshboard web app.")
                     OutlinedTextField(origin, { origin = it }, label = { Text("App address") }, modifier = Modifier.testTag("mobile-app-address"))
                     Text("In the local emulator, the default address connects to this computer.", fontSize = 12.sp)
-                    Button(onClick = { controller.share(origin) }, modifier = Modifier.testTag("mobile-create-invite")) { Text("Create invite") }
+                    Button(onClick = { sharing.share(origin) }, modifier = Modifier.testTag("mobile-create-invite")) { Text("Create invite") }
                 } else {
                     val qr = remember(state.invite) { qrImage(state.invite) }
                     Image(qr, "Board invite QR code", Modifier.size(180.dp))
@@ -242,7 +245,7 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
                     Button(onClick = { clipboard.setText(AnnotatedString(state.invite)); copied = true }) { Text(if (copied) "Copied" else "Copy invite") }
                     Text(state.connectionLabel, fontSize = 12.sp)
                     Row {
-                        TextButton(onClick = { controller.retry() }) { Text("Retry") }
+                        TextButton(onClick = { sharing.retry() }) { Text("Retry") }
                         TextButton(onClick = { dialog = "leave" }) { Text("Leave board") }
                     }
                 }
@@ -250,8 +253,8 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
                 Text("Prototype: transport encryption only; peers are not authenticated. Don’t share sensitive content.", fontSize = 12.sp)
             }
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
-        if (dialog == "leave") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Leave this board?") }, text = { Text("Your local copy will be discarded. Other connected participants can keep drawing.") },
-            confirmButton = { Button(onClick = { controller.leave(); view = View(); dialog = null }) { Text("Leave board") } },
+        if (dialog == "leave" && sharing != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Leave this board?") }, text = { Text("Your local copy will be discarded. Other connected participants can keep drawing.") },
+            confirmButton = { Button(onClick = { sharing.leave(); view = View(); dialog = null }) { Text("Leave board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
     }
 }

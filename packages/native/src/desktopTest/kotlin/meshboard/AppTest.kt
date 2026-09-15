@@ -69,4 +69,25 @@ class AppTest {
         rule.onNodeWithText("Join board", useUnmergedTree = true).performClick()
         rule.runOnIdle { assertEquals(invite, controller.state.value.invite) }
     }
+
+    @Test fun localMobileCanvasDrawsAndConfirmsClearWithoutSharing() {
+        var next = 0
+        val controller = LocalBoardController { "local-${++next}" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-connection-status").assertTextEquals("Local only")
+        rule.onNodeWithTag("mobile-join").assertDoesNotExist()
+        rule.onNodeWithTag("mobile-share").assertDoesNotExist()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(200f, 200f)); moveTo(Offset(300f, 280f)); up()
+        }
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithTag("mobile-clear").performClick()
+        rule.onNodeWithText("Cancel").performClick()
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithTag("mobile-clear").performClick()
+        rule.onNodeWithTag("mobile-confirm-clear").performClick()
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+    }
 }

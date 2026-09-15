@@ -14,5 +14,7 @@ test-results/
 build/
 target/
 local.properties
+xcuserdata/
+*.xcuserstate
 .android-sdk/
 .android-avd/

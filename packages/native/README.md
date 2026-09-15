@@ -8,6 +8,10 @@ include a Java runtime. This is the approved desktop architecture.
 Checkpoint 04b adds [Android sharing](androidApp/README.md), using the shared model,
 wire codec, and mobile Compose layout with Android-native WebRTC and OkHttp signaling.
 
+The [iPad/iPhone local canvas](iosApp/README.md) adds a SwiftUI/Xcode host for the
+same touch UI. Use `pnpm ios` on an Apple Silicon Mac, or open its Xcode project
+to configure signing and run on your iPad. iOS sharing is not implemented yet.
+
 ## Run on Linux
 
 Install JDK 21 (`mise install java` with the repository's configuration), then from

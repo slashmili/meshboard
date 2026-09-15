@@ -30,6 +30,16 @@ val desktopArch = when (val arch = System.getProperty("os.arch").lowercase()) {
 
 kotlin {
     jvm("desktop")
+    // Opt in so desktop/Android builds do not need the Apple toolchain.
+    if (providers.gradleProperty("meshboard.ios").orNull == "true") {
+        listOf(iosArm64(), iosSimulatorArm64()).forEach {
+            it.binaries.framework {
+                baseName = "MeshboardShared"
+                isStatic = true
+                binaryOption("bundleId", "dev.meshboard.shared")
+            }
+        }
+    }
     if (androidEnabled) androidTarget {
         compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) }
     }
