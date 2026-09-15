@@ -21,6 +21,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.*
@@ -46,6 +47,7 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
     var draft by remember { mutableStateOf<BoardElement?>(null) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var widthMenu by remember { mutableStateOf(false) }
+    var boardMenu by remember { mutableStateOf(false) }
     var cancelled by remember { mutableIntStateOf(0) }
     var canvasSize by remember { mutableStateOf(Size.Zero) }
     var origin by remember { mutableStateOf(defaultOrigin) }
@@ -58,18 +60,26 @@ fun MobileBoardApp(controller: BoardController, defaultOrigin: String = "https:/
 
     MaterialTheme(colorScheme = lightColorScheme(primary = MobileGreen, onPrimary = Color.White, surface = Color.White, onSurface = MobileInk, background = MobilePaper, outline = MobileBorder)) {
         Column(Modifier.fillMaxSize().background(MobilePaper)) {
-            Row(Modifier.fillMaxWidth().height(60.dp).background(Color.White).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("meshboard.", color = MobileGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { cancel(); dialog = "clear" }, enabled = state.elements.isNotEmpty(), modifier = Modifier.testTag("mobile-clear")) { Text("Clear") }
-                TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.testTag("mobile-help")) { Text("Help") }
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).background(Color.White).padding(start = 16.dp, end = 4.dp).testTag("mobile-header"), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
+                    Text("meshboard.", color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(state.connectionLabel, Modifier.testTag("mobile-connection-status"), fontSize = 10.sp, lineHeight = 14.sp, color = MobileMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-join"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Join", fontSize = 13.sp) }
+                TextButton(onClick = { cancel(); copied = false; dialog = "share" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-share"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Share", fontSize = 13.sp) }
+                Box {
+                    IconButton(onClick = { cancel(); boardMenu = true }, modifier = Modifier.size(48.dp).testTag("mobile-more").semantics { contentDescription = "Board options" }) {
+                        Canvas(Modifier.size(20.dp)) {
+                            listOf(.25f, .5f, .75f).forEach { y -> drawCircle(MobileGreen, 1.6.dp.toPx(), Offset(size.width / 2, size.height * y)) }
+                        }
+                    }
+                    DropdownMenu(expanded = boardMenu, onDismissRequest = { boardMenu = false }) {
+                        DropdownMenuItem(text = { Text("Clear board") }, enabled = state.elements.isNotEmpty(), onClick = { boardMenu = false; dialog = "clear" }, modifier = Modifier.testTag("mobile-clear"))
+                        DropdownMenuItem(text = { Text("Help") }, onClick = { boardMenu = false; dialog = "help" }, modifier = Modifier.testTag("mobile-help"))
+                    }
+                }
             }
             HorizontalDivider(color = MobileBorder)
-            Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(state.connectionLabel, Modifier.weight(1f).testTag("mobile-connection-status"), fontSize = 12.sp, color = MobileGreen)
-                TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.testTag("mobile-join")) { Text("Join") }
-                TextButton(onClick = { cancel(); copied = false; dialog = "share" }, modifier = Modifier.testTag("mobile-share")) { Text("Share") }
-            }
             Row(Modifier.fillMaxWidth().background(Color.White).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 Tool.entries.forEach { item ->
                     val label = when (item) { Tool.Rectangle -> "Rect"; Tool.Ellipse -> "Oval"; else -> item.label }

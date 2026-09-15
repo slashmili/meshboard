@@ -34,7 +34,8 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    signaling, link/QR creation, joining by pasted invite, and web/desktop full-mesh
    interoperability. Emulator tests cover bidirectional drawing/previews/erasing,
    large snapshots, creator departure/rejoin, and actual relay-only TURN traffic.
-   Pause for the user to try sharing in the local Android emulator. QR camera
+   Sharing accepted by the user; current follow-up is a compact Android header
+   with Clear/Help in an overflow menu. Pause for layout feedback. QR camera
    scanning/deep links and physical-device validation remain pending.
 
    **4c — Remaining platform validation, next.** Choose the next available target

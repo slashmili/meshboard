@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Rule
 import org.junit.Test
@@ -25,8 +26,10 @@ class CanvasTest {
         rule.onNodeWithTag("mobile-tool-eraser").performClick()
         canvas().performTouchInput { click(Offset(width * .25f, height * .3f)) }; count(0)
         rule.onNodeWithTag("mobile-tool-ellipse").performClick(); draw(); count(1)
+        rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithTag("mobile-clear").performClick()
         rule.onNodeWithText("Cancel").performClick(); count(1)
+        rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithTag("mobile-clear").performClick()
         rule.onNodeWithTag("mobile-confirm-clear").performClick(); count(0)
     }
@@ -55,6 +58,7 @@ class CanvasTest {
         rule.onNodeWithTag("mobile-zoom").assertTextEquals("120%")
         rule.onNodeWithText("Reset view").performClick()
         rule.onNodeWithTag("mobile-zoom").assertTextEquals("100%")
+        rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithTag("mobile-help").performClick()
         rule.onNodeWithText("Back to the board").performClick()
         count(1)
@@ -71,5 +75,18 @@ class CanvasTest {
         count(1)
         rule.waitUntil(5000) { rule.onAllNodesWithText("This invite has an invalid room ID.").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("mobile-connection-status").assertTextEquals("Local only")
+    }
+
+    @Test fun compactHeaderKeepsSharingVisibleAndSecondaryActionsInMenu() {
+        rule.onNodeWithTag("mobile-header").assertHeightIsEqualTo(52.dp)
+        rule.onNodeWithTag("mobile-join").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("mobile-share").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("mobile-help").assertDoesNotExist()
+        rule.onNodeWithTag("mobile-clear").assertDoesNotExist()
+        rule.onNodeWithTag("mobile-more").assertHeightIsAtLeast(48.dp).performClick()
+        rule.onNodeWithTag("mobile-clear").assertIsDisplayed().assertIsNotEnabled()
+        rule.onNodeWithTag("mobile-help").performClick()
+        rule.onNodeWithText("Back to the board").performClick()
+        canvas().assertIsDisplayed()
     }
 }

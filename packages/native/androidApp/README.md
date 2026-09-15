@@ -49,6 +49,8 @@ library; JVM WebRTC and desktop-specific UI stay in `desktopMain`.
 
 Draw with one finger or the emulator mouse. Choose shapes and colors, change the
 stroke width, then erase by touching an object's outline. Clear asks for confirmation.
+The compact header keeps Join/Share visible; **⋮ → Clear board / Help** holds
+the less frequent actions. Connection status sits underneath the small wordmark.
 Two fingers pan and pinch; adding a second finger cancels the unfinished stroke,
 and drawing resumes only after all fingers lift. Use the emulator's Ctrl/Cmd pinch
 gesture, or use the zoom buttons and Pan tool. Reset view restores the origin.
