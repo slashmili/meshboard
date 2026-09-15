@@ -13,6 +13,21 @@ plugins {
 val androidEnabled = providers.gradleProperty("meshboard.android").orNull == "true"
 if (androidEnabled) apply(plugin = "com.android.library")
 
+// Match the JVM architecture (including an Intel JDK under Rosetta), not the CPU.
+val desktopOs = System.getProperty("os.name").lowercase().let {
+    when {
+        it.startsWith("mac") -> "macos"
+        it.startsWith("linux") -> "linux"
+        it.startsWith("windows") -> "windows"
+        else -> error("Unsupported desktop OS: $it")
+    }
+}
+val desktopArch = when (val arch = System.getProperty("os.arch").lowercase()) {
+    "aarch64", "arm64" -> "aarch64"
+    "amd64", "x86_64" -> "x86_64"
+    else -> error("Unsupported desktop JVM architecture: $arch")
+}
+
 kotlin {
     jvm("desktop")
     if (androidEnabled) androidTarget {
@@ -35,7 +50,7 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
                 implementation("dev.onvoid.webrtc:webrtc-java:0.17.0")
-                runtimeOnly("dev.onvoid.webrtc:webrtc-java:0.17.0:linux-x86_64")
+                runtimeOnly("dev.onvoid.webrtc:webrtc-java:0.17.0:$desktopOs-$desktopArch")
                 implementation("com.google.zxing:core:3.5.3")
             }
         }
@@ -72,7 +87,7 @@ compose.desktop {
     application {
         mainClass = "meshboard.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Deb)
+            targetFormats(TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Meshboard"
             packageVersion = "0.1.0"
             description = "A session-only collaborative whiteboard"
@@ -80,6 +95,12 @@ compose.desktop {
             linux {
                 packageName = "meshboard" // Debian package identifiers stay lowercase.
                 iconFile.set(rootProject.file("../../icons/meshboard-icon-1024.png"))
+            }
+            macOS {
+                // Apple's bundle/build version requires a positive major number.
+                packageVersion = "1.0.0"
+                bundleID = "dev.meshboard.desktop"
+                iconFile.set(rootProject.file("../../icons/meshboard.icns"))
             }
             modules("java.net.http", "jdk.unsupported", "java.desktop", "java.logging")
         }

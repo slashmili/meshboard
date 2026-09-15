@@ -3,6 +3,27 @@
 Read [AGENTS.md](../AGENTS.md), [checkpoints](checkpoints.md), and this note before
 continuing on the Mac. This is a handoff, not a claim that Apple builds work yet.
 
+## Mac follow-up — September 15, 2026
+
+The historical gaps below describe the starting point. macOS desktop now selects
+the host JVM's WebRTC native artifact and packages a branded `.app` with a bundled
+runtime. Apple Silicon validation on macOS 26.5.2, Temurin 21, Xcode 26.6:
+
+- All nine desktop/model/protocol tests passed.
+- Two direct web/macOS interop tests passed: both creation directions, previews,
+  erasing, reconnect, 12,000-point late-join snapshot, and creator departure.
+- `createDistributable` succeeded; the packaged app launched and its canvas UI
+  was inspected. See the native README for exact commands.
+- `packageDmg` succeeded, producing `Meshboard-1.0.0.dmg`.
+- TURN was not tested on this Mac; no Coturn or container runtime was available.
+- Intel Mac execution, signing/notarization, and physical devices remain untested.
+
+iPad simulators are installed (iOS 26.3–26.5), but iOS targets, the Xcode host,
+and Apple-native transport are still next. The selected Xcode 26.6 is newer than
+Kotlin 2.2.21's documented Xcode 26.0 compatibility; resolve that for the iPad
+checkpoint without changing the working JVM desktop dependencies unnecessarily.
+Pause here for macOS drawing feedback before beginning iPad local canvas work.
+
 ## Priorities and decisions
 
 - Prioritize macOS, then iPad/iPhone. Windows can wait; a Windows VM on the Linux
