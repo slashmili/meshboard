@@ -18,6 +18,14 @@ Windows and physical-device validation are not covered by this workflow.
 CI lists the SDK hardware profiles and checks for Nexus 10 before creating its
 emulator. The local `pnpm emulator:android` setup remains Pixel Tablet.
 
+iOS interop scenarios retain a 60-second test timeout with no automatic retries.
+Simulator startup and cleanup run in a separate 120-second Playwright fixture
+budget; each asynchronous `simctl` command is capped at 30 seconds. The fixture
+also allows 20 seconds for the debug adapter to become ready and cleans up failed
+startup attempts. Desktop-peer and extra-browser cleanup use their own fixture
+budgets. Traces label setup, board-sync stages, and shutdown separately, so a slow
+simulator shutdown does not turn successful board assertions into a test timeout.
+
 For merge enforcement, select these checks in the repository's branch protection
 or ruleset after their first run. Running CI alone does not prevent merging a
 failed pull request.
