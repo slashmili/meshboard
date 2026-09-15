@@ -3,6 +3,9 @@
 A session-only whiteboard, working toward peer-to-peer collaboration on web,
 mobile, and desktop. Product requirements live in [AGENTS.md](AGENTS.md).
 
+Continuing on a Mac? Read the [Apple-platform handoff](docs/apple-handoff.md)
+for prerequisites, current porting gaps, and the next runnable checkpoints.
+
 ## Current checkpoint: 04b — Android peer connections
 
 The Android local canvas is accepted. Android now creates and joins shared boards

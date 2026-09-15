@@ -42,9 +42,12 @@ Keep [AGENTS.md](../AGENTS.md) as the product specification.
    testing by default, as requested by the user; retain the phone profile for
    optional phone-specific checks.
 
-   **4c — Remaining platform validation, next.** Choose the next available target
-   with the user. iOS/macOS need a Mac/Xcode environment; Windows needs Windows
-   build/runtime validation. Physical Android testing can be a separate checkpoint.
+   **4c — Apple platforms, next.** The user has a Mac and prioritizes macOS and
+   iPad/iPhone over Windows. Start with macOS desktop, then iPad local drawing,
+   then Apple peer connections and physical-device validation. Read the
+   [Apple handoff](apple-handoff.md) before continuing in the new Mac session.
+   Windows can be validated later in a Windows VM on Linux; physical Android
+   testing can be a separate checkpoint. Neither is complete yet.
 
 ## Phase 2
 
