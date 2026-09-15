@@ -1,5 +1,5 @@
-import { iosPeer, nativePeer } from './peers'
-import { expect, test, type Page } from '@playwright/test'
+import { test } from './ios-fixtures'
+import { expect, type Page } from '@playwright/test'
 import type { BoardElement } from '@meshboard/shared-protocol'
 
 const elements = (page: Page) => page.getByTestId('drawing-elements').locator(':scope > *')
@@ -16,20 +16,24 @@ async function inviteFromWeb(page: Page) {
   return invite
 }
 
-test('web creates; iOS joins, exchanges previews and strokes, erases and rejoins', async ({ page }) => {
-  const native = await iosPeer()
-  try {
+test('web creates; iOS joins, exchanges previews and strokes, erases and rejoins', async ({ page, native }) => {
+  const invite = await test.step('Create a web board and join from iOS', async () => {
     const invite = await inviteFromWeb(page)
     await draw(page)
     native.send({ type: 'join', invite })
     await expect.poll(() => native.state().connected, { timeout: 30_000 }).toBe(1)
     await expect.poll(() => native.state().elements.length).toBe(1)
+    return invite
+  })
+  await test.step('Exchange previews and committed strokes', async () => {
     native.send({ type: 'preview', element: stroke('native-stroke') })
     await expect(page.getByTestId('remote-drafts').locator(':scope > *')).toHaveCount(1)
     native.send({ type: 'put', element: stroke('native-stroke') })
     native.send({ type: 'preview', element: null })
     await expect(elements(page)).toHaveCount(2)
     await expect(page.getByTestId('remote-drafts').locator(':scope > *')).toHaveCount(0)
+  })
+  await test.step('Remove a stroke, rejoin, and erase from the web', async () => {
     native.send({ type: 'remove', ids: ['native-stroke'] })
     await expect(elements(page)).toHaveCount(1)
     native.send({ type: 'leave' })
@@ -39,13 +43,11 @@ test('web creates; iOS joins, exchanges previews and strokes, erases and rejoins
     await page.keyboard.press('e'); await page.mouse.click(350, 300)
     await expect.poll(() => native.state().elements.length).toBe(0)
     expect(native.state().error).toBeNull()
-  } finally { await native.close() }
+  })
 })
 
-test('iOS creates; large late-join snapshots and creator departure work across platforms', async ({ page, browser }) => {
-  const native = await iosPeer()
-  const context = await browser.newContext()
-  try {
+test('iOS creates; large late-join snapshots and creator departure work across platforms', async ({ page, native, third }) => {
+  await test.step('Create a large iOS board and sync it to the web', async () => {
     native.send({ type: 'put', element: stroke('large-native-stroke', 12000) })
     native.send({ type: 'share', origin: 'http://127.0.0.1:5173' })
     await expect.poll(() => native.state().signaling, { timeout: 30_000 }).toBe(true)
@@ -53,44 +55,49 @@ test('iOS creates; large late-join snapshots and creator departure work across p
     await expect(elements(page)).toHaveCount(1, { timeout: 30_000 })
     await draw(page)
     await expect.poll(() => native.state().elements.length).toBe(2)
-    const third = await context.newPage()
+  })
+  await test.step('Late-join a third peer and receive the large snapshot', async () => {
     await third.goto(native.state().invite)
     await expect(third.getByTestId('connection-status')).toHaveText('2 peers connected', { timeout: 30_000 })
     await expect(elements(third)).toHaveCount(2)
+  })
+  await test.step('Leave from the iOS creator and keep drawing', async () => {
     native.send({ type: 'leave' })
     await expect(page.getByTestId('connection-status')).toHaveText('1 peer connected')
     await draw(third)
     await expect(elements(page)).toHaveCount(3)
+  })
+  await test.step('Reload and recover all drawings from the remaining peer', async () => {
     await page.reload()
     await expect(elements(page)).toHaveCount(3, { timeout: 30_000 })
-  } finally { await native.close(); await context.close() }
+  })
 })
 
-test('iOS and web draw through real TURN with direct candidates disabled', async ({ page, context }) => {
-  const native = await iosPeer(true)
+const relayTest = test.extend({ relay: true })
+relayTest('iOS and web draw through real TURN with direct candidates disabled', async ({ page, context, native }) => {
   await context.route('**/api/rtc-config', async route => {
     const response = await route.fetch()
     await route.fulfill({ response, json: { ...await response.json(), iceTransportPolicy: 'relay' } })
   })
-  try {
+  await test.step('Join through TURN and verify the relay route', async () => {
     const invite = await inviteFromWeb(page)
     native.send({ type: 'join', invite })
     await expect.poll(() => native.state().connected, { timeout: 30_000 }).toBe(1)
     await expect(page.getByTestId('connection-route')).toContainText('VIA RELAY')
     await expect.poll(() => native.state().relayed).toBe(1)
+  })
+  await test.step('Exchange drawings through TURN', async () => {
     await draw(page)
     await expect.poll(() => native.state().elements.length).toBe(1)
     native.send({ type: 'put', element: stroke('relayed-native-stroke') })
     await expect(elements(page)).toHaveCount(2)
     expect(native.state().error).toBeNull()
-  } finally { await native.close() }
+  })
 })
 
 
-test('iOS, macOS and web mesh continues after the iOS creator leaves', async ({ page }) => {
-  const ipad = await iosPeer()
-  const mac = nativePeer()
-  try {
+test('iOS, macOS and web mesh continues after the iOS creator leaves', async ({ page, native: ipad, mac }) => {
+  const invite = await test.step('Create an iOS, macOS, and web mesh', async () => {
     ipad.send({ type: 'share', origin: 'http://127.0.0.1:5173' })
     await expect.poll(() => ipad.state().signaling, { timeout: 30_000 }).toBe(true)
     const invite = ipad.state().invite
@@ -101,11 +108,16 @@ test('iOS, macOS and web mesh continues after the iOS creator leaves', async ({ 
     ipad.send({ type: 'put', element: stroke('ipad-mesh') })
     await expect.poll(() => mac.state().elements.length).toBe(1)
     await expect(elements(page)).toHaveCount(1)
+    return invite
+  })
+  await test.step('Leave from iOS and draw from macOS', async () => {
     ipad.send({ type: 'leave' })
     await expect.poll(() => mac.state().connected).toBe(1)
     mac.send({ type: 'put', element: stroke('mac-after-creator') })
     await expect(elements(page)).toHaveCount(2)
+  })
+  await test.step('Rejoin from iOS and recover the board', async () => {
     ipad.send({ type: 'join', invite })
     await expect.poll(() => ipad.state().elements.length, { timeout: 30_000 }).toBe(2)
-  } finally { await ipad.close(); await mac.close() }
+  })
 })
