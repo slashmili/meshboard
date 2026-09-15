@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.net.URI
 
 plugins {
     kotlin("multiplatform") version "2.2.21"
@@ -26,6 +27,20 @@ val desktopArch = when (val arch = System.getProperty("os.arch").lowercase()) {
     "aarch64", "arm64" -> "aarch64"
     "amd64", "x86_64" -> "x86_64"
     else -> error("Unsupported desktop JVM architecture: $arch")
+}
+
+// Release workflows supply these properties; local builds remain local by default.
+val appOrigin = providers.gradleProperty("meshboard.appOrigin").orElse("http://127.0.0.1:5173").get().trimEnd('/')
+val originUri = URI(appOrigin)
+require(originUri.host != null && originUri.rawUserInfo == null && originUri.rawQuery == null && originUri.rawFragment == null && originUri.rawPath.isNullOrEmpty()) {
+    "meshboard.appOrigin must be an origin without credentials, path, query, or fragment"
+}
+require(originUri.scheme == "https" || (originUri.scheme == "http" && originUri.host in listOf("localhost", "127.0.0.1", "[::1]"))) {
+    "meshboard.appOrigin must use HTTPS except for local development"
+}
+val appVersion = providers.gradleProperty("meshboard.version").orElse("0.1.0").get()
+require(Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)").matches(appVersion)) {
+    "meshboard.version must be a numeric major.minor.patch version"
 }
 
 kotlin {
@@ -99,10 +114,11 @@ compose.resources {
 compose.desktop {
     application {
         mainClass = "meshboard.MainKt"
+        jvmArgs += listOf("-Dmeshboard.app.origin=$appOrigin", "-Dmeshboard.app.version=$appVersion")
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Meshboard"
-            packageVersion = "0.1.0"
+            packageVersion = appVersion
             description = "A session-only collaborative whiteboard"
             vendor = "Meshboard"
             linux {
@@ -111,7 +127,7 @@ compose.desktop {
             }
             macOS {
                 // Apple's bundle/build version requires a positive major number.
-                packageVersion = "1.0.0"
+                packageVersion = if (appVersion.startsWith("0.")) "1.${appVersion.substringAfter('.')}" else appVersion
                 bundleID = "dev.meshboard.desktop"
                 iconFile.set(rootProject.file("../../icons/meshboard.icns"))
             }

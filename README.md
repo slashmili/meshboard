@@ -136,6 +136,11 @@ Escape cancels an unfinished stroke or shape. The help button lists controls.
 
 ## Project structure
 
+GitHub Actions runs the automated tests on PRs and pushes to `main`, and builds
+Linux AppImage and macOS DMG assets when a release is published. See
+[CI and release setup](docs/ci-and-releases.md) for required repository variables,
+test coverage, and the first-release checklist.
+
 ```text
 packages/web/                React + TypeScript + Vite
   src/board.ts               Drawing geometry and viewport math

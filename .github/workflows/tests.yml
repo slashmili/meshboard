@@ -1,0 +1,145 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true'
+
+jobs:
+  desktop-web:
+    name: Web and desktop (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-22.04
+          - name: macos-arm64
+            runner: macos-26
+          - name: macos-x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn xvfb libgl1 libegl1 libasound2 libfontconfig1 fonts-dejavu-core
+          sudo systemctl stop coturn
+          pnpm --filter @meshboard/web exec playwright install --with-deps chromium
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install coturn
+          pnpm --filter @meshboard/web exec playwright install chromium
+      - name: Run Linux checks, unit/UI tests and real TURN interoperability
+        if: runner.os == 'Linux'
+        run: xvfb-run -a bash scripts/ci-tests.sh desktop
+      - name: Run macOS checks, unit/UI tests and real TURN interoperability
+        if: runner.os == 'macOS'
+        run: bash scripts/ci-tests.sh desktop
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: test-results-${{ matrix.name }}
+          retention-days: 7
+          path: |
+            packages/native/build/reports/tests/
+            packages/native/build/test-results/
+            packages/native/build/test-artifacts/
+            packages/web/test-results/
+            packages/web/playwright-report/
+            build/ci/
+
+  android:
+    name: Android tablet UI and interoperability
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install dependencies and enable KVM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn libgl1 libegl1 libasound2
+          sudo systemctl stop coturn
+          sudo chmod 666 /dev/kvm
+          pnpm --filter @meshboard/web exec playwright install --with-deps chromium
+      - name: Verify CI tablet hardware profile
+        shell: bash
+        run: |
+          devices="$("${ANDROID_HOME:?ANDROID_HOME must point to the Android SDK}/cmdline-tools/latest/bin/avdmanager" list device)"
+          printf '%s\n' "$devices"
+          if ! printf '%s\n' "$devices" | grep -F '"Nexus 10"'; then
+            echo 'Nexus 10 tablet profile is missing from the runner Android SDK.' >&2
+            exit 1
+          fi
+      - uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: Nexus 10
+          ram-size: 4096M
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none -camera-front none
+          disable-animations: true
+          script: bash scripts/ci-tests.sh android
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: test-results-android
+          retention-days: 7
+          path: |
+            packages/native/build/reports/tests/
+            packages/native/build/test-results/
+            packages/native/androidApp/build/reports/
+            packages/native/androidApp/build/outputs/androidTest-results/
+            packages/web/test-results/
+            build/ci/
+
+  ios:
+    name: iPad simulator tests and unsigned iOS device build
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install dependencies and inspect Apple toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          xcrun simctl list devices available
+          brew install coturn
+          pnpm --filter @meshboard/web exec playwright install chromium
+      - name: Run Kotlin iOS tests, iPad/Web/macOS interoperability and device compilation
+        run: bash scripts/ci-tests.sh ios
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: test-results-ios
+          retention-days: 7
+          path: |
+            packages/native/build/reports/tests/
+            packages/native/build/test-results/
+            packages/native/build/ios/Logs/Test/
+            packages/web/test-results/
+            build/ci/

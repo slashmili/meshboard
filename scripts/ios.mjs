@@ -49,7 +49,7 @@ if (deviceBuild) console.log('Unsigned device build only. To install on your iPa
 
 if (action === 'interop') {
   process.env.MESHBOARD_IOS_SIMULATOR = simulator.udid
-  const mise = spawnSync('mise', ['--version'], { stdio: 'ignore' }).status === 0
+  const mise = !process.env.CI && spawnSync('mise', ['--version'], { stdio: 'ignore' }).status === 0
   const invoke = (command, args) => mise
     ? run('mise', ['exec', 'java@temurin-21', 'node@22', 'pnpm@9', '--', command, ...args])
     : run(command, args)

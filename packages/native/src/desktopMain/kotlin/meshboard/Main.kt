@@ -17,12 +17,18 @@ import meshboard.resources.meshboard_icon
 import org.jetbrains.compose.resources.painterResource
 
 fun main(args: Array<String>) {
+    // Also exercises the bundled JVM/launcher in release CI, without a display.
+    if (args.contentEquals(arrayOf("--print-build-info"))) {
+        println("Meshboard ${System.getProperty("meshboard.app.version", "development")}")
+        println("App origin: ${desktopAppOrigin()}")
+        return
+    }
     val controller = DesktopController(forceRelay = System.getenv("MESHBOARD_RELAY_ONLY") == "true")
     if (args.isNotEmpty()) controller.join(args[0])
     application {
         Window(onCloseRequest = { controller.close(); exitApplication() }, title = "Meshboard", icon = painterResource(Res.drawable.meshboard_icon), state = rememberWindowState(width = 1200.dp, height = 820.dp)) {
             window.minimumSize = Dimension(940, 650)
-            val origin = remember { System.getenv("MESHBOARD_APP_ORIGIN") ?: "http://127.0.0.1:5173" }
+            val origin = remember { desktopAppOrigin() }
             MeshboardApp(controller, origin, ::qrImage)
         }
     }
