@@ -39,6 +39,9 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     private var socket: URLSessionWebSocketTask?
     private var fetch: URLSessionDataTask?
     private var receiveTask: Task<Void, Never>?
+    private var signalQueue: [String] = []
+    private var signalBytes = 0
+    private var signalSending = false
     private var generation = 0
     private var origin = ""
     private var room = ""
@@ -92,6 +95,7 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     func stop() {
         generation += 1; reconnect?.cancel(); reconnect = nil; fetch?.cancel(); fetch = nil
         receiveTask?.cancel(); receiveTask = nil
+        signalQueue.removeAll(); signalBytes = 0; signalSending = false
         let old = socket; socket = nil; old?.cancel(with: .goingAway, reason: nil)
         desired.removeAll(); attempts.removeAll(); selfID = ""; reconnectDelay = 1
         for id in Array(peers.keys) { drop(id) }
@@ -130,6 +134,8 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
     private func lost(_ ws: URLSessionWebSocketTask, rejected: Bool) {
         guard socket === ws else { return }; socket = nil
+        receiveTask?.cancel(); receiveTask = nil; ws.cancel(with: .goingAway, reason: nil)
+        signalQueue.removeAll(); signalBytes = 0; signalSending = false
         events?.signaling(active: false, error: rejected ? "The connection service declined this session." : "Reconnecting to the connection service…")
         guard !rejected else { return }
         let current = generation
@@ -141,10 +147,19 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     private func sendSignal(_ value: [String: Any]) {
         guard let ws = socket else { return }
         let raw = json(value)
-        guard raw.utf8.count <= 32_768 else { lost(ws, rejected: true); return }
+        guard raw.utf8.count <= 32_768, signalBytes + raw.utf8.count <= 256 * 1024 else { lost(ws, rejected: true); return }
+        signalQueue.append(raw); signalBytes += raw.utf8.count; flushSignals()
+    }
+    private func flushSignals() {
+        guard !signalSending, let ws = socket, let raw = signalQueue.first else { return }
+        signalSending = true
         ws.send(.string(raw)) { [weak self, weak ws] error in
-            guard error != nil else { return }
-            DispatchQueue.main.async { if let ws { self?.lost(ws, rejected: false) } }
+            DispatchQueue.main.async {
+                guard let self, let ws, self.socket === ws else { return }
+                if error != nil { self.lost(ws, rejected: false); return }
+                self.signalQueue.removeFirst(); self.signalBytes -= raw.utf8.count
+                self.signalSending = false; self.flushSignals()
+            }
         }
     }
     fileprivate func signal(_ peer: ApplePeer, _ payload: [String: Any]) {

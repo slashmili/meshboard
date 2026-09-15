@@ -22,7 +22,7 @@
     "test:android": "node scripts/android.mjs test",
     "test:interop:android": "node scripts/android.mjs interop",
     "test:native": "./packages/native/gradlew -p packages/native desktopTest",
-    "test:interop:ios": "pnpm --filter @meshboard/web exec playwright test -c playwright.ios.config.ts",
+    "test:interop:ios": "node scripts/ios.mjs interop",
     "test:interop": "./packages/native/gradlew -p packages/native prepareInterop && pnpm --filter @meshboard/web exec playwright test -c playwright.native.config.ts"
   }
 }

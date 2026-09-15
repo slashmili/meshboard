@@ -8,9 +8,10 @@ include a Java runtime. This is the approved desktop architecture.
 Checkpoint 04b adds [Android sharing](androidApp/README.md), using the shared model,
 wire codec, and mobile Compose layout with Android-native WebRTC and OkHttp signaling.
 
-The [iPad/iPhone local canvas](iosApp/README.md) adds a SwiftUI/Xcode host for the
-same touch UI. Use `pnpm ios` on an Apple Silicon Mac, or open its Xcode project
-to configure signing and run on your iPad. iOS sharing is not implemented yet.
+The [iPad/iPhone app](iosApp/README.md) adds a SwiftUI/Xcode host for the
+same touch UI and native Apple WebRTC sharing. Use `pnpm ios` on an Apple Silicon Mac, or open its Xcode project
+to configure signing and run on your iPad. Physical devices need reachable HTTPS,
+WSS, and TURN addresses.
 
 ## Run on Linux
 
@@ -42,8 +43,9 @@ mise exec java@temurin-21 node@22 pnpm@9 -- pnpm native
 The build selects WebRTC JNI for the running JVM's OS and architecture, including
 Apple Silicon and Intel Macs. Apple Silicon has been validated; Intel Mac builds
 remain untested. No Android SDK is needed. Local drawing works without the server;
-sharing needs the web/signaling service. The Linux container TURN launcher has not
-been validated on macOS; use a reachable TURN service for restrictive networks.
+sharing needs the web/signaling service. The macOS TURN launcher uses native Coturn (`brew install coturn`), with
+`TURNSERVER_PATH` available for a custom executable. The loopback relay was verified
+with forced-TURN browser/iOS tests; physical devices need a reachable TURN service.
 
 Build a standalone app with its own Java runtime:
 

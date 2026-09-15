@@ -236,7 +236,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                 if (state.invite.isEmpty()) {
                     Text("Your drawing stays on this board. Use the address of your running Meshboard web app.")
                     OutlinedTextField(origin, { origin = it }, label = { Text("App address") }, modifier = Modifier.testTag("mobile-app-address"))
-                    Text("In the local emulator, the default address connects to this computer.", fontSize = 12.sp)
+                    Text("Everyone needs to be able to reach this address.", fontSize = 12.sp)
                     Button(onClick = { sharing.share(origin) }, modifier = Modifier.testTag("mobile-create-invite")) { Text("Create invite") }
                 } else {
                     val qr = remember(state.invite) { qrImage(state.invite) }

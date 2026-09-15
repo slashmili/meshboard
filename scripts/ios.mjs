@@ -4,8 +4,8 @@ import { join } from 'node:path'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const action = process.argv[2] || 'run'
-if (process.platform !== 'darwin' || !['run', 'build', 'device-build'].includes(action)) {
-  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build]')
+if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop'].includes(action)) {
+  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop]')
   process.exit(1)
 }
 function run(command, args, capture = false) {
@@ -36,11 +36,23 @@ run('xcodebuild', ['-project', 'packages/native/iosApp/Meshboard.xcodeproj', '-s
   '-configuration', 'Debug', '-destination', deviceBuild ? 'generic/platform=iOS' : `platform=iOS Simulator,id=${simulator.udid}`,
   '-clonedSourcePackagesDirPath', join(root, 'packages/native/build/SourcePackages'),
   '-derivedDataPath', output, 'build', 'CODE_SIGNING_ALLOWED=NO'])
-if (action === 'run') {
+if (action === 'run' || action === 'interop') {
   if (simulator.state !== 'Booted') run('xcrun', ['simctl', 'boot', simulator.udid])
   run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b'])
   run('xcrun', ['simctl', 'install', simulator.udid, join(output, 'Build/Products/Debug-iphonesimulator/Meshboard.app')])
-  run('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', simulator.udid])
-  run('xcrun', ['simctl', 'launch', simulator.udid, 'dev.meshboard.ios'])
+  if (action === 'run') {
+    run('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', simulator.udid])
+    run('xcrun', ['simctl', 'launch', simulator.udid, 'dev.meshboard.ios'])
+  }
 }
 if (deviceBuild) console.log('Unsigned device build only. To install on your iPad, select a signing team and Run in Xcode; see packages/native/iosApp/README.md.')
+
+if (action === 'interop') {
+  process.env.MESHBOARD_IOS_SIMULATOR = simulator.udid
+  const mise = spawnSync('mise', ['--version'], { stdio: 'ignore' }).status === 0
+  const invoke = (command, args) => mise
+    ? run('mise', ['exec', 'java@temurin-21', 'node@22', 'pnpm@9', '--', command, ...args])
+    : run(command, args)
+  invoke('./packages/native/gradlew', ['-p', 'packages/native', 'prepareInterop'])
+  invoke('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.ios.config.ts', ...process.argv.slice(3)])
+}
