@@ -20,4 +20,11 @@ class WireTest {
             assertFails(url) { DesktopController.parseInvite(url) }
         }
     }
+    @Test fun crdtPreviewInvitesCannotJoinLegacySessions() {
+        val room = "123e4567-e89b-42d3-a456-426614174000"
+        val preview = "http://127.0.0.1:5174/?crdt=1#crdt=$room"
+        assertEquals("http://127.0.0.1:5174" to room, DesktopController.parseInvite(preview, crdt = true))
+        assertFails { DesktopController.parseInvite(preview) }
+        assertFails { DesktopController.parseInvite("http://127.0.0.1:5174/#room=$room", crdt = true) }
+    }
 }

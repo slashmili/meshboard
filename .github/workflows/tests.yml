@@ -33,6 +33,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - name: Set up Rust for Yjs and yrs compatibility tests
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |

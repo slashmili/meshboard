@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import { MAX_POINTS } from '@meshboard/shared-protocol'
 import { constrainEnd, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
-import { BoardDocument } from './sync/BoardDocument'
+import type { SessionDocument } from './sync/SessionDocument'
 
 type Gesture =
   | { type: 'draw'; pointer: number; element: BoardElement }
@@ -9,7 +9,7 @@ type Gesture =
   | { type: 'pan'; pointer: number; start: Point; view: View }
   | { type: 'pinch'; distance: number; anchor: Point; view: View }
 
-export function useBoard(tool: Tool, color: string, width: number, document: BoardDocument, preview: (element: BoardElement | null) => void) {
+export function useBoard(tool: Tool, color: string, width: number, document: SessionDocument, preview: (element: BoardElement | null) => void) {
   const svgRef = useRef<SVGSVGElement>(null)
   const elements = useSyncExternalStore(document.subscribe, document.getElements)
   const [draft, setDraft] = useState<BoardElement | null>(null)

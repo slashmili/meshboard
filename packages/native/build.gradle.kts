@@ -12,6 +12,7 @@ plugins {
 
 // Desktop builds do not require an Android SDK. Android scripts opt in explicitly.
 val androidEnabled = providers.gradleProperty("meshboard.android").orNull == "true"
+val crdtInteropEnabled = providers.gradleProperty("meshboard.crdtInterop").orNull == "true"
 if (androidEnabled) apply(plugin = "com.android.library")
 
 // Match the JVM architecture (including an Intel JDK under Rosetta), not the CPU.
@@ -74,6 +75,7 @@ kotlin {
         }
         commonTest.dependencies { implementation(kotlin("test")) }
         val desktopMain by getting {
+            if (crdtInteropEnabled) kotlin.srcDir("src/crdtJvmMain/kotlin")
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
@@ -83,6 +85,7 @@ kotlin {
             }
         }
         val desktopTest by getting {
+            if (crdtInteropEnabled) kotlin.srcDir("src/crdtJvmTest/kotlin")
             dependencies { implementation(compose.desktop.uiTestJUnit4) }
         }
     }
@@ -161,5 +164,67 @@ tasks.register("prepareInterop") {
             parentFile.mkdirs()
             writeText(files(desktopMainCompilation.output.allOutputs, desktopMainCompilation.runtimeDependencyFiles).asPath)
         }
+    }
+}
+
+// Opt-in only: no Rust toolchain or JNI library is needed by current app builds.
+if (crdtInteropEnabled) {
+    val rustTarget = when (desktopOs) {
+        "macos" -> "$desktopArch-apple-darwin"
+        "linux" -> "$desktopArch-unknown-linux-gnu"
+        else -> "$desktopArch-pc-windows-msvc"
+    }
+    val rustBuild = layout.buildDirectory.dir("crdt-core")
+    val libraryName = when (desktopOs) {
+        "macos" -> "libmeshboard_crdt_core.dylib"
+        "linux" -> "libmeshboard_crdt_core.so"
+        else -> "meshboard_crdt_core.dll"
+    }
+    val library = rustBuild.map { it.file("$rustTarget/debug/$libraryName") }
+    val buildCrdtJvm by tasks.registering(Exec::class) {
+        workingDir(rootProject.file("../crdt-core"))
+        commandLine("cargo", "build", "--locked", "--lib", "--features", "jvm", "--target", rustTarget)
+        environment("CARGO_TARGET_DIR", rustBuild.get().asFile.absolutePath)
+        // Cargo owns incremental checking, including compiler/toolchain changes.
+        outputs.upToDateWhen { false }
+    }
+    val launcher = extensions.getByType<JavaToolchainService>().launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+    val crdtJvmTest by tasks.registering(Test::class) {
+        dependsOn(buildCrdtJvm, "desktopTestClasses")
+        testClassesDirs = desktopMainCompilation.output.classesDirs
+        classpath = files(desktopMainCompilation.output.allOutputs, desktopMainCompilation.runtimeDependencyFiles)
+        javaLauncher.set(launcher)
+        jvmArgs("-Xcheck:jni")
+        filter { includeTestsMatching("meshboard.crdt.*") }
+        systemProperty("meshboard.crdt.library", library.get().asFile.absolutePath)
+        inputs.file(library)
+    }
+    tasks.register("prepareCrdtInterop") {
+        dependsOn(crdtJvmTest)
+        val output = layout.buildDirectory.file("crdt/interop.json")
+        outputs.file(output)
+        outputs.upToDateWhen { false }
+        doLast {
+            output.get().asFile.apply {
+                parentFile.mkdirs()
+                writeText(groovy.json.JsonOutput.toJson(mapOf(
+                    "java" to launcher.get().executablePath.asFile.absolutePath,
+                    "library" to library.get().asFile.absolutePath,
+                    "classpath" to files(desktopMainCompilation.output.allOutputs, desktopMainCompilation.runtimeDependencyFiles).asPath,
+                )))
+            }
+        }
+    }
+    tasks.register<JavaExec>("runCrdtPreview") {
+        dependsOn(buildCrdtJvm, "desktopMainClasses")
+        val main = desktop.compilations.getByName("main")
+        classpath(main.output.allOutputs, main.runtimeDependencyFiles)
+        javaLauncher.set(launcher)
+        mainClass.set("meshboard.MainKt")
+        systemProperty("meshboard.crdt.preview", "true")
+        systemProperty("meshboard.app.origin", "http://127.0.0.1:5174")
+        systemProperty("meshboard.crdt.library", library.get().asFile.absolutePath)
     }
 }

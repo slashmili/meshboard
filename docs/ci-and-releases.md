@@ -18,6 +18,19 @@ Windows and physical-device validation are not covered by this workflow.
 CI lists the SDK hardware profiles and checks for Nexus 10 before creating its
 emulator. The local `pnpm emulator:android` setup remains Pixel Tablet.
 
+Desktop/web jobs also install stable Rust and run the isolated Yjs/yrs binary
+compatibility suite through `pnpm test`. This validates the Phase 2 prototype,
+not CRDT integration into the currently shipped apps. `pnpm test:crdt:kotlin`
+also builds the opt-in JNI library for each desktop runner's JVM architecture,
+runs Kotlin lifecycle/validation/concurrency tests, and repeats the seven Yjs
+scenarios through Kotlin and JNI. The library is not packaged into releases yet.
+`pnpm test:interop:crdt` then tests the opt-in local preview through real WebRTC
+and TURN on a separate development server (port 5174), including four-peer
+convergence and legacy/preview protocol isolation. The preview uses actual
+y-webrtc in the browser; tests also exercise an unmodified upstream provider's
+raw sync/awareness against desktop and rejection of invalid updates. Large
+Meshboard messages use the documented, negotiated fragmentation extension.
+
 iOS interop scenarios retain a 60-second test timeout with no automatic retries.
 Simulator startup and cleanup run in a separate 120-second Playwright fixture
 budget; each asynchronous `simctl` command is capped at 30 seconds. The fixture

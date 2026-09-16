@@ -31,8 +31,10 @@ case "$1" in
     pnpm test
     pnpm build
     pnpm test:native
+    pnpm test:crdt:kotlin
     pnpm test:e2e
     pnpm test:interop
+    pnpm test:interop:crdt
     ;;
   android)
     ./packages/native/gradlew -p packages/native -Pmeshboard.android=true testDebugUnitTest :androidApp:testDebugUnitTest
