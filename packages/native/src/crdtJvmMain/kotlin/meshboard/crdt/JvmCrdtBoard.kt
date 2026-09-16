@@ -7,12 +7,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import meshboard.BoardElement
 import meshboard.Wire
 
-/** Loaded only in the opt-in CRDT checkpoint; not included in app distributions. */
+/** Loaded only in opt-in desktop/Android CRDT checkpoints. */
 internal object CrdtJni {
     init {
-        System.load(requireNotNull(System.getProperty("meshboard.crdt.library")) {
-            "Run the CRDT Gradle task to build and locate the native library"
-        })
+        val desktopLibrary = System.getProperty("meshboard.crdt.library")
+        if (desktopLibrary != null) System.load(desktopLibrary)
+        else System.loadLibrary("meshboard_crdt_core") // Android's ABI-specific APK library.
     }
     external fun create(clientId: Long): Long
     external fun call(handle: Long, operation: Int, input: ByteArray): ByteArray

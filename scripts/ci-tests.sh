@@ -40,6 +40,7 @@ case "$1" in
     ./packages/native/gradlew -p packages/native -Pmeshboard.android=true testDebugUnitTest :androidApp:testDebugUnitTest
     pnpm test:android
     pnpm test:interop:android
+    pnpm test:crdt:android | tee build/ci/android-crdt.log
     ;;
   ios)
     ./packages/native/gradlew -p packages/native -Pmeshboard.ios=true iosSimulatorArm64Test

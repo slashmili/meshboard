@@ -26,6 +26,7 @@
     "emulator:android": "node scripts/android.mjs emulator",
     "build:android": "node scripts/android.mjs build",
     "test:android": "node scripts/android.mjs test",
+    "test:crdt:android": "node scripts/android.mjs crdt-test",
     "test:interop:android": "node scripts/android.mjs interop",
     "test:native": "./packages/native/gradlew -p packages/native desktopTest",
     "test:interop:ios": "node scripts/ios.mjs interop",

@@ -83,8 +83,8 @@ and [iOS README](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Validate the isolated Phase 2 web/desktop preview (2d below), then extend
-   CRDT bindings and protocol integration to mobile in separate checkpoints.
+1. Validate the Android CRDT binding checkpoint (2e below), then add live Android
+   CRDT sharing. Keep iOS bindings and protocol integration as separate checkpoints.
 2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
    checks. Basic iPad/web and local-server macOS sharing are user-validated.
 3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
@@ -131,7 +131,7 @@ using the existing transport, **not y-webrtc protocol compatibility**. Default
 and packaged apps still use Phase 1 sync; mobile bindings and broader security
 and performance work remain pending. Superseded in the active preview by 2d.
 
-**2d — y-webrtc web/desktop interoperability ready for feedback.** The browser
+**2d — y-webrtc web/desktop interoperability accepted on Linux; CI passed.** The browser
 uses pinned upstream y-webrtc; desktop implements its unencrypted signaling,
 binary sync and awareness profile. A separate development-only signaling endpoint
 keeps released sessions unchanged. Large board messages use an explicitly
@@ -140,8 +140,20 @@ Linux tests cover four mixed peers, large snapshots, creator departure/rejoin,
 refresh recovery, TURN, an unmodified upstream provider exchanging small raw
 sync/awareness messages with desktop, and rejection of invalid incoming updates.
 Codec fixtures, fragment limits, awareness expiry and signaling isolation/caps
-also pass. Mac validation remains pending; Android/iOS still use v1.
+also pass. User confirmed all CI checks passed on Linux and both macOS runners
+after the four-peer convergence deadline/readiness fix. Manual Mac preview
+validation remains pending; Android/iOS still use v1.
 See [preview instructions and protocol limits](crdt-preview.md). Pause for feedback.
+
+**2e — Android CRDT JNI boundary ready for feedback.** Opt-in debug packaging
+reuses the desktop Kotlin/JNI wrapper and Rust core for x86_64 and ARM64 Android.
+`pnpm test:crdt:android` runs the six JNI tests on the tablet and all seven existing
+Yjs scenarios through Android, including a 12,000-point stroke and deletion-only
+sync. Android CI runs the same checks. No new Android UI or live CRDT transport
+is enabled; ordinary and released apps remain on v1 without the Rust library.
+See [Android checkpoint instructions](../packages/native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e).
+Physical ARM64 execution and iOS bindings remain pending. Pause before adding
+the opt-in Android live-sharing preview.
 
 ## Phase 3
 

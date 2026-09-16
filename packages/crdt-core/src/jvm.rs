@@ -1,4 +1,4 @@
-//! Experimental desktop JNI bridge. Opaque IDs, never raw pointers, cross JNI.
+//! Experimental desktop/Android JNI bridge. Opaque IDs, never raw pointers, cross JNI.
 use crate::Board;
 use jni::objects::{JByteArray, JObject};
 use jni::sys::{jbyteArray, jint, jlong};

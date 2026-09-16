@@ -54,7 +54,10 @@ resulting shape schema, root types, and 2 MiB document budget before committing.
 The CLI remains an unrestricted compatibility harness. This is **not a complete
 untrusted-network security boundary yet**: binary decoding still needs adversarial
 CPU/allocation testing and isolation/resource-budget work before non-local use.
-Android JNI packaging and iOS C interop remain separate platform checkpoints.
+An opt-in [Android JNI checkpoint](../native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e)
+now reuses this wrapper and the same seven compatibility scenarios on a tablet
+with `pnpm test:crdt:android`. It does not enable live Android CRDT sharing.
+iOS C interop remains a separate platform checkpoint.
 
 ## Candidate document format
 

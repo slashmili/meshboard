@@ -8,7 +8,7 @@ also be started manually from Actions. It runs the existing automated suites:
 | Runner | Checks |
 | --- | --- |
 | Linux x86_64, macOS Apple Silicon, macOS Intel | TypeScript checks, protocol/signaling/web unit tests, release-script tests, web production build, Kotlin/common and desktop UI tests, browser end-to-end tests, browser/desktop interoperability |
-| Linux Android emulator | Kotlin Android unit tests, instrumented UI tests, browser/Android/desktop interoperability on an Android 15 Nexus 10 tablet |
+| Linux Android emulator | Kotlin Android unit tests, instrumented UI tests, browser/Android/desktop interoperability, opt-in CRDT JNI and Yjs compatibility on an Android 15 Nexus 10 tablet |
 | Apple Silicon with Xcode 26.6 | Kotlin iOS simulator tests, iPad/browser/macOS interoperability, unsigned physical-device compilation |
 
 Interop tests include real local Coturn relay traffic. CI never needs production
@@ -30,6 +30,13 @@ convergence and legacy/preview protocol isolation. The preview uses actual
 y-webrtc in the browser; tests also exercise an unmodified upstream provider's
 raw sync/awareness against desktop and rejection of invalid updates. Large
 Meshboard messages use the documented, negotiated fragmentation extension.
+
+The Android job installs NDK 28.2.13676358 and Rust targets for x86_64/ARM64,
+then runs `pnpm test:crdt:android`: six JNI tests and the same seven Yjs scenarios
+inside the x86_64 tablet emulator. Both Android ABIs are compiled; ARM64 device
+execution is not claimed. This debug-only checkpoint leaves default sync and
+release APK contents unchanged. Its instrumentation reports are kept separately
+from UI reports, and the Yjs/instrumentation console log is included in CI artifacts.
 
 iOS interop scenarios retain a 60-second test timeout with no automatic retries.
 Simulator startup and cleanup run in a separate 120-second Playwright fixture
