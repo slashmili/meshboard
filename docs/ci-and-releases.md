@@ -44,12 +44,18 @@ interoperability. Its log is `build/ci/android-crdt-interop.log`; preview UI
 reports are kept under `androidApp/build/reports/androidTests/crdt-preview`.
 
 The iOS job installs Rust's `aarch64-apple-ios` and `aarch64-apple-ios-sim` targets.
-`pnpm test:crdt:ios` runs five Kotlin/Native boundary tests and the same seven Yjs
+`pnpm test:crdt:ios` runs five Kotlin/Native boundary tests, four controller tests and the same seven Yjs
 scenarios through a simulator executable, then links the opt-in device framework.
-No iOS live CRDT sharing is enabled. The following normal app/tests still run
-without the opt-in. Binding XML/HTML reports are kept under `test-results/crdt-ios`
+The following normal app/tests still run without the opt-in. Binding XML/HTML reports are kept under `test-results/crdt-ios`
 and `reports/tests/crdt-ios`; the compatibility log is `build/ci/ios-crdt.log`.
-The first Apple CI result is pending; Linux checks cannot validate Apple linking.
+The original binding checkpoint passed Apple CI (user-confirmed).
+`pnpm test:interop:ios:crdt` additionally builds/installs the opt-in Debug simulator
+preview and runs six live browser/iPad/desktop scenarios. These cover awareness,
+retry, large snapshots, four peers, creator departure/rejoin, reload, real TURN,
+unmodified upstream providers and input/protocol/origin guards. Its log is
+`build/ci/ios-crdt-interop.log`, with traces under `packages/web/test-results/ios-crdt`.
+The new preview still needs its first Apple CI result. Normal device compilation
+runs afterwards with the preview explicitly disabled. No physical-device CRDT is enabled.
 
 iOS interop scenarios retain a 60-second test timeout with no automatic retries.
 Simulator startup and cleanup run in a separate 120-second Playwright fixture

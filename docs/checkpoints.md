@@ -83,8 +83,8 @@ and [iOS README](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Run the opt-in iOS CRDT binding checkpoint (2g below) on Apple CI/a Mac.
-   Pause for results before adding an iOS live-sharing preview in a separate checkpoint.
+1. Run the local iPad simulator CRDT sharing checkpoint (2h below) on Apple CI/a Mac,
+   then pause for manual simulator feedback before physical-device support or migration.
 2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
    checks. Basic iPad/web and local-server macOS sharing are user-validated.
 3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
@@ -168,7 +168,7 @@ See [manual tablet checks](crdt-preview.md#try-the-android-tablet--checkpoint-2f
 Pause for user feedback; physical-device CRDT, iOS CRDT, security hardening and
 production migration are not completed by this checkpoint.
 
-**2g — iOS CRDT C boundary ready for Apple CI, not yet Apple-validated.**
+**2g — iOS CRDT C boundary CI-validated (user-confirmed).**
 Opt-in `meshboard.crdtIos=true` builds Rust static libraries for ARM64 iOS devices
 and simulators, generates C bindings, and implements `AppleCrdtBoard` behind the
 shared document API. JNI and C reuse the same validated Rust handle registry.
@@ -177,8 +177,24 @@ seven Yjs compatibility scenarios through a simulator-only Kotlin/Native
 executable, and links the opt-in device framework. Normal iOS app builds do not
 include this binding or require Rust; AppleBoardController remains on v1.
 See [Mac setup and CI instructions](../packages/native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g).
-This Linux-hosted implementation still requires its first successful Apple CI
-run. Pause there; do not claim iOS CRDT live sharing or physical-device execution.
+The user reported successful Apple CI before proceeding to 2h. Device library
+linking does not establish physical-device execution.
+
+**2h — Local iPad simulator CRDT sharing ready for Apple CI and manual feedback.**
+`pnpm ios:crdt` opts into Debug simulator sharing with the web/desktop/Android
+CRDT previews. The UI is explicitly labeled and the controller refuses non-local
+origins and legacy invites before discarding state. Swift also requires a
+local-development RTC configuration. Release/device preview builds are refused;
+ordinary apps still use v1 and do not load Rust. Native platforms now share the
+same common-Kotlin sync/fragmentation/awareness codec and its unit tests.
+Four additional iOS controller tests exercise large snapshots, delete-only sync,
+raw messages, awareness, invalid updates and guards. `pnpm test:interop:ios:crdt`
+adds six live scenarios, including four mixed peers, a 12,000-point stroke,
+creator departure/rejoin, browser reload, real TURN and unmodified y-webrtc.
+Apple execution is pending; local Linux regressions cannot validate Swift or
+simulator behavior. Pause after CI for the [manual simulator checks](crdt-preview.md#try-the-ipad-simulator--checkpoint-2h).
+Physical iPad CRDT, Android/iOS simultaneous execution, security hardening and
+production migration remain separate work.
 
 ## Phase 3
 

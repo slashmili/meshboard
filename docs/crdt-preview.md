@@ -1,10 +1,10 @@
-# Local web/desktop/Android CRDT preview — checkpoints 2d and 2f
+# Local cross-platform CRDT previews — checkpoints 2d, 2f and 2h
 
 This opt-in checkpoint uses the actual **y-webrtc 10.3.0 provider** in the browser
-and compatible signaling, binary Yjs sync, and awareness on the yrs/Kotlin desktop/Android
+and compatible signaling, binary Yjs sync, and awareness on the yrs/Kotlin desktop/mobile
 side. It is **local-only**, separate from the released v0.1.0 apps.
-Default Android and all iOS builds remain on the old protocol. Do not deploy or
-use sensitive drawings. Android's emulator-only preview is explicitly enabled below.
+Default mobile builds remain on the old protocol. Do not deploy or use sensitive
+drawings. Android/iOS previews are emulator/simulator-only and explicitly enabled below.
 
 ## Try on Linux (Mac validation pending)
 
@@ -59,11 +59,34 @@ Debug emulator networking maps it to the host without changing the invite.
 4. Rotate the tablet and check that the drawing and live session survive.
 
 Pause here for feedback. This is not the normal Android build and cannot join
-v1 (`#room=`) invites or iOS sessions. It refuses non-local origins and requires
+v1 (`#room=`) invites or normal iOS sessions. It refuses non-local origins and requires
 both an emulator and `localDevelopment` server configuration. Physical-device
 CRDT sharing is not enabled. Only debug builds can set `CRDT_PREVIEW=true`;
 ordinary/release builds never load the optional Rust library. `pnpm android`
 reinstalls normal mode. Switching builds can end the in-memory session.
+
+## Try the iPad simulator — checkpoint 2h
+
+On an Apple Silicon Mac with the [iOS CRDT toolchain](../packages/native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g),
+keep the local TURN service and `pnpm dev:crdt` running. Launch `pnpm ios:crdt`.
+The header must say **Meshboard · CRDT preview · local only** and Share should
+use `http://127.0.0.1:5174`. Keep that origin; the simulator shares Mac loopback.
+
+1. Create an invite in the web preview and join from the simulator. Copy the
+   entire link, transfer the Mac clipboard with Simulator's Edit → Paste, then
+   paste into Join. Draw/erase both ways and check live unfinished strokes.
+2. Leave, create a fresh board from the simulator, and join from the browser,
+   desktop preview and a separate browser window. Draw from several peers.
+3. Leave from the simulator creator; remaining peers must keep drawing. Delete
+   a stroke, reload one browser, then rejoin the simulator with the same invite.
+   All peers should agree, and the deleted stroke must not return.
+4. Rotate the simulator and confirm the live board survives.
+
+Pause for feedback. The initial iOS binding CI passed; this live preview still
+needs Apple CI and manual validation. Physical iPad CRDT sharing is not enabled.
+The Swift host refuses non-local origins and production RTC configuration, and
+the build script refuses device/Release preview requests. `pnpm ios` restores
+normal mode; released apps are unchanged. No app-layer encryption yet.
 
 ## Automated checks
 
@@ -74,6 +97,7 @@ pnpm test:crdt          # Rust/Yjs binary compatibility
 pnpm test:crdt:kotlin   # Kotlin/JNI lifecycle plus the same compatibility cases
 pnpm test:interop:crdt  # Real Chromium/desktop WebRTC and TURN
 pnpm test:interop:android:crdt # Tablet UI, then Android/web/desktop WebRTC and TURN
+pnpm test:interop:ios:crdt # On Mac: iPad simulator/browser/desktop WebRTC and TURN
 ```
 
 The live suite covers web creation; native creation with a 12,000-point stroke;
@@ -89,7 +113,10 @@ runs six preview UI tests and six live scenarios: bidirectional updates and
 awareness, retry, four mixed peers with a 12,000-point snapshot, creator departure,
 reload/rejoin recovery, large messages through TURN, unmodified upstream peers
 creating in either direction, invalid-update rejection, and local/protocol guards.
-The iOS job remains on v1. Network assertions have bounded 30-second budgets;
+The iOS job now runs six equivalent CRDT preview scenarios in addition to v1
+checks, plus four controller tests with the binding tests. Android and iOS
+simultaneous execution is not covered by these separate CI jobs.
+Network assertions have bounded 30-second budgets;
 test retries are not used to hide failures.
 
 ## Protocol profile and isolation
@@ -130,7 +157,7 @@ Send queues are limited to 8 MiB per peer and honor channel backpressure.
 This fragmentation is a **Meshboard extension**, not part of y-webrtc. The upstream
 interop test deliberately uses small raw messages and an unmodified provider.
 Large-board support with arbitrary third-party providers is not claimed. Password-
-encrypted signaling, broadcast-channel peer discovery, iOS integration and
+encrypted signaling, broadcast-channel peer discovery, physical-device CRDT and
 application-layer security are outside this checkpoint. The pinned provider's
 per-peer hooks are covered by the live tests; review them when upgrading y-webrtc.
 Android creates ordered/reliable channels, but its current Java WebRTC API does

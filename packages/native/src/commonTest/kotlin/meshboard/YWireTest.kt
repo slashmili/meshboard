@@ -16,6 +16,7 @@ class YWireTest {
     }
     @Test fun fragmentsRoundTripAndRejectInvalidSequences() {
         val bytes = ByteArray(500_000) { 42 }; bytes[0] = 0
+        assertContentEquals(byteArrayOf(127, 0, 7, -95, 32), YWire.frames(bytes).first().copyOfRange(0, 5))
         val receiver = YWire.Receiver()
         val messages = YWire.frames(bytes).mapNotNull(receiver::accept)
         assertEquals(1, messages.size); assertContentEquals(bytes, messages.single())

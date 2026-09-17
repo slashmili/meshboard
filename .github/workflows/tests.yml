@@ -176,5 +176,6 @@ jobs:
             packages/native/build/reports/tests/
             packages/native/build/test-results/
             packages/native/build/ios/Logs/Test/
+            packages/native/build/ios-crdt-preview/Logs/Test/
             packages/web/test-results/
             build/ci/

@@ -20,6 +20,8 @@
     "signaling": "pnpm --filter @meshboard/signaling start",
     "native": "./packages/native/gradlew -p packages/native run",
     "ios": "node scripts/ios.mjs run",
+    "ios:crdt": "node scripts/ios.mjs crdt-run",
+    "test:interop:ios:crdt": "node scripts/ios.mjs crdt-interop",
     "build:ios": "node scripts/ios.mjs build",
     "build:ios:device": "node scripts/ios.mjs device-build",
     "android": "node scripts/android.mjs run",
