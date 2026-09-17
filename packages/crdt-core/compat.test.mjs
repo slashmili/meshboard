@@ -40,9 +40,12 @@ async function native(request) {
     })
     socket.on('end', () => { try { resolve(JSON.parse(output)) } catch (error) { reject(error) } })
   })
-  const result = spawnSync(jvm ? jvm.java : binary,
-    jvm ? ['-Xcheck:jni', `-Dmeshboard.crdt.library=${jvm.library}`, '-cp', jvm.classpath, 'meshboard.crdt.CrdtCompatKt'] : [],
-    { input: JSON.stringify(request), encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 })
+  const ios = process.env.MESHBOARD_CRDT_IOS_BINARY
+  if (ios) ok(process.env.MESHBOARD_IOS_SIMULATOR, 'iOS CRDT harness requires an explicit simulator UUID')
+  const result = spawnSync(ios ? 'xcrun' : jvm ? jvm.java : binary,
+    ios ? ['simctl', 'spawn', process.env.MESHBOARD_IOS_SIMULATOR, ios]
+      : jvm ? ['-Xcheck:jni', `-Dmeshboard.crdt.library=${jvm.library}`, '-cp', jvm.classpath, 'meshboard.crdt.CrdtCompatKt'] : [],
+    { input: JSON.stringify(request) + '\n', encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 })
   if (result.error) throw result.error
   strictEqual(result.status, 0, result.stderr)
   return JSON.parse(result.stdout)

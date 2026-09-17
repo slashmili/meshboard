@@ -4,8 +4,8 @@ import { join } from 'node:path'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const action = process.argv[2] || 'run'
-if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop'].includes(action)) {
-  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop]')
+if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop', 'crdt-test'].includes(action)) {
+  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop|crdt-test]')
   process.exit(1)
 }
 function run(command, args, capture = false) {
@@ -30,6 +30,19 @@ if (!deviceBuild) {
       || available.find(device => device.name.startsWith('iPad'))
   if (!simulator) throw new Error('Install an iPad simulator in Xcode, or set MESHBOARD_IOS_SIMULATOR to an available simulator UUID.')
   console.log(`Building for ${simulator.name} (${simulator.udid})`)
+}
+if (action === 'crdt-test') {
+  // Standalone simulator executable: no app install, live transport, or signing changes.
+  if (simulator.state !== 'Booted') run('xcrun', ['simctl', 'boot', simulator.udid])
+  run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b'])
+  run('./packages/native/gradlew', ['-p', 'packages/native', '-Pmeshboard.ios=true', '-Pmeshboard.crdtIos=true',
+    `-Pmeshboard.iosTestDevice=${simulator.udid}`, 'iosSimulatorArm64Test',
+    'linkCrdtCompatDebugExecutableIosSimulatorArm64', 'linkDebugFrameworkIosArm64'])
+  process.env.MESHBOARD_IOS_SIMULATOR = simulator.udid
+  process.env.MESHBOARD_CRDT_IOS_BINARY = join(root, 'packages/native/build/bin/iosSimulatorArm64/crdtCompatDebugExecutable/crdtCompat.kexe')
+  run('node', ['--test', 'packages/crdt-core/compat.test.mjs'])
+  console.log('iOS CRDT bindings checked; normal iOS sharing still uses the existing protocol.')
+  process.exit(0)
 }
 const output = join(root, 'packages/native/build', deviceBuild ? 'ios-device' : 'ios')
 run('xcodebuild', ['-project', 'packages/native/iosApp/Meshboard.xcodeproj', '-scheme', 'Meshboard',

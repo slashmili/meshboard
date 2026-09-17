@@ -13,6 +13,10 @@ plugins {
 // Desktop builds do not require an Android SDK. Android scripts opt in explicitly.
 val androidEnabled = providers.gradleProperty("meshboard.android").orNull == "true"
 val crdtInteropEnabled = providers.gradleProperty("meshboard.crdtInterop").orNull == "true"
+val crdtIosEnabled = providers.gradleProperty("meshboard.crdtIos").orNull == "true"
+require(!crdtIosEnabled || providers.gradleProperty("meshboard.ios").orNull == "true") {
+    "meshboard.crdtIos requires meshboard.ios=true"
+}
 if (androidEnabled) apply(plugin = "com.android.library")
 
 // Match the JVM architecture (including an Intel JDK under Rosetta), not the CPU.
@@ -48,11 +52,46 @@ kotlin {
     jvm("desktop")
     // Opt in so desktop/Android builds do not need the Apple toolchain.
     if (providers.gradleProperty("meshboard.ios").orNull == "true") {
-        listOf(iosArm64(), iosSimulatorArm64()).forEach {
-            it.binaries.framework {
+        listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+            target.binaries.framework {
                 baseName = "MeshboardShared"
                 isStatic = true
                 binaryOption("bundleId", "dev.meshboard.shared")
+            }
+            if (crdtIosEnabled) {
+                val rustTarget = if (target.name == "iosArm64") "aarch64-apple-ios" else "aarch64-apple-ios-sim"
+                val rustBuild = layout.buildDirectory.dir("crdt-ios")
+                val libraryDir = rustBuild.map { it.dir("$rustTarget/debug") }
+                val buildRust = tasks.register<Exec>("buildCrdt${target.name.replaceFirstChar { it.uppercase() }}") {
+                    workingDir(rootProject.file("../crdt-core"))
+                    commandLine("cargo", "build", "--locked", "--lib", "--features", "c-api", "--target", rustTarget)
+                    environment("CARGO_TARGET_DIR", rustBuild.get().asFile.absolutePath)
+                    environment("IPHONEOS_DEPLOYMENT_TARGET", "16.0")
+                    outputs.upToDateWhen { false } // Cargo owns toolchain-aware incremental checking.
+                }
+                val interop = target.compilations.getByName("main").cinterops.create("meshboardCrdt") {
+                    definitionFile.set(project.file("src/nativeInterop/cinterop/meshboardCrdt.def"))
+                    includeDirs(rootProject.file("../crdt-core/include"))
+                    extraOpts("-libraryPath", libraryDir.get().asFile.absolutePath)
+                }
+                tasks.named(interop.interopProcessingTaskName) {
+                    dependsOn(buildRust)
+                    inputs.file(libraryDir.map { it.file("libmeshboard_crdt_core.a") })
+                }
+                // Leaf source sets avoid requiring cinterop commonization for ordinary app builds.
+                target.compilations.getByName("main").defaultSourceSet.kotlin.srcDir("src/crdtIosMain/kotlin")
+                if (target.name == "iosSimulatorArm64") {
+                    providers.gradleProperty("meshboard.iosTestDevice").orNull?.let { device ->
+                        (target as org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithSimulatorTests)
+                            .testRuns.getByName("test").deviceId = device
+                    }
+                    target.compilations.getByName("test").defaultSourceSet.kotlin.srcDir("src/crdtIosTest/kotlin")
+                    target.compilations.getByName("main").defaultSourceSet.kotlin.srcDir("src/crdtIosHarness/kotlin")
+                    target.binaries.executable("crdtCompat", listOf(org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.DEBUG)) {
+                        baseName = "crdtCompat"
+                        entryPoint = "meshboard.crdt.main"
+                    }
+                }
             }
         }
     }
@@ -143,6 +182,14 @@ compose.desktop {
 tasks.withType<Test>().configureEach {
     testLogging { events("passed", "skipped", "failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
     systemProperty("meshboard.fixtures", rootProject.file("../shared-protocol/fixtures").absolutePath)
+}
+
+if (crdtIosEnabled) {
+    tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest>().configureEach {
+        // The ordinary iOS tests run afterwards; preserve binding reports separately.
+        reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/crdt-ios/$name"))
+        reports.html.outputLocation.set(layout.buildDirectory.dir("reports/tests/crdt-ios/$name"))
+    }
 }
 
 // The harness uses the exact desktop transport without opening a window.

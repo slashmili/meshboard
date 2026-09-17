@@ -7,7 +7,7 @@ Start with [delivery checkpoints](docs/checkpoints.md) for current progress and 
 steps, then use the platform guide: [desktop](packages/native/README.md),
 [Android](packages/native/androidApp/README.md), or [iPad/iPhone](packages/native/iosApp/README.md).
 
-## Current checkpoint: 2f — local web/desktop/Android CRDT preview
+## Current checkpoint: 2g — opt-in iOS CRDT bindings (Apple CI pending)
 
 Web, Linux desktop, macOS, Android emulator, and iOS simulator support shared
 boards with link/QR invites, live previews, late-join snapshots, and TURN fallback.
@@ -19,7 +19,9 @@ default apps still use the existing sync implementation. An opt-in
 [local web/desktop/Android CRDT preview](docs/crdt-preview.md) uses y-webrtc in
 the browser and yrs on native peers. Desktop CI passed on Linux and both macOS
 runners; manual Mac preview validation remains pending. Android's opt-in tablet
-preview is ready for feedback. Released/default apps and iOS remain on Phase 1 sync.
+preview is available for local testing. The next [iOS binding checkpoint](packages/native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g)
+adds simulator compatibility tests without changing the app's sharing behavior.
+Released/default apps and iOS sharing remain on Phase 1 sync.
 See [delivery checkpoints](docs/checkpoints.md) for the validation record.
 
 Default apps remain on Phase 1; its full platform-validation milestone is still

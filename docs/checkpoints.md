@@ -83,8 +83,8 @@ and [iOS README](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Try the local Android CRDT sharing preview (2f below), then extend bindings
-   and protocol integration to iOS in separate checkpoints.
+1. Run the opt-in iOS CRDT binding checkpoint (2g below) on Apple CI/a Mac.
+   Pause for results before adding an iOS live-sharing preview in a separate checkpoint.
 2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
    checks. Basic iPad/web and local-server macOS sharing are user-validated.
 3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
@@ -167,6 +167,18 @@ rejection. Android CI includes both legacy and preview suites.
 See [manual tablet checks](crdt-preview.md#try-the-android-tablet--checkpoint-2f).
 Pause for user feedback; physical-device CRDT, iOS CRDT, security hardening and
 production migration are not completed by this checkpoint.
+
+**2g — iOS CRDT C boundary ready for Apple CI, not yet Apple-validated.**
+Opt-in `meshboard.crdtIos=true` builds Rust static libraries for ARM64 iOS devices
+and simulators, generates C bindings, and implements `AppleCrdtBoard` behind the
+shared document API. JNI and C reuse the same validated Rust handle registry.
+`pnpm test:crdt:ios` runs five boundary tests in the simulator, then the same
+seven Yjs compatibility scenarios through a simulator-only Kotlin/Native
+executable, and links the opt-in device framework. Normal iOS app builds do not
+include this binding or require Rust; AppleBoardController remains on v1.
+See [Mac setup and CI instructions](../packages/native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g).
+This Linux-hosted implementation still requires its first successful Apple CI
+run. Pause there; do not claim iOS CRDT live sharing or physical-device execution.
 
 ## Phase 3
 

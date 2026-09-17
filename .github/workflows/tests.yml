@@ -159,7 +159,13 @@ jobs:
           xcrun simctl list devices available
           brew install coturn
           pnpm --filter @meshboard/web exec playwright install chromium
+      - name: Set up Rust for iOS CRDT bindings
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
       - name: Run Kotlin iOS tests, iPad/Web/macOS interoperability and device compilation
+        # Binding checks run first; ordinary app builds below remain opted out.
         run: bash scripts/ci-tests.sh ios
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()

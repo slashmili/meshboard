@@ -69,6 +69,42 @@ the app does not request camera/microphone access or create media tracks.
   startup check aborted the app when that entry was missing.
 - Keep `@executable_path/Frameworks` in the runtime search path for embedded WebRTC.
 
+## Opt-in CRDT bindings — checkpoint 2g
+
+This checkpoint adds **no UI or sharing changes**. The normal app continues to
+use v1, and its builds neither require Rust nor include the CRDT C binding.
+On an Apple Silicon Mac, install the stable Rust toolchain in addition to the
+Xcode/JDK/Node prerequisites above, then run from the repository root:
+
+```sh
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+pnpm test:crdt:ios
+```
+
+The command selects/boots the same iPad simulator as `pnpm ios` (override with
+`MESHBOARD_IOS_SIMULATOR=<UUID>`). It enables `meshboard.ios=true` and
+`meshboard.crdtIos=true` only for this build. It runs five Kotlin/Native boundary
+tests, seven real Yjs↔Kotlin/Native↔Rust compatibility scenarios, and links an
+ARM64 device framework. These cover lifecycle/stale handles, malformed and
+oversized data, a 12,000-point snapshot, incremental/delete-only updates,
+duplicate/out-of-order delivery, concurrent writes and creator-independent sync.
+Compatibility requests run in a standalone simulator executable over stdin/stdout;
+there is no socket listener or new app debug endpoint. No signing team is needed.
+
+The Rust C API returns owned byte buffers; Kotlin copies them and frees every
+result in `finally`, including errors. Documents use opaque non-reused IDs, and
+both Kotlin calls/close and Rust registry access are serialized. Explicit `close()`
+is required; this is not yet a hardened untrusted-network boundary.
+The binding uses Kotlin's [C interop and static-library definition support](https://kotlinlang.org/docs/native-definition-file.html).
+
+CI runs this before the existing v1 iPad interoperability and unsigned app build.
+Binding reports live in `packages/native/build/reports/tests/crdt-ios/` and
+`packages/native/build/test-results/crdt-ios/`; `build/ci/ios-crdt.log` contains
+the seven Yjs scenario results. All are uploaded in `test-results-ios`.
+The new Apple path is not validated on this Linux development machine: **wait
+for green Apple CI before starting the live iOS CRDT preview**. The device library
+is compile/link checked only; this does not establish physical iPad execution.
+
 ## Install on your physical iPad
 
 1. Connect and unlock the iPad; trust the Mac if prompted.

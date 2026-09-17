@@ -27,6 +27,7 @@
     "build:android": "node scripts/android.mjs build",
     "test:android": "node scripts/android.mjs test",
     "test:crdt:android": "node scripts/android.mjs crdt-test",
+    "test:crdt:ios": "node scripts/ios.mjs crdt-test",
     "android:crdt": "node scripts/android.mjs crdt-run",
     "test:interop:android:crdt": "node scripts/android.mjs crdt-interop",
     "test:interop:android": "node scripts/android.mjs interop",

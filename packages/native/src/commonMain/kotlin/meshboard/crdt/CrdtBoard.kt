@@ -2,7 +2,7 @@ package meshboard.crdt
 
 import meshboard.BoardElement
 
-/** Phase 2 document API, used by the opt-in desktop preview; mobile bindings pending. */
+/** Phase 2 document API for opt-in platform bindings and local sharing previews. */
 interface CrdtBoard {
     fun put(element: BoardElement)
     fun remove(id: String)

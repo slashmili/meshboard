@@ -7,6 +7,11 @@ use yrs::{Any, Doc, Map, MapRef, ReadTxn, StateVector, Transact, Update};
 #[cfg(feature = "jvm")]
 mod jvm;
 
+#[cfg(any(feature = "jvm", feature = "c-api"))]
+mod bridge;
+#[cfg(feature = "c-api")]
+mod c_api;
+
 pub struct Board {
     doc: Doc,
     elements: MapRef,

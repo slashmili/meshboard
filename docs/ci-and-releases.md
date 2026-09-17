@@ -9,7 +9,7 @@ also be started manually from Actions. It runs the existing automated suites:
 | --- | --- |
 | Linux x86_64, macOS Apple Silicon, macOS Intel | TypeScript checks, protocol/signaling/web unit tests, release-script tests, web production build, Kotlin/common and desktop UI tests, browser end-to-end tests, browser/desktop interoperability |
 | Linux Android emulator | Kotlin Android unit tests, instrumented UI tests, browser/Android/desktop interoperability, opt-in CRDT JNI and Yjs compatibility on an Android 15 Nexus 10 tablet |
-| Apple Silicon with Xcode 26.6 | Kotlin iOS simulator tests, iPad/browser/macOS interoperability, unsigned physical-device compilation |
+| Apple Silicon with Xcode 26.6 | Opt-in iOS CRDT boundary and Yjs compatibility tests, Kotlin iOS simulator tests, iPad/browser/macOS interoperability, unsigned physical-device compilation |
 
 Interop tests include real local Coturn relay traffic. CI never needs production
 TURN credentials or contacts the production deployment. Failing test reports,
@@ -42,6 +42,14 @@ opt-in preview and six live Android/browser/desktop CRDT scenarios, including
 large snapshots, four-peer convergence, TURN and unmodified upstream-provider
 interoperability. Its log is `build/ci/android-crdt-interop.log`; preview UI
 reports are kept under `androidApp/build/reports/androidTests/crdt-preview`.
+
+The iOS job installs Rust's `aarch64-apple-ios` and `aarch64-apple-ios-sim` targets.
+`pnpm test:crdt:ios` runs five Kotlin/Native boundary tests and the same seven Yjs
+scenarios through a simulator executable, then links the opt-in device framework.
+No iOS live CRDT sharing is enabled. The following normal app/tests still run
+without the opt-in. Binding XML/HTML reports are kept under `test-results/crdt-ios`
+and `reports/tests/crdt-ios`; the compatibility log is `build/ci/ios-crdt.log`.
+The first Apple CI result is pending; Linux checks cannot validate Apple linking.
 
 iOS interop scenarios retain a 60-second test timeout with no automatic retries.
 Simulator startup and cleanup run in a separate 120-second Playwright fixture

@@ -58,7 +58,11 @@ An opt-in [Android JNI checkpoint](../native/androidApp/README.md#opt-in-android
 now reuses this wrapper and the same seven compatibility scenarios on a tablet
 with `pnpm test:crdt:android`. Live sharing requires the additional
 [Android preview opt-in](../../docs/crdt-preview.md#try-the-android-tablet--checkpoint-2f).
-iOS C interop remains a separate platform checkpoint.
+The opt-in [iOS C interop checkpoint](../native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g)
+adds `AppleCrdtBoard` and repeats the same scenarios inside an ARM64 simulator.
+It uses the same validated Rust operations as JNI, with a private C header,
+owned result buffers and caught panics. `pnpm test:crdt:ios` requires an Apple
+Silicon Mac; its first Apple CI validation is pending. iOS live sharing remains v1.
 
 ## Candidate document format
 
@@ -105,8 +109,9 @@ See the [Yjs update API](https://docs.yjs.dev/api/document-updates) and
 6. Delete-only updates synchronize even with unchanged state vectors.
 7. A remaining peer seeds a newcomer and accepts its edits without the creator.
 
-These binary-only tests do **not** establish mobile FFI, live transport
+The Rust CLI tests alone do **not** establish mobile FFI, live transport
 compatibility, four-device convergence, encrypted admission, or mobile performance.
+The opt-in platform binding suites above separately exercise their FFI boundaries.
 The separate local preview suite now tests actual y-webrtc signaling/sync/awareness
 against desktop, including an unmodified provider and a negotiated large-message
 extension. See the linked preview guide for the exact scope and limits.
