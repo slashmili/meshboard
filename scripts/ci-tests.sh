@@ -41,6 +41,7 @@ case "$1" in
     pnpm test:android
     pnpm test:interop:android
     pnpm test:crdt:android | tee build/ci/android-crdt.log
+    pnpm test:interop:android:crdt | tee build/ci/android-crdt-interop.log
     ;;
   ios)
     ./packages/native/gradlew -p packages/native -Pmeshboard.ios=true iosSimulatorArm64Test

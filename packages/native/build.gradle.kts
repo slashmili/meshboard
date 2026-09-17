@@ -75,6 +75,7 @@ kotlin {
         }
         commonTest.dependencies { implementation(kotlin("test")) }
         val desktopMain by getting {
+            kotlin.srcDir("src/jvmTransportMain/kotlin")
             if (crdtInteropEnabled) kotlin.srcDir("src/crdtJvmMain/kotlin")
             dependencies {
                 implementation(compose.desktop.currentOs)

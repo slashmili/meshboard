@@ -2,7 +2,7 @@
 
 This isolated prototype tests **Yjs 13.6.32 ↔ yrs 0.27.4** using real binary
 updates. An opt-in Kotlin/JVM JNI bridge exercises the same core in-process.
-An opt-in [local web/desktop preview](../../docs/crdt-preview.md) now uses this
+An opt-in [local web/desktop/Android preview](../../docs/crdt-preview.md) now uses this
 core for live synchronization. Released/default apps still use the Phase 1 JSON
 protocol; these checkpoints do not change their behavior.
 
@@ -35,8 +35,8 @@ test driver starts a JVM for each harness request, just as checkpoint 2a starts
 the Rust CLI. Lifecycle and concurrent-access tests exercise persistent handles.
 Both test paths enable the JVM's JNI checking mode (`-Xcheck:jni`).
 
-`CrdtBoard` is a common Kotlin API. `JvmCrdtBoard` is currently desktop-only,
-compiled with `-Pmeshboard.crdtInterop=true`; the regular desktop distribution
+`CrdtBoard` is a common Kotlin API. `JvmCrdtBoard` is shared with Android and
+compiled on desktop with `-Pmeshboard.crdtInterop=true`; the regular desktop distribution
 does not include its implementation or load a native CRDT library. Current
 app builds do not require Rust. CI runs this checkpoint on its existing Linux,
 Apple Silicon macOS, and Intel macOS desktop jobs. Only Linux has been run locally.
@@ -56,7 +56,8 @@ untrusted-network security boundary yet**: binary decoding still needs adversari
 CPU/allocation testing and isolation/resource-budget work before non-local use.
 An opt-in [Android JNI checkpoint](../native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e)
 now reuses this wrapper and the same seven compatibility scenarios on a tablet
-with `pnpm test:crdt:android`. It does not enable live Android CRDT sharing.
+with `pnpm test:crdt:android`. Live sharing requires the additional
+[Android preview opt-in](../../docs/crdt-preview.md#try-the-android-tablet--checkpoint-2f).
 iOS C interop remains a separate platform checkpoint.
 
 ## Candidate document format

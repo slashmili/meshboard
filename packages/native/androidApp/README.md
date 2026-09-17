@@ -46,7 +46,8 @@ pnpm test:interop:android # Real Android/web/desktop sessions; run pnpm turn fir
 ```
 
 All Android commands use one script, `scripts/android.mjs`, with modes for
-`emulator`, `run`, `build`, `test`, `interop`, and `crdt-test`. Start the emulator once, then
+`emulator`, `run`, `build`, `test`, `interop`, `crdt-test`, `crdt-run`, and
+`crdt-interop`. Start the emulator once, then
 use the app commands repeatedly; rebuilding does not restart Android. The app
 commands also work with a device started from Android Studio or a connected phone.
 
@@ -141,7 +142,31 @@ with API 26 and 16 KiB ELF segment alignment. No cargo-ndk installation is neede
 Android CI runs the same command, preserving its logs in `build/ci/android-crdt.log`
 and the JNI reports under `androidApp/build/reports/androidTests/crdt`.
 To return to the ordinary app after testing, run `pnpm android`; it rebuilds
-without the optional library. Live Android CRDT transport is the next checkpoint.
+without the optional library. Live preview transport is a separate opt-in below.
+
+## Local Android CRDT sharing — checkpoint 2f
+
+With the above toolchain and tablet ready, run `pnpm dev:crdt`, `pnpm turn`
+(unless already running), and `pnpm android:crdt` in separate terminals.
+Open <http://127.0.0.1:5174/?crdt=1> on the host. The tablet header identifies
+**CRDT preview · local only** and defaults sharing to port 5174. Create on either
+platform and copy the full `#crdt=` invite to the other. Desktop preview peers
+(`pnpm native:crdt`) can join too. Normal/iOS `#room=` sessions are incompatible.
+
+`pnpm test:interop:android:crdt` runs the six tablet UI tests in preview mode,
+then six live tests covering four peers, concurrent edits, large snapshots,
+creator departure, reload/rejoin, awareness, TURN, upstream y-webrtc compatibility,
+and invalid input. The test adapters remain confined to test APKs. Preview UI
+reports are under `build/reports/androidTests/crdt-preview`, separate from the
+binding tests. Android CI runs both suites, as well as the normal v1 tests.
+
+The preview adds `-Pmeshboard.crdtPreview=true` to the binding opt-in. It is
+debug/emulator-only and requires a loopback app origin and a local-development
+server; it cannot connect to a public deployment. ARM64 packaging alone does not
+enable physical-device CRDT sharing. Release mode always disables the preview.
+There is still no authenticated invitation or application-layer encryption.
+Use test drawings only. See [manual checks and protocol limits](../../../docs/crdt-preview.md#try-the-android-tablet--checkpoint-2f).
+Pause for manual feedback before continuing to iOS or release migration.
 
 References: [Android emulator](https://developer.android.com/studio/run/emulator),
 [Kotlin Multiplatform Android setup](https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html).

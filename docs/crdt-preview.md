@@ -1,9 +1,10 @@
-# Local web/desktop CRDT preview — checkpoint 2d
+# Local web/desktop/Android CRDT preview — checkpoints 2d and 2f
 
 This opt-in checkpoint uses the actual **y-webrtc 10.3.0 provider** in the browser
-and compatible signaling, binary Yjs sync, and awareness on the yrs/Kotlin desktop
+and compatible signaling, binary Yjs sync, and awareness on the yrs/Kotlin desktop/Android
 side. It is **local-only**, separate from the released v0.1.0 apps.
-Android/iOS remain on the old protocol. Do not deploy or use sensitive drawings.
+Default Android and all iOS builds remain on the old protocol. Do not deploy or
+use sensitive drawings. Android's emulator-only preview is explicitly enabled below.
 
 ## Try on Linux (Mac validation pending)
 
@@ -34,6 +35,36 @@ running desktop/server cannot speak the new protocol. Create a fresh test board.
 Pause here for feedback. Mac runs use the same commands, but have not been tried
 locally. No changes to installed AppImage/DMG apps are required.
 
+## Try the Android tablet — checkpoint 2f
+
+Install the [Android CRDT toolchain](../packages/native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e)
+first. Keep `pnpm dev:crdt` and the local TURN service running. In separate terminals:
+
+```sh
+pnpm emulator:android  # Pixel Tablet; skip if already running
+pnpm android:crdt      # Opt-in debug build; starts on the tablet
+```
+
+The compact header must say **Meshboard · CRDT preview · local only**. Share uses
+`http://127.0.0.1:5174` by default; keep that address when creating invites.
+Debug emulator networking maps it to the host without changing the invite.
+
+1. Create a board at <http://127.0.0.1:5174/?crdt=1>, then paste its full invite
+   into Android's **Join** dialog. Draw shapes, change colors, and erase both ways.
+2. Start a fresh board from Android's **Share → Create invite**. Join from web
+   and optionally `pnpm native:crdt`; open another browser window for four peers.
+3. Draw from several peers, then leave from the creator. Remaining peers should
+   keep drawing. Reload a browser while another stays connected; erased strokes
+   must not return. Rejoin Android using the same invite to recover current state.
+4. Rotate the tablet and check that the drawing and live session survive.
+
+Pause here for feedback. This is not the normal Android build and cannot join
+v1 (`#room=`) invites or iOS sessions. It refuses non-local origins and requires
+both an emulator and `localDevelopment` server configuration. Physical-device
+CRDT sharing is not enabled. Only debug builds can set `CRDT_PREVIEW=true`;
+ordinary/release builds never load the optional Rust library. `pnpm android`
+reinstalls normal mode. Switching builds can end the in-memory session.
+
 ## Automated checks
 
 With the local TURN relay running:
@@ -42,6 +73,7 @@ With the local TURN relay running:
 pnpm test:crdt          # Rust/Yjs binary compatibility
 pnpm test:crdt:kotlin   # Kotlin/JNI lifecycle plus the same compatibility cases
 pnpm test:interop:crdt  # Real Chromium/desktop WebRTC and TURN
+pnpm test:interop:android:crdt # Tablet UI, then Android/web/desktop WebRTC and TURN
 ```
 
 The live suite covers web creation; native creation with a 12,000-point stroke;
@@ -52,7 +84,13 @@ hooks, against desktop for raw sync, deletion and awareness in both directions,
 with both browser-created and desktop-created sessions.
 An invalid upstream update must be rejected without changing the browser board.
 The dedicated Playwright configuration starts the server on 5174 when needed.
-Linux and both macOS CI desktop jobs include the suite; mobile jobs are unchanged.
+Linux and both macOS CI desktop jobs include the desktop suite. Android CI also
+runs six preview UI tests and six live scenarios: bidirectional updates and
+awareness, retry, four mixed peers with a 12,000-point snapshot, creator departure,
+reload/rejoin recovery, large messages through TURN, unmodified upstream peers
+creating in either direction, invalid-update rejection, and local/protocol guards.
+The iOS job remains on v1. Network assertions have bounded 30-second budgets;
+test retries are not used to hide failures.
 
 ## Protocol profile and isolation
 
@@ -92,9 +130,13 @@ Send queues are limited to 8 MiB per peer and honor channel backpressure.
 This fragmentation is a **Meshboard extension**, not part of y-webrtc. The upstream
 interop test deliberately uses small raw messages and an unmodified provider.
 Large-board support with arbitrary third-party providers is not claimed. Password-
-encrypted signaling, broadcast-channel peer discovery, mobile integration and
+encrypted signaling, broadcast-channel peer discovery, iOS integration and
 application-layer security are outside this checkpoint. The pinned provider's
 per-peer hooks are covered by the live tests; review them when upgrading y-webrtc.
+Android creates ordered/reliable channels, but its current Java WebRTC API does
+not expose reliability settings for received channels. This preview relies on
+the matching peers' defaults; hostile DCEP/channel configuration needs further
+hardening before non-local use.
 
 ## Validation and limits
 

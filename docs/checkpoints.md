@@ -83,8 +83,8 @@ and [iOS README](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Validate the Android CRDT binding checkpoint (2e below), then add live Android
-   CRDT sharing. Keep iOS bindings and protocol integration as separate checkpoints.
+1. Try the local Android CRDT sharing preview (2f below), then extend bindings
+   and protocol integration to iOS in separate checkpoints.
 2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
    checks. Basic iPad/web and local-server macOS sharing are user-validated.
 3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
@@ -145,7 +145,7 @@ after the four-peer convergence deadline/readiness fix. Manual Mac preview
 validation remains pending; Android/iOS still use v1.
 See [preview instructions and protocol limits](crdt-preview.md). Pause for feedback.
 
-**2e — Android CRDT JNI boundary ready for feedback.** Opt-in debug packaging
+**2e — Android CRDT JNI boundary accepted.** Opt-in debug packaging
 reuses the desktop Kotlin/JNI wrapper and Rust core for x86_64 and ARM64 Android.
 `pnpm test:crdt:android` runs the six JNI tests on the tablet and all seven existing
 Yjs scenarios through Android, including a 12,000-point stroke and deletion-only
@@ -154,6 +154,19 @@ is enabled; ordinary and released apps remain on v1 without the Rust library.
 See [Android checkpoint instructions](../packages/native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e).
 Physical ARM64 execution and iOS bindings remain pending. Pause before adding
 the opt-in Android live-sharing preview.
+
+**2f — Local Android/web/desktop CRDT sharing ready for feedback.** The opt-in
+debug Android controller uses the same y-webrtc signaling, binary sync,
+awareness and negotiated fragmentation profile as desktop. JVM codecs are shared
+between Android and desktop. `pnpm android:crdt` starts the explicitly labeled,
+emulator-only UI on port 5174; normal and release builds stay on v1.
+`pnpm test:interop:android:crdt` runs the preview UI and mixed-peer live suite,
+including a 12,000-point snapshot, concurrent updates, creator departure,
+reload/rejoin, TURN, unmodified upstream-provider interoperability and input
+rejection. Android CI includes both legacy and preview suites.
+See [manual tablet checks](crdt-preview.md#try-the-android-tablet--checkpoint-2f).
+Pause for user feedback; physical-device CRDT, iOS CRDT, security hardening and
+production migration are not completed by this checkpoint.
 
 ## Phase 3
 

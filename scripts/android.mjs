@@ -8,8 +8,13 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const sdk = process.env.ANDROID_HOME || resolve(root, '.android-sdk')
 const windows = process.platform === 'win32'
 const mode = process.argv[2] ?? 'run'
-const tasks = { build: [':androidApp:assembleDebug'], test: [':androidApp:connectedDebugAndroidTest'], run: [':androidApp:installDebug'], interop: [':androidApp:installDebug', ':androidApp:installDebugAndroidTest', 'prepareInterop'], 'crdt-test': [':androidApp:connectedDebugAndroidTest'] }
-if (mode !== 'emulator' && !Object.hasOwn(tasks, mode)) throw new Error('Usage: node scripts/android.mjs [emulator|build|test|run|interop|crdt-test]')
+const tasks = {
+  build: [':androidApp:assembleDebug'], test: [':androidApp:connectedDebugAndroidTest'], run: [':androidApp:installDebug'],
+  interop: [':androidApp:installDebug', ':androidApp:installDebugAndroidTest', 'prepareInterop'],
+  'crdt-test': [':androidApp:connectedDebugAndroidTest'], 'crdt-run': [':androidApp:installDebug'],
+  'crdt-interop': [':androidApp:installDebug', ':androidApp:installDebugAndroidTest', 'prepareCrdtInterop', 'prepareInterop'],
+}
+if (mode !== 'emulator' && !Object.hasOwn(tasks, mode)) throw new Error('Usage: node scripts/android.mjs [emulator|build|test|run|interop|crdt-test|crdt-run|crdt-interop]')
 const env = { ...process.env, ANDROID_HOME: sdk }
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, env, stdio: 'inherit', shell: windows })
@@ -114,7 +119,18 @@ if (mode === 'emulator') {
     // Gradle's connected tests run on all devices; require an unambiguous test target.
     if (online.length !== 1) throw new Error('Keep only the intended test device connected for this command.')
   }
-  run(join(root, 'packages/native', windows ? 'gradlew.bat' : 'gradlew'), ['-p', 'packages/native', '-Pmeshboard.android=true', ...(mode === 'crdt-test' ? ['-Pmeshboard.crdtAndroid=true', '-Pandroid.testInstrumentationRunnerArguments.class=meshboard.crdt.JvmCrdtBoardTest'] : []), ...tasks[mode]])
+  const preview = mode === 'crdt-run' || mode === 'crdt-interop'
+  const properties = [
+    ...(mode.startsWith('crdt-') ? ['-Pmeshboard.crdtAndroid=true'] : []),
+    ...(preview ? ['-Pmeshboard.crdtPreview=true'] : []),
+    ...(mode === 'crdt-interop' ? ['-Pmeshboard.crdtInterop=true'] : []),
+    ...(mode === 'crdt-test' ? ['-Pandroid.testInstrumentationRunnerArguments.class=meshboard.crdt.JvmCrdtBoardTest'] : []),
+  ]
+  if (mode === 'crdt-interop') {
+    run(join(root, 'packages/native', windows ? 'gradlew.bat' : 'gradlew'), ['-p', 'packages/native', '-Pmeshboard.android=true', ...properties,
+      '-Pandroid.testInstrumentationRunnerArguments.class=dev.meshboard.android.CanvasTest', ':androidApp:connectedDebugAndroidTest'])
+  }
+  run(join(root, 'packages/native', windows ? 'gradlew.bat' : 'gradlew'), ['-p', 'packages/native', '-Pmeshboard.android=true', ...properties, ...tasks[mode]])
   if (mode === 'crdt-test') {
     // Connected tests uninstall their APKs. Install only after that task has
     // finished; Gradle may reorder install tasks within the same invocation.
@@ -122,6 +138,7 @@ if (mode === 'emulator') {
     run(adb, ['-s', serial, 'install', '-r', '-t', 'packages/native/androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk'])
     await crdtCompatibility()
   }
-  if (mode === 'run') run(adb, ['-s', serial, 'shell', 'am', 'start', '-n', 'dev.meshboard.android/.MainActivity'])
+  if (mode === 'run' || mode === 'crdt-run') run(adb, ['-s', serial, 'shell', 'am', 'start', '-n', 'dev.meshboard.android/.MainActivity'])
   if (mode === 'interop') run('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.android.config.ts', ...process.argv.slice(3)])
+  if (mode === 'crdt-interop') run('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.android-crdt.config.ts', ...process.argv.slice(3)])
 }

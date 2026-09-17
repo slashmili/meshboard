@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ThreadLocalRandom
 import kotlinx.serialization.json.*
 
-/** lib0 varuint framing used by y-webrtc / y-protocols. No JSON board envelope. */
+/** Shared desktop/Android lib0 framing for y-webrtc / y-protocols. */
 object YWire {
     const val FRAGMENT_CHANNEL = "meshboard.y-webrtc.fragments-v1"
     const val FRAGMENT_SDP = "a=meshboard-fragments:1"

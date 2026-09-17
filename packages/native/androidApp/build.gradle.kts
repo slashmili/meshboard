@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val crdtPreview = providers.gradleProperty("meshboard.crdtPreview").orNull == "true"
+require(!crdtPreview || providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
+    "Android CRDT preview requires -Pmeshboard.crdtAndroid=true"
+}
 android {
     namespace = "dev.meshboard.android"
     compileSdk = 35
@@ -14,7 +18,10 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "CRDT_PREVIEW", "false")
     }
+    buildTypes.getByName("debug").buildConfigField("boolean", "CRDT_PREVIEW", crdtPreview.toString())
+    sourceSets.getByName("main").java.srcDir(rootProject.file("src/jvmTransportMain/kotlin"))
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
@@ -23,8 +30,8 @@ android {
 }
 kotlin { jvmToolchain(21) }
 
-// Boundary-only checkpoint: neither the released app nor the live Android
-// controller uses CRDT yet. No Rust/NDK requirement without this explicit opt-in.
+// Neither normal nor release builds need Rust. Live preview additionally
+// requires meshboard.crdtPreview and is enabled only in the debug build type.
 if (providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
     android.ndkVersion = "28.2.13676358"
     val targets = mapOf("x86_64" to "x86_64-linux-android", "arm64-v8a" to "aarch64-linux-android")
@@ -68,8 +75,9 @@ if (providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
     }
     tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(prepareCrdtAndroid) }
     android.testOptions {
-        resultsDir = layout.buildDirectory.dir("outputs/androidTest-results/crdt").get().asFile.absolutePath
-        reportDir = layout.buildDirectory.dir("reports/androidTests/crdt").get().asFile.absolutePath
+        val reports = if (crdtPreview) "crdt-preview" else "crdt"
+        resultsDir = layout.buildDirectory.dir("outputs/androidTest-results/$reports").get().asFile.absolutePath
+        reportDir = layout.buildDirectory.dir("reports/androidTests/$reports").get().asFile.absolutePath
     }
     dependencies { androidTestImplementation(kotlin("test-junit")) }
 }

@@ -37,6 +37,11 @@ inside the x86_64 tablet emulator. Both Android ABIs are compiled; ARM64 device
 execution is not claimed. This debug-only checkpoint leaves default sync and
 release APK contents unchanged. Its instrumentation reports are kept separately
 from UI reports, and the Yjs/instrumentation console log is included in CI artifacts.
+`pnpm test:interop:android:crdt` additionally runs six tablet UI tests in the
+opt-in preview and six live Android/browser/desktop CRDT scenarios, including
+large snapshots, four-peer convergence, TURN and unmodified upstream-provider
+interoperability. Its log is `build/ci/android-crdt-interop.log`; preview UI
+reports are kept under `androidApp/build/reports/androidTests/crdt-preview`.
 
 iOS interop scenarios retain a 60-second test timeout with no automatic retries.
 Simulator startup and cleanup run in a separate 120-second Playwright fixture

@@ -41,7 +41,7 @@ export async function androidPeer(relay = false) {
   const serial = process.env.ANDROID_SERIAL || 'emulator-5554'
   const run = (args: string[]) => execFileSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: 15_000 })
   const port = Number(run(['forward', 'tcp:0', 'tcp:18765']).trim())
-  const child = spawn(adb, ['-s', serial, 'shell', 'am', 'instrument', '-w', '-e', 'class', 'dev.meshboard.android.InteropTest', '-e', 'meshboard.interop', 'true', '-e', 'meshboard.relay', String(relay), 'dev.meshboard.android.test/androidx.test.runner.AndroidJUnitRunner'])
+  const child = spawn(adb, ['-s', serial, 'shell', 'am', 'instrument', '-w', '-e', 'class', 'dev.meshboard.android.InteropTest', '-e', 'meshboard.interop', 'true', '-e', 'meshboard.relay', String(relay), '-e', 'meshboard.crdt', String(process.env.MESHBOARD_CRDT_PREVIEW === '1'), 'dev.meshboard.android.test/androidx.test.runner.AndroidJUnitRunner'])
   let diagnostics = ''
   let spawnError: Error | undefined
   child.stdout.on('data', data => { diagnostics += data })
@@ -51,7 +51,8 @@ export async function androidPeer(relay = false) {
   let state: NativeState | undefined
   let socketError = ''
   async function close() {
-    if (socket && !socket.destroyed) { socket.write('{"type":"close"}\n'); socket.end() }
+    // Let Android consume the final command before closing the adb-forwarded socket.
+    if (socket && !socket.destroyed) socket.write('{"type":"close"}\n')
     if (child.exitCode === null && !spawnError) await new Promise<void>(resolve => {
       const timer = setTimeout(() => { child.kill(); resolve() }, 10_000)
       child.once('exit', () => { clearTimeout(timer); resolve() })
@@ -74,7 +75,7 @@ export async function androidPeer(relay = false) {
     if (!state) throw new Error(`Android harness did not start: ${socketError}\n${diagnostics}`)
     return {
       send(message: unknown) { if (!socket || socket.destroyed) throw new Error(`Android disconnected: ${diagnostics}`); socket.write(JSON.stringify(message) + '\n') },
-      state() { if (!state || socket?.destroyed || child.exitCode !== null) throw new Error(`Android disconnected: ${diagnostics}`); if (state.error) throw new Error(`Android peer: ${state.error}`); return state },
+      state(allowError = false) { if (!state || socket?.destroyed || child.exitCode !== null) throw new Error(`Android disconnected: ${diagnostics}`); if (state.error && !allowError) throw new Error(`Android peer: ${state.error}`); return state },
       async close() { await close(); if (!/OK \(1 test\)/.test(diagnostics)) throw new Error(`Android instrumentation failed: ${diagnostics}`) },
     }
   } catch (error) { await close(); throw error }
