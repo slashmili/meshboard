@@ -8,13 +8,16 @@ import { INITIAL_STATUS, type SessionStatus } from './MeshSession'
 import { FRAGMENT_CHANNEL, FRAGMENT_SDP, fragmentYMessage, MAX_Y_MESSAGE, YMessageReceiver } from './YTransport'
 
 type SimplePeer = {
-  connected: boolean; destroyed: boolean; _pc: RTCPeerConnection; _channel: RTCDataChannel
+  connected: boolean; destroyed: boolean; _pc: RTCPeerConnection; _channel: RTCDataChannel | null
   send(bytes: Uint8Array): void; destroy(error?: Error): void
   listeners(event: 'data'): ((bytes: Uint8Array) => void)[]
   removeAllListeners(event: 'data'): void
   on(event: 'data', fn: (bytes: Uint8Array) => void): void
+  on(event: 'connect' | 'close', fn: () => void): void
   prependListener(event: 'signal', fn: (signal: { sdp?: string }) => void): void
 }
+type OutgoingMessage = { message?: Uint8Array; frames?: Uint8Array[]; next: number }
+type PeerState = { queue: OutgoingMessage[]; bytes: number; relay: boolean; fragments: boolean }
 
 /** Actual upstream provider; hooks are limited to input validation, bounded I/O,
  * negotiated large-message fragmentation and disabling same-browser shortcuts. */
@@ -25,7 +28,7 @@ export class YWebrtcSession {
   private timer?: ReturnType<typeof setInterval>
   private previewTimer?: ReturnType<typeof setTimeout>
   private pendingPreview: BoardElement | null = null
-  private peers = new Map<WebrtcConn, { queue: Uint8Array[]; bytes: number; relay: boolean; fragments: boolean }>()
+  private peers = new Map<WebrtcConn, PeerState>()
   private shown = new Set<string>()
   private status = { ...INITIAL_STATUS }
   constructor(private room: string, private document: CrdtDocument,
@@ -123,7 +126,7 @@ export class YWebrtcSession {
     for (const conn of this.provider?.room?.webrtcConns.values() ?? []) {
       if (this.peers.has(conn)) continue
       const peer = conn.peer as SimplePeer
-      const state = { queue: [] as Uint8Array[], bytes: 0, relay: false, fragments: false }
+      const state: PeerState = { queue: [], bytes: 0, relay: false, fragments: false }
       this.peers.set(conn, state)
       // Add capability to the signaled SDP, after simple-peer reads its local
       // description: WebRTC implementations can discard unknown SDP attributes.
@@ -131,15 +134,18 @@ export class YWebrtcSession {
         if (signal.sdp && !signal.sdp.split('\r\n').includes(FRAGMENT_SDP)) signal.sdp = signal.sdp.replace('\r\nm=', `\r\n${FRAGMENT_SDP}\r\nm=`)
       })
       const send = peer.send.bind(peer)
-      const fragments = () => peer._channel.label === FRAGMENT_CHANNEL && state.fragments
+      const fragments = () => peer._channel?.label === FRAGMENT_CHANNEL && state.fragments
       peer.send = bytes => {
-        if (!peer.connected) return // The initial state-vector exchange catches up.
-        const frames = fragments() ? fragmentYMessage(bytes) : [bytes]
-        const size = frames.reduce((n, frame) => n + frame.length, 0)
-        if (bytes.length > MAX_Y_MESSAGE || state.bytes + size > 8 * 1024 * 1024) { peer.destroy(new Error('Peer is too slow.')); return }
-        state.queue.push(...frames); state.bytes += size
+        if (peer.destroyed) return
+        // Native peers may ask for state before simple-peer finishes its ICE
+        // stats/readiness checks. Dropping that reply leaves the newcomer empty:
+        // our later state-vector request synchronizes the opposite direction.
+        if (!bytes.length || bytes.length > MAX_Y_MESSAGE || state.bytes + bytes.length > 8 * 1024 * 1024) { peer.destroy(new Error('Peer is too slow.')); return }
+        state.queue.push({ message: bytes.slice(), next: 0 }); state.bytes += bytes.length
         this.drain(peer, state, send)
       }
+      peer.on('connect', () => this.drain(peer, state, send))
+      peer.on('close', () => { state.queue.length = 0; state.bytes = 0 })
       const receive = peer.listeners('data')
       peer.removeAllListeners('data')
       const assembler = new YMessageReceiver()
@@ -161,10 +167,21 @@ export class YWebrtcSession {
     for (const conn of this.peers.keys()) if (conn.closed) { this.peers.delete(conn); this.senders.delete(conn) }
   }
   private senders = new Map<WebrtcConn, (bytes: Uint8Array) => void>()
-  private drain(peer: SimplePeer, state: { queue: Uint8Array[]; bytes: number }, send: (bytes: Uint8Array) => void) {
+  private drain(peer: SimplePeer, state: PeerState, send: (bytes: Uint8Array) => void) {
     try {
-      while (peer.connected && state.queue.length && peer._channel.bufferedAmount < 256 * 1024) {
-        const frame = state.queue[0]; send(frame); state.queue.shift(); state.bytes -= frame.length
+      while (!peer.destroyed && peer.connected && peer._channel && state.queue.length && peer._channel.bufferedAmount < 256 * 1024) {
+        const pending = state.queue[0]
+        if (!pending.frames) {
+          const bytes = pending.message!
+          // Choose framing only after channel/SDP negotiation has completed.
+          pending.frames = peer._channel.label === FRAGMENT_CHANNEL && state.fragments ? fragmentYMessage(bytes) : [bytes]
+          state.bytes += pending.frames.reduce((n, frame) => n + frame.length, 0) - bytes.length
+          delete pending.message
+          if (state.bytes > 8 * 1024 * 1024) throw new Error('Peer is too slow.')
+        }
+        const frame = pending.frames[pending.next]
+        send(frame); pending.next++; state.bytes -= frame.length
+        if (pending.next === pending.frames.length) state.queue.shift()
       }
     } catch { peer.destroy(new Error('Could not send drawing update.')) }
   }

@@ -1,27 +1,37 @@
 package meshboard
 
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.util.concurrent.ThreadLocalRandom
+import kotlin.random.Random
+import kotlin.time.Clock
 import kotlinx.serialization.json.*
 
-/** Shared desktop/Android lib0 framing for y-webrtc / y-protocols. */
+/** Shared native lib0 framing for y-webrtc / y-protocols. */
 object YWire {
     const val FRAGMENT_CHANNEL = "meshboard.y-webrtc.fragments-v1"
     const val FRAGMENT_SDP = "a=meshboard-fragments:1"
     const val MAX_MESSAGE = 2 * 1024 * 1024 + 1024
     private const val CHUNK = 16 * 1024 - 5
     class Writer {
-        private val out = ByteArrayOutputStream()
+        private var out = ByteArray(64)
+        private var size = 0
+        private fun write(value: Int) {
+            if (size == out.size) out = out.copyOf(out.size * 2)
+            out[size++] = value.toByte()
+        }
         fun uint(value: Long): Writer {
             require(value in 0..9_007_199_254_740_991L)
             var n = value
-            while (n > 127) { out.write(((n and 127) or 128).toInt()); n = n ushr 7 }
-            out.write(n.toInt()); return this
+            while (n > 127) { write(((n and 127) or 128).toInt()); n = n ushr 7 }
+            write(n.toInt()); return this
         }
-        fun bytes(value: ByteArray): Writer { uint(value.size.toLong()); out.write(value); return this }
+        fun bytes(value: ByteArray): Writer {
+            require(value.size <= MAX_MESSAGE)
+            uint(value.size.toLong())
+            if (size + value.size > out.size) out = out.copyOf(maxOf(out.size * 2, size + value.size))
+            value.copyInto(out, size); size += value.size
+            return this
+        }
         fun string(value: String) = bytes(value.encodeToByteArray())
-        fun finish() = out.toByteArray()
+        fun finish() = out.copyOf(size)
     }
     class Reader(private val data: ByteArray) {
         private var offset = 0
@@ -51,10 +61,14 @@ object YWire {
         if (bytes.size <= CHUNK) return listOf(bytes)
         return (bytes.indices step CHUNK).map { offset ->
             val length = minOf(CHUNK, bytes.size - offset)
-            ByteBuffer.allocate(length + 5).put(127.toByte()).putInt(bytes.size).put(bytes, offset, length).array()
+            ByteArray(length + 5).also { frame ->
+                frame[0] = 127
+                for (i in 0..3) frame[i + 1] = (bytes.size ushr (24 - i * 8)).toByte()
+                bytes.copyInto(frame, 5, offset, offset + length)
+            }
         }
     }
-    class Receiver(private val now: () -> Long = System::currentTimeMillis) {
+    class Receiver(private val now: () -> Long = ::protocolMillis) {
         private var pending: ByteArray? = null
         private var offset = 0
         private var started = 0L
@@ -62,7 +76,8 @@ object YWire {
             require(bytes.isNotEmpty() && bytes.size <= MAX_MESSAGE)
             if (bytes[0] != 127.toByte()) { require(pending == null); return bytes }
             require(bytes.size in 6..CHUNK + 5)
-            val total = ByteBuffer.wrap(bytes, 1, 4).int
+            var total = 0
+            for (i in 1..4) total = (total shl 8) or (bytes[i].toInt() and 255)
             require(total in CHUNK + 1..MAX_MESSAGE)
             if (pending == null) { pending = ByteArray(total); offset = 0; started = now() }
             val target = pending!!
@@ -75,9 +90,9 @@ object YWire {
 }
 
 /** Bounded y-protocols awareness state, with clocks, removal and 30-second expiry. */
-class YAwareness(private val now: () -> Long = System::currentTimeMillis) {
+class YAwareness(private val now: () -> Long = ::protocolMillis) {
     private data class Entry(val clock: Long, val state: JsonObject?, val seen: Long)
-    val clientId = ThreadLocalRandom.current().nextLong(1, 0x1_0000_0000L)
+    val clientId = Random.nextLong(1, 0x1_0000_0000L)
     private val entries = mutableMapOf<Long, Entry>()
     private var clock = 0L
     fun local(peer: String, preview: BoardElement?): ByteArray {
@@ -125,3 +140,6 @@ class YAwareness(private val now: () -> Long = System::currentTimeMillis) {
         entry.state?.get("meshboard")?.jsonObject?.get("preview")?.takeUnless { it == JsonNull }?.let { id.toString() to Wire.element(it) }
     }.toMap()
 }
+
+@OptIn(kotlin.time.ExperimentalTime::class)
+private fun protocolMillis() = Clock.System.now().toEpochMilliseconds()

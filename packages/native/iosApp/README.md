@@ -84,7 +84,7 @@ pnpm test:crdt:ios
 The command selects/boots the same iPad simulator as `pnpm ios` (override with
 `MESHBOARD_IOS_SIMULATOR=<UUID>`). It enables `meshboard.ios=true` and
 `meshboard.crdtIos=true` only for this build. It runs five Kotlin/Native boundary
-tests, seven real Yjs↔Kotlin/Native↔Rust compatibility scenarios, and links an
+tests, four CRDT controller tests, seven real Yjs↔Kotlin/Native↔Rust compatibility scenarios, and links an
 ARM64 device framework. These cover lifecycle/stale handles, malformed and
 oversized data, a 12,000-point snapshot, incremental/delete-only updates,
 duplicate/out-of-order delivery, concurrent writes and creator-independent sync.
@@ -101,9 +101,46 @@ CI runs this before the existing v1 iPad interoperability and unsigned app build
 Binding reports live in `packages/native/build/reports/tests/crdt-ios/` and
 `packages/native/build/test-results/crdt-ios/`; `build/ci/ios-crdt.log` contains
 the seven Yjs scenario results. All are uploaded in `test-results-ios`.
-The new Apple path is not validated on this Linux development machine: **wait
-for green Apple CI before starting the live iOS CRDT preview**. The device library
-is compile/link checked only; this does not establish physical iPad execution.
+The original binding checkpoint passed Apple CI (user-confirmed). The device
+library is compile/link checked only; this does not establish physical iPad execution.
+
+## Local CRDT sharing preview — checkpoint 2h
+
+Requires the Rust/toolchain setup above. In separate terminals on your Mac:
+
+```sh
+pnpm turn       # Skip if the local TURN service is already running.
+pnpm dev:crdt
+pnpm ios:crdt
+```
+
+Open <http://127.0.0.1:5174/?crdt=1> in the browser. The simulator header must read
+**Meshboard · CRDT preview · local only**. Create an invite in either app, copy
+the full `#crdt=…` link, and paste it into the other. In Simulator, use
+**Edit → Paste** (⌘V) to transfer the Mac clipboard, then paste into Join.
+Check drawing/erasing in both directions, live previews, browser reload while
+the simulator stays connected, and rotation. Add `pnpm native:crdt` and another
+browser window, leave from the creator, and verify remaining peers keep drawing.
+See [the full checklist](../../../docs/crdt-preview.md#try-the-ipad-simulator--checkpoint-2h).
+
+Automated checks: `pnpm test:interop:ios:crdt`. Six scenarios run the actual Swift
+transport against browsers and the desktop preview, including large snapshots,
+TURN, unmodified y-webrtc, recovery and invalid-update/protocol/origin guards.
+Logs are in `build/ci/ios-crdt-interop.log` on CI; traces use
+`packages/web/test-results/ios-crdt/`. Simulator setup/cleanup has its own
+120-second fixture budget, separate from each test's 120-second budget.
+
+The script passes `MESHBOARD_CRDT_PREVIEW=1` to a **Debug simulator** build;
+the Xcode bridge enables `meshboard.crdtIos` and `meshboard.crdtIosPreview`.
+Other script actions explicitly reset the flag. Preview derived data is separate
+(`build/ios-crdt-preview`), while Swift packages remain shared. Use `pnpm ios` to
+reinstall normal v1 mode. Switching builds can end the in-memory session.
+
+**This is simulator-only, not a physical-iPad build.** Only localhost/127.0.0.1
+origins with `localDevelopment=true` are allowed. Device/Release preview requests
+fail; default/device/Release apps stay on v1. Use test drawings only: application
+encryption and peer authentication are still absent. Apple CI and manual preview
+validation are pending. Pause here before enabling real-device sharing or migration.
 
 ## Install on your physical iPad
 

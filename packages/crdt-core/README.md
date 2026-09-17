@@ -62,7 +62,9 @@ The opt-in [iOS C interop checkpoint](../native/iosApp/README.md#opt-in-crdt-bin
 adds `AppleCrdtBoard` and repeats the same scenarios inside an ARM64 simulator.
 It uses the same validated Rust operations as JNI, with a private C header,
 owned result buffers and caught panics. `pnpm test:crdt:ios` requires an Apple
-Silicon Mac; its first Apple CI validation is pending. iOS live sharing remains v1.
+Silicon Mac; the binding checkpoint passed Apple CI (user-confirmed). Live iOS
+CRDT sharing now has a separate [simulator-only preview](../native/iosApp/README.md#local-crdt-sharing-preview--checkpoint-2h),
+pending its own Apple CI/manual validation. Default iOS sharing remains v1.
 
 ## Candidate document format
 

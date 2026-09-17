@@ -12,6 +12,9 @@ final class DebugInterop {
     private var buffer = Data()
     private var last = ""
     init() throws {
+        guard AppleCrdtModeKt.appleCrdtPreviewEnabled() == CommandLine.arguments.contains("--crdt") else {
+            throw NSError(domain: "MeshboardInterop", code: 1, userInfo: [NSLocalizedDescriptionKey: "Installed app does not match the requested CRDT/legacy protocol."])
+        }
         controller = AppleInterop(network: NativeAppleNetwork(forceRelay: CommandLine.arguments.contains("--relay")))
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: 18766)

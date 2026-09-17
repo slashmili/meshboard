@@ -97,7 +97,7 @@ export async function iosPeer(relay = false) {
   try {
     // A previous test may have exited before it could stop the app.
     await runIos(['simctl', 'terminate', serial, 'dev.meshboard.ios'], false)
-    await runIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : [])])
+    await runIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : []), ...(process.env.MESHBOARD_CRDT_PREVIEW === '1' ? ['--crdt'] : [])])
     const deadline = Date.now() + 20_000
     while (!state && Date.now() < deadline) {
       if (socket && !socket.destroyed) { await new Promise(resolve => setTimeout(resolve, 100)); continue }
@@ -113,7 +113,7 @@ export async function iosPeer(relay = false) {
     const connection = socket
     return {
       send(message: unknown) { if (connection.destroyed) throw new Error('iOS adapter disconnected'); connection.write(JSON.stringify(message) + '\n') },
-      state() { if (!state || connection.destroyed) throw new Error('iOS adapter disconnected'); if (state.error) throw new Error(`iOS peer: ${state.error}`); return state },
+      state(allowError = false) { if (!state || connection.destroyed) throw new Error('iOS adapter disconnected'); if (state.error && !allowError) throw new Error(`iOS peer: ${state.error}`); return state },
       async close() {
         try { connection.end(); await runIos(['simctl', 'terminate', serial, 'dev.meshboard.ios']) }
         finally { disconnect() }

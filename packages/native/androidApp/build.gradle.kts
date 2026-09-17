@@ -21,7 +21,6 @@ android {
         buildConfigField("boolean", "CRDT_PREVIEW", "false")
     }
     buildTypes.getByName("debug").buildConfigField("boolean", "CRDT_PREVIEW", crdtPreview.toString())
-    sourceSets.getByName("main").java.srcDir(rootProject.file("src/jvmTransportMain/kotlin"))
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
