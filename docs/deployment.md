@@ -256,9 +256,11 @@ This test also needs Node 22, installed workspace dependencies, and OpenSSL. Set
 `CONTAINER_RUNTIME=podman` to use Podman; `SIGNALING_IMAGE` and `WEB_IMAGE` can
 override the image names. It uses temporary containers, local certificates, and
 an explicitly temporary loopback exception for TURN. It tests built assets,
-HTTPS/WSS proxying, credential issuance, and real UDP/TLS relay traffic, then
+HTTPS/WSS proxying, credential issuance, public IPv4 permission acceptance,
+private/link-local/loopback permission rejection, and real UDP/TLS relay traffic, then
 removes its own containers and temporary files. It never requests public
-certificates or reads your deployment `.env`. Do not run it on a live VPS.
+certificates or reads your deployment `.env`. Permission checks do not send
+traffic to the requested public or private addresses. Do not run it on a live VPS.
 
 References: [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https),
 [Coturn](https://github.com/coturn/coturn),

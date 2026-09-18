@@ -3,7 +3,8 @@
 // OpenSSL, installed workspace dependencies, and Docker or Podman.
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { createHmac, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes } from 'node:crypto'
+import dgram from 'node:dgram'
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import https from 'node:https'
 import { createRequire } from 'node:module'
@@ -58,6 +59,73 @@ function get(url) {
     request.setTimeout(2000, () => request.destroy(new Error('HTTPS timeout')))
     request.on('error', reject)
   })
+}
+
+// CREATE_PERMISSION checks the production ACL without sending traffic to the
+// requested IP. Loopback relay tests alone miss rules that deny all public IPs.
+async function checkTurnPermissions(port, username, credential) {
+  const socket = dgram.createSocket('udp4')
+  const cookie = 0x2112a442
+  function attribute(type, value) {
+    const bytes = Buffer.alloc(4 + Math.ceil(value.length / 4) * 4)
+    bytes.writeUInt16BE(type); bytes.writeUInt16BE(value.length, 2); value.copy(bytes, 4)
+    return bytes
+  }
+  async function request(type, attributes, key) {
+    const transaction = randomBytes(12), body = Buffer.concat(attributes), header = Buffer.alloc(20)
+    header.writeUInt16BE(type); header.writeUInt16BE(body.length + (key ? 24 : 0), 2)
+    header.writeUInt32BE(cookie, 4); transaction.copy(header, 8)
+    const unsigned = Buffer.concat([header, body])
+    const packet = key ? Buffer.concat([unsigned, attribute(8, createHmac('sha1', key).update(unsigned).digest())]) : unsigned
+    const response = await new Promise((resolve, reject) => {
+      const finish = (error, bytes) => {
+        clearTimeout(timer); socket.off('message', receive); socket.off('error', failed)
+        if (error) reject(error); else resolve(bytes)
+      }
+      const failed = error => finish(error)
+      const receive = (bytes, source) => {
+        if (source.address === '127.0.0.1' && source.port === port && bytes.length >= 20 && bytes.subarray(8, 20).equals(transaction)) finish(null, bytes)
+      }
+      const timer = setTimeout(() => finish(new Error('TURN permission check timed out')), 5000)
+      socket.on('message', receive); socket.on('error', failed)
+      socket.send(packet, port, '127.0.0.1', error => { if (error) finish(error) })
+    })
+    const values = new Map()
+    for (let offset = 20; offset + 4 <= response.length;) {
+      const length = response.readUInt16BE(offset + 2)
+      values.set(response.readUInt16BE(offset), response.subarray(offset + 4, offset + 4 + length))
+      offset += 4 + Math.ceil(length / 4) * 4
+    }
+    return { type: response.readUInt16BE(0), values }
+  }
+  let auth, key, allocated = false
+  try {
+    const transport = attribute(0x19, Buffer.from([17, 0, 0, 0]))
+    const challenge = await request(3, [transport])
+    assert.equal(challenge.type, 0x113)
+    const realm = challenge.values.get(0x14), nonce = challenge.values.get(0x15)
+    assert(realm && nonce, 'TURN must challenge for long-term credentials')
+    key = createHash('md5').update(Buffer.concat([Buffer.from(`${username}:`), realm, Buffer.from(`:${credential}`)])).digest()
+    auth = [attribute(6, Buffer.from(username)), attribute(0x14, realm), attribute(0x15, nonce)]
+    assert.equal((await request(3, [transport, ...auth], key)).type, 0x103)
+    allocated = true
+    for (const [ip, allowed] of [['8.8.8.8', true], ['1.1.1.1', true], ['10.1.2.3', false], ['172.16.1.2', false], ['192.168.1.2', false], ['169.254.169.254', false], ['127.0.0.2', false]]) {
+      const address = Buffer.alloc(8); address[1] = 1
+      address.writeUInt16BE(12345 ^ (cookie >>> 16), 2)
+      Buffer.from(ip.split('.').map(Number)).copy(address, 4)
+      address.writeUInt32BE((address.readUInt32BE(4) ^ cookie) >>> 0, 4)
+      const result = await request(8, [attribute(0x12, address), ...auth], key)
+      assert.equal(result.type, allowed ? 0x108 : 0x118, `TURN permission for ${ip}`)
+      if (!allowed) {
+        const error = result.values.get(9)
+        assert(error && error[2] * 100 + error[3] === 403, `Expected forbidden peer ${ip}`)
+      }
+    }
+    console.log('PASS: public IPv4 TURN permissions allowed; private/link-local/loopback peers blocked')
+  } finally {
+    try { if (allocated) await request(4, [attribute(0x0d, Buffer.alloc(4)), ...auth], key) }
+    finally { socket.close() }
+  }
 }
 
 try {
@@ -122,6 +190,7 @@ try {
     socket.setTimeout(1000, () => socket.destroy(new Error('TURN TLS timeout')))
     socket.on('error', reject)
   }))
+  await checkTurnPermissions(turnPort, username, credential)
   for (const [label, flags, selectedPort] of [['UDP', [], turnPort], ['TLS', ['-t', '-S'], tlsPort]]) {
     const result = await command(['run', '--rm', '--network', 'host', '--entrypoint', 'turnutils_uclient', turnImage,
       ...flags, '-y', '-c', '-n', '20', '-m', '1', '-u', username, '-w', credential, '-p', String(selectedPort), '127.0.0.1'])
