@@ -9,14 +9,14 @@ import { attachSignaling, rtcConfiguration } from './server.ts'
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup() })
 
-async function fixture() {
+async function fixture(localDevelopment = true) {
   const server: Server = createServer((request, response) => relay.handleHttp(request, response, () => response.writeHead(404).end()))
-  const relay = attachSignaling(server, rtcConfiguration({}, true))
+  const relay = attachSignaling(server, { ...rtcConfiguration({}, true), localDevelopment })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   cleanups.push(() => { relay.close(); return new Promise(resolve => server.close(() => resolve())) })
-  async function connect(room: string) {
-    const socket = new WebSocket(base.replace('http:', 'ws:') + '/signal')
+  async function connect(room: string, path = '/signal') {
+    const socket = new WebSocket(base.replace('http:', 'ws:') + path)
     const messages: ServerSignal[] = []
     socket.on('message', data => messages.push(JSON.parse(data.toString())))
     await new Promise<void>(resolve => socket.on('open', resolve))
@@ -28,6 +28,24 @@ async function fixture() {
 }
 
 describe('signaling-only relay', () => {
+  it('isolates legacy and CRDT preview rooms even when their UUIDs match', async () => {
+    const { connect } = await fixture()
+    const room = randomUUID()
+    const legacy = await connect(room), preview = await connect(room, '/signal-crdt')
+    const other = await connect(room, '/signal-crdt')
+    if (legacy.first.type !== 'welcome' || preview.first.type !== 'welcome' || other.first.type !== 'welcome') throw new Error('Missing welcome')
+    expect(preview.first.peers).toEqual([])
+    expect(other.first.peers).toEqual([preview.first.self])
+    legacy.socket.send(JSON.stringify({ v: 1, type: 'signal', to: preview.first.self, payload: { description: { type: 'offer', sdp: 'v=0\r\n' } } }))
+    legacy.socket.send(JSON.stringify({ v: 1, type: 'join', room }))
+    await expect.poll(() => legacy.messages.some(message => message.type === 'error')).toBe(true)
+    expect(preview.messages.some(message => message.type === 'signal')).toBe(false)
+  })
+  it('does not expose the preview signaling endpoint in production configuration', async () => {
+    const { base } = await fixture(false)
+    const socket = new WebSocket(base.replace('http:', 'ws:') + '/signal-crdt')
+    await new Promise<void>((resolve, reject) => { socket.on('error', () => resolve()); socket.on('open', () => { socket.close(); reject(new Error('Preview endpoint was exposed')) }) })
+  })
   it('introduces peers and forwards connection metadata with a server-bound sender', async () => {
     const { connect } = await fixture()
     const room = randomUUID()

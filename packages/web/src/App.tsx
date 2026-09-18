@@ -4,6 +4,7 @@ import { Element } from './Element'
 import { MAX_ZOOM, MIN_ZOOM, type Tool } from './board'
 import { useBoard } from './useBoard'
 import { BoardDocument } from './sync/BoardDocument'
+import { CrdtDocument } from './sync/CrdtDocument'
 import { useSession } from './sync/useSession'
 import { ShareDialog } from './ShareDialog'
 
@@ -36,7 +37,8 @@ export function App() {
   const [tool, setTool] = useState<Tool>('pen')
   const [color, setColor] = useState(COLORS[0].value)
   const [width, setWidth] = useState(3)
-  const [document] = useState(() => new BoardDocument())
+  const crdt = import.meta.env.DEV && ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('crdt') === '1'
+  const [document] = useState(() => crdt ? new CrdtDocument() : new BoardDocument())
   const session = useSession(document)
   const board = useBoard(tool, color, width, document, session.preview)
   const [sharing, setSharing] = useState(false)
@@ -73,7 +75,7 @@ export function App() {
           <span>Meshboard</span>
         </div>
         <span className="header-divider" />
-        <div className="board-title">Untitled board <span>A space for ideas</span></div>
+        <div className="board-title">Untitled board <span>{crdt ? 'CRDT preview · local only' : 'A space for ideas'}</span></div>
         <div className="header-actions">
           <span className="local-badge" role="status" data-testid="connection-status"><span className="status-dot" /> {connectionLabel}</span>
           <button className="primary-button share-button" aria-label="Share board" onClick={() => { session.share(); setSharing(true) }}><Share2 size={15} /><span>Share</span></button>

@@ -7,15 +7,26 @@ Start with [delivery checkpoints](docs/checkpoints.md) for current progress and 
 steps, then use the platform guide: [desktop](packages/native/README.md),
 [Android](packages/native/androidApp/README.md), or [iPad/iPhone](packages/native/iosApp/README.md).
 
-## Current checkpoint: 04c — iOS sharing preview
+## Current checkpoint: 2h — local iPad simulator CRDT sharing (Apple CI pending)
 
 Web, Linux desktop, macOS, Android emulator, and iOS simulator support shared
 boards with link/QR invites, live previews, late-join snapshots, and TURN fallback.
-The iOS sharing preview is ready for feedback. Physical-device networking and
-Pencil validation, Intel Mac execution, and Windows validation remain pending.
+Basic real iPad/web sharing and local-server macOS sharing are user-validated.
+iPhone, Pencil, physical-device restrictive-network/TURN checks, Intel Mac
+execution, and Windows validation remain pending. An isolated
+[Yjs/yrs compatibility checkpoint](packages/crdt-core/README.md) starts Phase 2;
+default apps still use the existing sync implementation. An opt-in
+[local web/desktop/Android CRDT preview](docs/crdt-preview.md) uses y-webrtc in
+the browser and yrs on native peers. Desktop CI passed on Linux and both macOS
+runners; manual Mac preview validation remains pending. Android's opt-in tablet
+preview is available for local testing. The iOS bindings passed CI (user-confirmed).
+The new [iPad simulator preview](packages/native/iosApp/README.md#local-crdt-sharing-preview--checkpoint-2h)
+adds opt-in live CRDT sharing; its Apple CI and manual checks are pending.
+Released/default apps still use Phase 1 sync.
 See [delivery checkpoints](docs/checkpoints.md) for the validation record.
 
-This is part of Phase 1, **not** the Phase 1 exit milestone. You can
+Default apps remain on Phase 1; its full platform-validation milestone is still
+open. You can
 draw with a pen, erase whole objects, create rectangles/ellipses/lines, choose
 colors and stroke widths, and pan/zoom. Mouse, pen, and touch input are supported.
 
@@ -30,8 +41,8 @@ opening the same link afterward starts empty. An unshared board stays local.
 
 This is a **connection prototype**: WebRTC encrypts transport with DTLS, but
 invites are not authenticated and application-layer encryption is not implemented.
-Use test drawings. Yjs/yrs, export, undo, and production security are
-still pending. There are no accounts, analytics, or board persistence.
+Use test drawings. Yjs/yrs rollout to released/mobile apps, export, undo, and
+production security are still pending. There are no accounts, analytics, or board persistence.
 
 ## Switching between development machines
 

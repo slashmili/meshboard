@@ -1,0 +1,14 @@
+{
+  "name": "@meshboard/crdt-core",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MPL-2.0",
+  "type": "module",
+  "scripts": {
+    "test": "cargo test --locked --all-features && cargo build --locked --bin compat && node --test compat.test.mjs",
+    "test:kotlin": "node --test --test-reporter=spec compat-kotlin.test.mjs"
+  },
+  "devDependencies": {
+    "yjs": "13.6.32"
+  }
+}

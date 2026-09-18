@@ -3,11 +3,13 @@ import type { EventEmitter } from 'node:events'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 import { clientSignalSchema, MAX_PEERS, MAX_SIGNAL_BYTES, type RtcConfig, type ServerSignal } from '@meshboard/shared-protocol'
+import { attachYWebrtc } from './y-webrtc.ts'
 export { rtcConfiguration } from './config.ts'
 
 type Client = { id: string; socket: WebSocket; room?: string; alive: boolean; count: number; window: number }
 
 export function attachSignaling(server: EventEmitter, config: RtcConfig) {
+  const closeYWebrtc = attachYWebrtc(server, config.localDevelopment)
   const rooms = new Map<string, Map<string, Client>>()
   const clients = new Set<Client>()
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_SIGNAL_BYTES, perMessageDeflate: false })
@@ -24,7 +26,9 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
   }
 
   const upgrade = (request: IncomingMessage, socket: import('node:stream').Duplex, head: Buffer) => {
-    if (request.url?.split('?')[0] !== '/signal') return
+    const path = request.url?.split('?')[0]
+    if (path !== '/signal' && path !== '/signal-crdt') return
+    if (path === '/signal-crdt' && !config.localDevelopment) { socket.destroy(); return }
     // Browser requests must be same-origin. Native clients may omit Origin.
     const origin = request.headers.origin
     if (origin) {
@@ -32,11 +36,12 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
       catch { socket.destroy(); return }
     }
     if (clients.size >= 256) { socket.destroy(); return }
-    wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws))
+    wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request))
   }
   server.on('upgrade', upgrade)
 
-  wss.on('connection', socket => {
+  wss.on('connection', (socket, request) => {
+    const crdt = request.url?.split('?')[0] === '/signal-crdt'
     const client: Client = { id: randomUUID(), socket, alive: true, count: 0, window: Date.now() }
     clients.add(client)
     const joinTimeout = setTimeout(() => { if (!client.room) socket.close(1008, 'join-timeout') }, 10_000)
@@ -53,14 +58,15 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
       const message = parsed.data
       if (message.type === 'join') {
         if (client.room) { reject(client, 'invalid-message'); return }
-        const room = rooms.get(message.room) ?? new Map<string, Client>()
+        const roomKey = `${crdt ? 'crdt' : 'v1'}:${message.room}`
+        const room = rooms.get(roomKey) ?? new Map<string, Client>()
         if (room.size >= MAX_PEERS) { reject(client, 'room-full'); return }
         clearTimeout(joinTimeout)
-        client.room = message.room
+        client.room = roomKey
         send(client, { v: 1, type: 'welcome', self: client.id, peers: [...room.keys()] })
         for (const peer of room.values()) send(peer, { v: 1, type: 'peer-joined', peer: client.id })
         room.set(client.id, client)
-        rooms.set(message.room, room)
+        rooms.set(roomKey, room)
       } else {
         if (!client.room) { reject(client, 'invalid-message'); return }
         const peer = rooms.get(client.room)?.get(message.to)
@@ -95,6 +101,7 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
   }
 
   function close() {
+    closeYWebrtc()
     clearInterval(heartbeat)
     server.off('upgrade', upgrade)
     for (const client of clients) client.socket.terminate()

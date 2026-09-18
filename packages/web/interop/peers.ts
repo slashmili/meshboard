@@ -11,7 +11,8 @@ type NativeState = { connected: number; relayed: number; invite: string; signali
 const execFileAsync = promisify(execFile)
 export function nativePeer(relay = false) {
   const classpath = readFileSync(new URL('../../native/build/interop/classpath.txt', import.meta.url), 'utf8')
-  const child = spawn('java', ['-cp', classpath, 'meshboard.InteropPeerKt', ...(relay ? ['--relay'] : [])])
+  const crdt = process.env.MESHBOARD_CRDT_PREVIEW === '1' ? JSON.parse(readFileSync(new URL('../../native/build/crdt/interop.json', import.meta.url), 'utf8')) : null
+  const child = spawn(crdt?.java ?? 'java', [...(crdt ? ['-Dmeshboard.crdt.preview=true', `-Dmeshboard.crdt.library=${crdt.library}`] : []), '-cp', crdt?.classpath ?? classpath, 'meshboard.InteropPeerKt', ...(relay ? ['--relay'] : [])])
   let state: NativeState = { connected: 0, relayed: 0, invite: '', signaling: false, error: null, elements: [], previews: [] }
   let diagnostics = ''
   child.stderr.on('data', data => { diagnostics = (diagnostics + data).slice(-8000) })
@@ -40,7 +41,7 @@ export async function androidPeer(relay = false) {
   const serial = process.env.ANDROID_SERIAL || 'emulator-5554'
   const run = (args: string[]) => execFileSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: 15_000 })
   const port = Number(run(['forward', 'tcp:0', 'tcp:18765']).trim())
-  const child = spawn(adb, ['-s', serial, 'shell', 'am', 'instrument', '-w', '-e', 'class', 'dev.meshboard.android.InteropTest', '-e', 'meshboard.interop', 'true', '-e', 'meshboard.relay', String(relay), 'dev.meshboard.android.test/androidx.test.runner.AndroidJUnitRunner'])
+  const child = spawn(adb, ['-s', serial, 'shell', 'am', 'instrument', '-w', '-e', 'class', 'dev.meshboard.android.InteropTest', '-e', 'meshboard.interop', 'true', '-e', 'meshboard.relay', String(relay), '-e', 'meshboard.crdt', String(process.env.MESHBOARD_CRDT_PREVIEW === '1'), 'dev.meshboard.android.test/androidx.test.runner.AndroidJUnitRunner'])
   let diagnostics = ''
   let spawnError: Error | undefined
   child.stdout.on('data', data => { diagnostics += data })
@@ -50,7 +51,8 @@ export async function androidPeer(relay = false) {
   let state: NativeState | undefined
   let socketError = ''
   async function close() {
-    if (socket && !socket.destroyed) { socket.write('{"type":"close"}\n'); socket.end() }
+    // Let Android consume the final command before closing the adb-forwarded socket.
+    if (socket && !socket.destroyed) socket.write('{"type":"close"}\n')
     if (child.exitCode === null && !spawnError) await new Promise<void>(resolve => {
       const timer = setTimeout(() => { child.kill(); resolve() }, 10_000)
       child.once('exit', () => { clearTimeout(timer); resolve() })
@@ -73,7 +75,7 @@ export async function androidPeer(relay = false) {
     if (!state) throw new Error(`Android harness did not start: ${socketError}\n${diagnostics}`)
     return {
       send(message: unknown) { if (!socket || socket.destroyed) throw new Error(`Android disconnected: ${diagnostics}`); socket.write(JSON.stringify(message) + '\n') },
-      state() { if (!state || socket?.destroyed || child.exitCode !== null) throw new Error(`Android disconnected: ${diagnostics}`); if (state.error) throw new Error(`Android peer: ${state.error}`); return state },
+      state(allowError = false) { if (!state || socket?.destroyed || child.exitCode !== null) throw new Error(`Android disconnected: ${diagnostics}`); if (state.error && !allowError) throw new Error(`Android peer: ${state.error}`); return state },
       async close() { await close(); if (!/OK \(1 test\)/.test(diagnostics)) throw new Error(`Android instrumentation failed: ${diagnostics}`) },
     }
   } catch (error) { await close(); throw error }
@@ -95,7 +97,7 @@ export async function iosPeer(relay = false) {
   try {
     // A previous test may have exited before it could stop the app.
     await runIos(['simctl', 'terminate', serial, 'dev.meshboard.ios'], false)
-    await runIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : [])])
+    await runIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : []), ...(process.env.MESHBOARD_CRDT_PREVIEW === '1' ? ['--crdt'] : [])])
     const deadline = Date.now() + 20_000
     while (!state && Date.now() < deadline) {
       if (socket && !socket.destroyed) { await new Promise(resolve => setTimeout(resolve, 100)); continue }
@@ -111,7 +113,7 @@ export async function iosPeer(relay = false) {
     const connection = socket
     return {
       send(message: unknown) { if (connection.destroyed) throw new Error('iOS adapter disconnected'); connection.write(JSON.stringify(message) + '\n') },
-      state() { if (!state || connection.destroyed) throw new Error('iOS adapter disconnected'); if (state.error) throw new Error(`iOS peer: ${state.error}`); return state },
+      state(allowError = false) { if (!state || connection.destroyed) throw new Error('iOS adapter disconnected'); if (state.error && !allowError) throw new Error(`iOS peer: ${state.error}`); return state },
       async close() {
         try { connection.end(); await runIos(['simctl', 'terminate', serial, 'dev.meshboard.ios']) }
         finally { disconnect() }

@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val crdtPreview = providers.gradleProperty("meshboard.crdtPreview").orNull == "true"
+require(!crdtPreview || providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
+    "Android CRDT preview requires -Pmeshboard.crdtAndroid=true"
+}
 android {
     namespace = "dev.meshboard.android"
     compileSdk = 35
@@ -14,7 +18,9 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "CRDT_PREVIEW", "false")
     }
+    buildTypes.getByName("debug").buildConfigField("boolean", "CRDT_PREVIEW", crdtPreview.toString())
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
@@ -22,6 +28,58 @@ android {
     }
 }
 kotlin { jvmToolchain(21) }
+
+// Neither normal nor release builds need Rust. Live preview additionally
+// requires meshboard.crdtPreview and is enabled only in the debug build type.
+if (providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
+    android.ndkVersion = "28.2.13676358"
+    val targets = mapOf("x86_64" to "x86_64-linux-android", "arm64-v8a" to "aarch64-linux-android")
+    val host = when {
+        System.getProperty("os.name").startsWith("Linux") -> "linux-x86_64"
+        System.getProperty("os.name").startsWith("Mac") -> "darwin-x86_64"
+        else -> error("The Android CRDT build checkpoint currently supports Linux and macOS hosts")
+    }
+    val toolchain = android.sdkDirectory.resolve("ndk/${android.ndkVersion}/toolchains/llvm/prebuilt/$host/bin")
+    val rustBuild = layout.buildDirectory.dir("crdt-core")
+    val builds = targets.map { (abi, target) ->
+        tasks.register<Exec>("buildCrdtAndroid${abi.replace('-', '_')}") {
+            workingDir(rootProject.file("../crdt-core"))
+            commandLine("cargo", "build", "--locked", "--lib", "--features", "jvm", "--target", target)
+            environment("CARGO_TARGET_DIR", rustBuild.get().asFile.absolutePath)
+            environment("CARGO_TARGET_${target.uppercase().replace('-', '_')}_LINKER", toolchain.resolve("${target}26-clang").absolutePath)
+            // Explicit 16 KiB alignment for Rust-linked Android libraries too.
+            environment("CARGO_TARGET_${target.uppercase().replace('-', '_')}_RUSTFLAGS", "-C link-arg=-Wl,-z,max-page-size=16384")
+            outputs.upToDateWhen { false } // Cargo owns incremental/toolchain checks.
+            doFirst {
+                require(toolchain.resolve("${target}26-clang").isFile) {
+                    "Install ndk;${android.ndkVersion} and Rust Android targets; see androidApp/README.md"
+                }
+            }
+        }
+    }
+    val prepareCrdtAndroid by tasks.registering(Sync::class) {
+        dependsOn(builds)
+        targets.forEach { (abi, target) ->
+            from(rustBuild.map { it.file("$target/debug/libmeshboard_crdt_core.so") }) { into(abi) }
+        }
+        into(layout.buildDirectory.dir("generated/crdtJniLibs"))
+    }
+    android.sourceSets.getByName("debug") {
+        java.srcDir(rootProject.file("src/crdtJvmMain/kotlin"))
+        jniLibs.srcDir(layout.buildDirectory.dir("generated/crdtJniLibs"))
+    }
+    android.sourceSets.getByName("androidTest") {
+        java.srcDir(rootProject.file("src/crdtJvmTest/kotlin"))
+        java.srcDir("src/crdtAndroidTest/kotlin")
+    }
+    tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(prepareCrdtAndroid) }
+    android.testOptions {
+        val reports = if (crdtPreview) "crdt-preview" else "crdt"
+        resultsDir = layout.buildDirectory.dir("outputs/androidTest-results/$reports").get().asFile.absolutePath
+        reportDir = layout.buildDirectory.dir("reports/androidTests/$reports").get().asFile.absolutePath
+    }
+    dependencies { androidTestImplementation(kotlin("test-junit")) }
+}
 
 dependencies {
     implementation(project(":"))
