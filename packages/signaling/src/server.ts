@@ -3,14 +3,28 @@ import type { EventEmitter } from 'node:events'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 import { clientSignalSchema, MAX_PEERS, MAX_SIGNAL_BYTES, type RtcConfig, type ServerSignal } from '@meshboard/shared-protocol'
-export { rtcConfiguration } from './config.ts'
+export { rtcConfiguration, rtcConfigurationProvider } from './config.ts'
 
 type Client = { id: string; socket: WebSocket; room?: string; alive: boolean; count: number; window: number }
 
-export function attachSignaling(server: EventEmitter, config: RtcConfig) {
+export function attachSignaling(server: EventEmitter, config: RtcConfig | (() => RtcConfig), options: { trustProxy?: boolean } = {}) {
   const rooms = new Map<string, Map<string, Client>>()
   const clients = new Set<Client>()
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_SIGNAL_BYTES, perMessageDeflate: false })
+  const limits = new Map<string, { since: number; requests: number; upgrades: number; connections: number }>()
+  function budget(request: IncomingMessage) {
+    // Only enable behind a trusted proxy with no public path to this listener.
+    const forwarded = options.trustProxy ? request.headers['x-forwarded-for'] : undefined
+    const ip = (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : undefined) || request.socket.remoteAddress || 'unknown'
+    let entry = limits.get(ip)
+    if (!entry) {
+      if (limits.size >= 4096) return undefined
+      entry = { since: Date.now(), requests: 0, upgrades: 0, connections: 0 }
+      limits.set(ip, entry)
+    }
+    if (Date.now() - entry.since >= 60_000) { entry.since = Date.now(); entry.requests = 0; entry.upgrades = 0 }
+    return entry
+  }
 
   function send(client: Client, message: ServerSignal) {
     if (client.socket.readyState !== WebSocket.OPEN) return
@@ -24,7 +38,7 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
   }
 
   const upgrade = (request: IncomingMessage, socket: import('node:stream').Duplex, head: Buffer) => {
-    if (request.url?.split('?')[0] !== '/signal') return
+    if (request.url?.split('?')[0] !== '/signal') { socket.destroy(); return }
     // Browser requests must be same-origin. Native clients may omit Origin.
     const origin = request.headers.origin
     if (origin) {
@@ -32,7 +46,13 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
       catch { socket.destroy(); return }
     }
     if (clients.size >= 256) { socket.destroy(); return }
-    wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws))
+    const limit = budget(request)
+    if (!limit || ++limit.upgrades > 30 || limit.connections >= 16) { socket.destroy(); return }
+    wss.handleUpgrade(request, socket, head, ws => {
+      limit.connections++
+      ws.on('close', () => { limit.connections-- })
+      wss.emit('connection', ws)
+    })
   }
   server.on('upgrade', upgrade)
 
@@ -79,6 +99,7 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
   })
 
   const heartbeat = setInterval(() => {
+    for (const [ip, limit] of limits) if (!limit.connections && Date.now() - limit.since >= 60_000) limits.delete(ip)
     for (const client of clients) {
       if (!client.alive) { client.socket.terminate(); continue }
       client.alive = false
@@ -90,8 +111,15 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
   function handleHttp(request: IncomingMessage, response: ServerResponse, next: () => void) {
     if (request.url !== '/api/rtc-config' && request.url !== '/health') { next(); return }
     if (request.method !== 'GET') { response.writeHead(405).end(); return }
+    if (request.url === '/api/rtc-config') {
+      const limit = budget(request)
+      if (!limit || ++limit.requests > 30) {
+        response.writeHead(429, { 'retry-after': '60', 'cache-control': 'no-store' }).end()
+        return
+      }
+    }
     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
-    response.end(JSON.stringify(request.url === '/health' ? { ok: true } : config))
+    response.end(JSON.stringify(request.url === '/health' ? { ok: true } : typeof config === 'function' ? config() : config))
   }
 
   function close() {
@@ -100,6 +128,7 @@ export function attachSignaling(server: EventEmitter, config: RtcConfig) {
     for (const client of clients) client.socket.terminate()
     wss.close()
     rooms.clear()
+    limits.clear()
   }
   return { handleHttp, close }
 }

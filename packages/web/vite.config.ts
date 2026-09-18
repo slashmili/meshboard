@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { attachSignaling, rtcConfiguration } from '@meshboard/signaling'
+import { attachSignaling, rtcConfigurationProvider } from '@meshboard/signaling'
 
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, '../..', 'MESHBOARD_'), ...process.env }
@@ -8,12 +8,12 @@ export default defineConfig(({ mode }) => {
     name: 'meshboard-local-signaling',
     configureServer(server) {
       if (!server.httpServer) return
-      const relay = attachSignaling(server.httpServer, rtcConfiguration(env, true))
+      const relay = attachSignaling(server.httpServer, rtcConfigurationProvider(env, true))
       server.middlewares.use(relay.handleHttp)
       server.httpServer.on('close', relay.close)
     },
     configurePreviewServer(server) {
-      const relay = attachSignaling(server.httpServer, rtcConfiguration(env, true))
+      const relay = attachSignaling(server.httpServer, rtcConfigurationProvider(env, true))
       server.middlewares.use(relay.handleHttp)
       server.httpServer.on('close', relay.close)
     },

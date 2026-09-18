@@ -183,8 +183,15 @@ local fallback path, not connectivity through a real corporate firewall.
 environment variables unless `MESHBOARD_LOCAL_DEV=true` is explicitly set. The
 standalone process reads process environment; load your `.env` before launching
 it. For hosting, serve the built web files and reverse-proxy `/signal` (WebSocket)
-and `/api/rtc-config` to the relay on the same origin. HTTPS/WSS, public TURN
-networking, and deployment are not set up in this checkpoint.
+and `/api/rtc-config` to the relay on the same origin.
+
+For self-hosting on a Linux VPS, use the [Docker Compose deployment guide](docs/deployment.md).
+For Ubuntu 26.04 LTS, start with the [server installation steps](infra/README.md).
+It includes HTTPS, self-hosted TURN/TLS, temporary relay credentials, DNS/firewall
+instructions, certificate renewal, and a deployment acceptance checklist. All
+operator-specific values live in an ignored environment file; no domain, IP, or
+secret needs to be committed. This is a testing deployment, not completion of the
+planned application-layer encryption or authenticated-invite work.
 
 Limits: 8 participants, 2,000 objects, 10,000 deleted IDs, 12,000 points per
 stroke segment, and a 4 MiB document. Long strokes split into segments. This

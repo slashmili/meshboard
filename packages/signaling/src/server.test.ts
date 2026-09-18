@@ -4,14 +4,14 @@ import { randomUUID } from 'node:crypto'
 import { WebSocket } from 'ws'
 import { afterEach, describe, expect, it } from 'vitest'
 import { rtcConfigSchema, type ServerSignal } from '@meshboard/shared-protocol'
-import { attachSignaling, rtcConfiguration } from './server.ts'
+import { attachSignaling, rtcConfiguration, rtcConfigurationProvider } from './server.ts'
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup() })
 
-async function fixture() {
+async function fixture(config: Parameters<typeof attachSignaling>[1] = rtcConfiguration({}, true), trustProxy = false) {
   const server: Server = createServer((request, response) => relay.handleHttp(request, response, () => response.writeHead(404).end()))
-  const relay = attachSignaling(server, rtcConfiguration({}, true))
+  const relay = attachSignaling(server, config, { trustProxy })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   cleanups.push(() => { relay.close(); return new Promise(resolve => server.close(() => resolve())) })
@@ -75,5 +75,33 @@ describe('signaling-only relay', () => {
     expect(rtcConfigSchema.parse(await response.json()).iceServers[0].urls[0]).toContain('turn:')
     expect(() => rtcConfiguration({})).toThrow('Configure TURN')
     expect(rtcConfiguration({ MESHBOARD_TURN_URLS: 'turn:relay.example:3478', MESHBOARD_TURN_USERNAME: 'user', MESHBOARD_TURN_CREDENTIAL: 'test', MESHBOARD_RELAY_ONLY: 'true' }).iceTransportPolicy).toBe('relay')
+  })
+
+  it('issues fresh credentials on each HTTP request without exposing the signing secret', async () => {
+    const secret = 'ab'.repeat(32)
+    const { base } = await fixture(rtcConfigurationProvider({ MESHBOARD_TURN_SECRET: secret, MESHBOARD_TURN_URLS: 'turn:turn.example.com:3478' }))
+    const a = rtcConfigSchema.parse(await (await fetch(`${base}/api/rtc-config`)).json())
+    const b = rtcConfigSchema.parse(await (await fetch(`${base}/api/rtc-config`)).json())
+    expect(a.iceServers[0].username).not.toBe(b.iceServers[0].username)
+    expect(JSON.stringify(a)).not.toContain(secret)
+  })
+
+  it('limits credential issuance, ignores untrusted forwarded headers, and keeps health available', async () => {
+    const { base } = await fixture()
+    for (let i = 0; i < 30; i++) {
+      expect((await fetch(`${base}/api/rtc-config`, { headers: { 'x-forwarded-for': `192.0.2.${i}` } })).status).toBe(200)
+    }
+    const limited = await fetch(`${base}/api/rtc-config`)
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('retry-after')).toBe('60')
+    expect(limited.headers.get('cache-control')).toBe('no-store')
+    expect((await fetch(`${base}/health`)).status).toBe(200)
+  })
+
+  it('separates client budgets only when configured behind a trusted proxy', async () => {
+    const { base } = await fixture(undefined, true)
+    for (let i = 0; i < 31; i++) await fetch(`${base}/api/rtc-config`, { headers: { 'x-forwarded-for': '192.0.2.1' } })
+    expect((await fetch(`${base}/api/rtc-config`, { headers: { 'x-forwarded-for': '192.0.2.1' } })).status).toBe(429)
+    expect((await fetch(`${base}/api/rtc-config`, { headers: { 'x-forwarded-for': '192.0.2.2' } })).status).toBe(200)
   })
 })
