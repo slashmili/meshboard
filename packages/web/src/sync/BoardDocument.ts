@@ -1,4 +1,4 @@
-import { MAX_ELEMENTS, MAX_MESSAGE_BYTES, MAX_REMOVED, elementSchema, type BoardElement, type BoardMessage, type Snapshot } from '@meshboard/shared-protocol'
+import { MAX_ELEMENTS, MAX_MESSAGE_BYTES, MAX_REMOVED, elementSchema, type BoardElement, type BoardMessage, type SessionMessage, type Snapshot } from '@meshboard/shared-protocol'
 
 // Phase 1: immutable object inserts and explicit deletes, held only in memory.
 // Yjs replaces this small store in Phase 2; it is not a Yjs-compatible document.
@@ -17,7 +17,8 @@ export class BoardDocument {
 
   snapshot(): Snapshot { return { v: 1, type: 'snapshot', elements: this.visible, removed: [...this.removed] } }
 
-  receive(message: BoardMessage) {
+  receive(message: SessionMessage) {
+    if (message.type === 'crdt') throw new Error('CRDT preview requires a separate session.')
     if (message.type === 'preview') return
     const objects = new Map(this.objects)
     const removed = new Set(this.removed)

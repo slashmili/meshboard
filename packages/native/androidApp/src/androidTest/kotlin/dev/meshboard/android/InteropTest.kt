@@ -14,6 +14,7 @@ class InteropTest {
     @Test fun peer() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         assumeTrue("Run with test:interop:android", args.getString("meshboard.interop") == "true")
+        check(BuildConfig.CRDT_PREVIEW == (args.getString("meshboard.crdt") == "true")) { "Install the matching legacy/CRDT Android test build." }
         val controller = AndroidController(InstrumentationRegistry.getInstrumentation().targetContext, args.getString("meshboard.relay") == "true")
         try {
             ServerSocket(18765, 1, InetAddress.getByName("127.0.0.1")).use { server ->

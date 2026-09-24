@@ -1,5 +1,10 @@
 # Phase 1 protocol v1
 
+This remains the default/released protocol. The opt-in local Phase 2 checkpoint
+has a [separate preview protocol](../../docs/crdt-preview.md); it is not mixed
+into v1 sessions. The preview uses y-webrtc binary sync/awareness and compatible
+signaling, plus an explicitly negotiated large-message fragmentation extension.
+
 This is the temporary, JSON-based connection-validation protocol. It is not
 compatible with Yjs updates or y-webrtc signaling/data-channel messages. Phase 2
 must replace it with Yjs/yrs and validate y-webrtc compatibility. Every current

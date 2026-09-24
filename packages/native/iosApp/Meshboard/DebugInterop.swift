@@ -10,12 +10,18 @@ final class DebugInterop {
     private var connection: NWConnection?
     private var timer: DispatchSourceTimer?
     private var buffer = Data()
-    private var last = ""
     init() throws {
-        controller = AppleInterop(network: NativeAppleNetwork(forceRelay: CommandLine.arguments.contains("--relay")))
+        guard AppleCrdtModeKt.appleCrdtPreviewEnabled() == CommandLine.arguments.contains("--crdt") else {
+            throw NSError(domain: "MeshboardInterop", code: 1, userInfo: [NSLocalizedDescriptionKey: "Installed app does not match the requested CRDT/legacy protocol."])
+        }
+        let network = NativeAppleNetwork(forceRelay: CommandLine.arguments.contains("--relay"))
+        controller = AppleInterop(network: network)
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: 18766)
         listener = try NWListener(using: parameters)
+        network.diagnostic = { [weak self] value in
+            self?.connection?.send(content: Data(("MESHBOARD_DIAGNOSTIC " + value + "\n").utf8), completion: .contentProcessed { _ in })
+        }
         listener.newConnectionHandler = { [weak self] connection in
             guard let self, self.connection == nil else { connection.cancel(); return }
             self.connection = connection
@@ -33,8 +39,8 @@ final class DebugInterop {
         timer.schedule(deadline: .now(), repeating: .milliseconds(50))
         timer.setEventHandler { [weak self] in
             guard let self, let connection = self.connection else { return }
-            let state = self.controller.snapshot()
-            if state != self.last { self.last = state; connection.send(content: Data(("MESHBOARD " + state + "\n").utf8), completion: .contentProcessed { _ in }) }
+            guard let state = self.controller.snapshot() else { return }
+            connection.send(content: Data(("MESHBOARD " + state + "\n").utf8), completion: .contentProcessed { _ in })
         }
         self.timer = timer; timer.resume()
     }

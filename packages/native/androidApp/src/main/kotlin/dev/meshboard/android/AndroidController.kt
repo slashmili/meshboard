@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
 import meshboard.*
+import meshboard.crdt.CrdtBoard
 import okhttp3.*
 import okio.ByteString
 import org.webrtc.*
@@ -25,6 +26,15 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private val mutable = MutableStateFlow(BoardState())
     override val state = mutable.asStateFlow()
     private val document = BoardDocument()
+    // Reflection keeps the optional wrapper/library out of normal and release APKs.
+    private fun newCrdt(): CrdtBoard? = if (BuildConfig.CRDT_PREVIEW)
+        Class.forName("meshboard.crdt.JvmCrdtBoard").getConstructor().newInstance() as CrdtBoard else null
+    private var crdt = newCrdt()
+    private val elements get() = crdt?.elements() ?: document.elements
+    private val channelLabel get() = if (crdt != null) YWire.FRAGMENT_CHANNEL else "meshboard.v1"
+    private fun resetDocument() { document.reset(); crdt?.close(); crdt = newCrdt() }
+    private var awareness = YAwareness()
+    private var awarenessTask: ScheduledFuture<*>? = null
     private val previews = mutableMapOf<String, BoardElement>()
     private var factory: PeerConnectionFactory? = null
     private var config = PeerConnection.RTCConfiguration(emptyList())
@@ -49,7 +59,10 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         var timeout: ScheduledFuture<*>? = null
         val candidates = mutableListOf<IceCandidate>()
         val receiver = FrameReceiver(System::currentTimeMillis)
-        val queue = ArrayDeque<String>()
+        val yReceiver = YWire.Receiver()
+        var token: Double? = null
+        var remoteFragments = false
+        val queue = ArrayDeque<ByteArray>()
         var queueBytes = 0
     }
     private fun post(action: () -> Unit) {
@@ -60,22 +73,37 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private fun later(delay: Long, action: () -> Unit) = executor.schedule({ post(action) }, delay, TimeUnit.MILLISECONDS)
     private fun report(error: String? = mutable.value.error) {
         val open = peers.values.filter { it.open }
-        mutable.value = mutable.value.copy(elements = document.elements, previews = previews.values.toList(), connected = open.size,
+        mutable.value = mutable.value.copy(elements = elements, previews = previews.values.toList(), connected = open.size,
             connecting = peers.size - open.size, relayed = open.count { it.relayed }, error = error)
     }
     override fun newId() = "${System.currentTimeMillis().toString(36)}-${UUID.randomUUID()}"
     override fun put(element: BoardElement) = post { Wire.element(Wire.elementJson(element)); local(BoardMessage("put", element = element)) }
     override fun remove(ids: List<String>) = post { if (ids.isNotEmpty()) local(BoardMessage("remove", ids = ids)) }
-    private fun local(message: BoardMessage) { document.apply(message); report(); broadcast(message) }
+    private fun local(message: BoardMessage) {
+        val board = crdt
+        if (board == null) { document.apply(message); report(); broadcast(message); return }
+        val before = board.stateVector()
+        when (message.type) {
+            "put" -> board.put(requireNotNull(message.element))
+            "remove" -> board.removeAll(message.ids)
+            else -> error("Invalid local CRDT operation")
+        }
+        report(); broadcastY(YWire.sync(2, board.update(before)))
+    }
     override fun preview(element: BoardElement?) = post {
         pendingPreview = element
-        if (element == null) { previewTask?.cancel(false); previewTask = null; broadcast(BoardMessage("preview")) }
-        else if (previewTask == null) previewTask = later(50) { previewTask = null; broadcast(BoardMessage("preview", element = pendingPreview)) }
+        if (element == null) {
+            previewTask?.cancel(false); previewTask = null
+            if (crdt == null) broadcast(BoardMessage("preview")) else broadcastY(awareness.local(self, null))
+        } else if (previewTask == null) previewTask = later(50) {
+            previewTask = null
+            if (crdt == null) broadcast(BoardMessage("preview", element = pendingPreview)) else broadcastY(awareness.local(self, pendingPreview))
+        }
     }
     override fun share(origin: String) = post { if (room.isEmpty()) begin(validateOrigin(origin), UUID.randomUUID().toString(), true) }
     override fun join(invite: String) = post { val (base, id) = parseInvite(invite); begin(base, id, false) }
     override fun retry() = post { if (room.isNotEmpty()) begin(origin, room, true) }
-    override fun leave() = post { disconnect(); room = ""; document.reset(); mutable.value = BoardState() }
+    override fun leave() = post { disconnect(); room = ""; resetDocument(); mutable.value = BoardState() }
 
     // Keep the canonical invite unchanged. Only debug emulator network destinations use its host alias.
     private fun destination(url: String): String {
@@ -84,9 +112,22 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         return if (uri.host in listOf("127.0.0.1", "localhost")) URI(uri.scheme, null, "10.0.2.2", uri.port, uri.path, uri.query, null).toString() else url
     }
     private fun begin(base: String, id: String, keepDrawing: Boolean) {
-        disconnect(); if (!keepDrawing) document.reset()
+        require(crdt == null || (emulator && URI(base).host in listOf("localhost", "127.0.0.1", "10.0.2.2"))) {
+            "CRDT preview is local-only and requires an Android emulator."
+        }
+        disconnect(); if (!keepDrawing) resetDocument()
         origin = base; room = id
-        mutable.value = BoardState(elements = document.elements, invite = "$origin/#room=$room")
+        if (crdt != null) {
+            self = UUID.randomUUID().toString(); awareness = YAwareness(); awareness.local(self, null)
+            fun tick() {
+                awareness.expire()?.let(::broadcastY)
+                previews.clear(); previews.putAll(awareness.previews()); report()
+                broadcastY(awareness.local(self, pendingPreview))
+                awarenessTask = later(10_000) { tick() }
+            }
+            awarenessTask = later(10_000) { tick() }
+        }
+        mutable.value = BoardState(elements = elements, invite = if (crdt != null) "$origin/?crdt=1#crdt=$room" else "$origin/#room=$room")
         val current = generation
         http.newCall(Request.Builder().url(destination("$base/api/rtc-config")).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) = post { if (current == generation) report("Could not load connection settings. Check the app address and retry.") }
@@ -111,6 +152,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         o.exact("iceServers", "iceTransportPolicy", "localDevelopment")
         val policy = o.text("iceTransportPolicy"); require(policy in listOf("all", "relay"))
         val local = o.getValue("localDevelopment").jsonPrimitive.boolean
+        require(crdt == null || local) { "CRDT preview requires a local-development server." }
         val servers = o.getValue("iceServers").jsonArray; require(servers.size <= 8)
         val ice = servers.map { item ->
             val server = item.jsonObject; require(server.keys.all { it in setOf("urls", "username", "credential") })
@@ -126,11 +168,16 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         }
     }
     private fun connectSocket(current: Int) {
-        val url = destination(origin).replaceFirst("https:", "wss:").replaceFirst("http:", "ws:") + "/signal"
+        val url = destination(origin).replaceFirst("https:", "wss:").replaceFirst("http:", "ws:") + if (crdt != null) "/signal-y-webrtc" else "/signal"
         socket = http.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) = post {
                 if (current != generation || socket !== ws) { ws.cancel(); return@post }
-                sendJson(buildJsonObject { put("v", 1); put("type", "join"); put("room", room) })
+                if (crdt == null) sendJson(buildJsonObject { put("v", 1); put("type", "join"); put("room", room) })
+                else {
+                    sendJson(buildJsonObject { put("type", "subscribe"); putJsonArray("topics") { add("meshboard-crdt:$room") } })
+                    announceY(); reconnectDelay = 1
+                    mutable.value = mutable.value.copy(signaling = true); report(null)
+                }
             }
             override fun onMessage(ws: WebSocket, text: String) = post {
                 if (current != generation || socket !== ws) return@post
@@ -154,8 +201,58 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         val ws = socket ?: return; val raw = message.toString()
         require(raw.length <= 32_768 && ws.queueSize() < 256 * 1024 && ws.send(raw)) { "The connection service is unavailable. Retry the connection." }
     }
-    private fun signal(id: String, payload: JsonObject) = sendJson(buildJsonObject { put("v", 1); put("type", "signal"); put("to", id); put("payload", payload) })
+    private fun signal(id: String, payload: JsonObject) {
+        if (crdt == null) { sendJson(buildJsonObject { put("v", 1); put("type", "signal"); put("to", id); put("payload", payload) }); return }
+        val p = peers[id] ?: return
+        val token = p.token ?: (System.currentTimeMillis().toDouble() + ThreadLocalRandom.current().nextDouble()).also { p.token = it }
+        publishY(buildJsonObject {
+            put("type", "signal"); put("from", self); put("to", id); put("token", token)
+            put("signal", payload["description"] ?: buildJsonObject { put("type", "candidate"); put("candidate", payload.getValue("candidate")) })
+        })
+    }
+    private fun publishY(data: JsonObject) = sendJson(buildJsonObject { put("type", "publish"); put("topic", "meshboard-crdt:$room"); put("data", data) })
+    private fun announceY() = publishY(buildJsonObject { put("type", "announce"); put("from", self) })
     private fun receiveSignal(raw: String) {
+        if (crdt != null) receiveYSignal(Json.parseToJsonElement(raw).jsonObject) else receiveLegacySignal(raw)
+    }
+    private fun receiveYSignal(message: JsonObject) {
+        if (message.text("type") == "pong") return
+        if (message.text("type") == "error") {
+            report(if (message.text("code") == "room-full") "This board already has 8 participants." else "The connection service declined this session.")
+            socket?.close(1000, "policy"); socket = null
+            mutable.value = mutable.value.copy(signaling = false); return
+        }
+        require(message.text("type") == "publish" && message.text("topic") == "meshboard-crdt:$room")
+        val data = message.getValue("data").jsonObject
+        val id = data.text("from"); require(uuidPattern.matches(id))
+        if (id == self || ("to" in data && data.text("to") != self)) return
+        if (peers.size >= 7 && id !in peers) return
+        desired.add(id)
+        if (data.text("type") == "announce") { ensurePeer(id, true); return }
+        require(data.text("type") == "signal")
+        val signal = data.getValue("signal").jsonObject
+        val type = signal.text("type")
+        if (type == "offer") {
+            val existing = peers[id]
+            if (existing?.open == true) return
+            val remote = data.number("token")
+            if (existing?.token != null) {
+                if (existing.token!! > remote) return
+                // Recreate the losing offerer, matching simple-peer's glare policy.
+                drop(id)
+            }
+        }
+        val p = ensurePeer(id, false) ?: return
+        if (type == "offer" || type == "answer") p.remoteFragments = signal.text("sdp").split("\r\n").contains(YWire.FRAGMENT_SDP)
+        if (type == "answer") p.token = null
+        val payload = when (type) {
+            "offer", "answer" -> buildJsonObject { put("description", signal) }
+            "candidate" -> buildJsonObject { put("candidate", signal.getValue("candidate")) }
+            else -> error("Unsupported WebRTC signal")
+        }
+        receiveLegacySignal(buildJsonObject { put("v", 1); put("type", "signal"); put("from", id); put("payload", payload) }.toString())
+    }
+    private fun receiveLegacySignal(raw: String) {
         val o = Json.parseToJsonElement(raw).jsonObject; o.version()
         when (o.text("type")) {
             "welcome" -> {
@@ -200,7 +297,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             else -> error("Unsupported signaling message")
         }
     }
-    private fun ensurePeer(id: String): Peer? {
+    private fun ensurePeer(id: String, initiator: Boolean = crdt == null && self < id): Peer? {
         peers[id]?.let { return it }; if (id !in desired) return null
         val count = attempts[id] ?: 0
         if (count >= 3) { report("A peer could not connect. Check the network and retry."); return null }
@@ -226,7 +323,10 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             override fun onRenegotiationNeeded() {}
         }))
         peer = Peer(pc); peers[id] = peer; peer.timeout = later(20_000) { fail(id, peer) }
-        if (self < id) { attach(id, peer, pc.createDataChannel("meshboard.v1", DataChannel.Init())); makeDescription(id, peer, true) }
+        if (initiator) {
+            if (crdt != null) peer.token = System.currentTimeMillis().toDouble() + ThreadLocalRandom.current().nextDouble()
+            attach(id, peer, pc.createDataChannel(channelLabel, DataChannel.Init())); makeDescription(id, peer, true)
+        }
         report(); return peer
     }
     private fun observer(id: String, p: Peer, create: (SessionDescription) -> Unit = {}, set: () -> Unit = {}) = object : SdpObserver {
@@ -238,23 +338,31 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private fun makeDescription(id: String, p: Peer, offer: Boolean) {
         val listener = observer(id, p, create = { d ->
             p.pc.setLocalDescription(observer(id, p, set = {
-                signal(id, buildJsonObject { putJsonObject("description") { put("type", d.type.canonicalForm()); put("sdp", d.description) } })
+                signal(id, buildJsonObject { putJsonObject("description") {
+                    put("type", d.type.canonicalForm())
+                    put("sdp", if (crdt == null) d.description else d.description.replaceFirst("\r\nm=", "\r\n${YWire.FRAGMENT_SDP}\r\nm="))
+                } })
             }), d)
         })
         if (offer) p.pc.createOffer(listener, MediaConstraints()) else p.pc.createAnswer(listener, MediaConstraints())
     }
     private fun attach(id: String, p: Peer, channel: DataChannel) {
-        if (p.channel != null || channel.label() != "meshboard.v1") { channel.close(); channel.dispose(); return }
+        if (p.channel != null || (crdt == null && channel.label() != channelLabel)) { channel.close(); channel.dispose(); return }
         p.channel = channel
         channel.registerObserver(object : DataChannel.Observer {
             override fun onBufferedAmountChange(previousAmount: Long) = post { if (peers[id] === p) flush(id, p) }
             override fun onStateChange() = post { if (peers[id] === p) channelState(id, p) }
             override fun onMessage(buffer: DataChannel.Buffer) {
-                if (buffer.binary || buffer.data.remaining() > Wire.MAX_FRAME) { post { if (peers[id] === p) reject(id) }; return }
+                if (buffer.binary != (crdt != null) || buffer.data.remaining() > (if (crdt != null) YWire.MAX_MESSAGE else Wire.MAX_FRAME)) { post { if (peers[id] === p) reject(id) }; return }
                 val bytes = ByteArray(buffer.data.remaining()); buffer.data.get(bytes)
                 post {
                     if (peers[id] !== p) return@post
                     try {
+                        if (crdt != null) {
+                            val message = if (channel.label() == YWire.FRAGMENT_CHANNEL && p.remoteFragments) p.yReceiver.accept(bytes) else bytes
+                            if (message != null) receiveYData(id, p, message)
+                            return@post
+                        }
                         val message = p.receiver.accept(bytes.decodeToString(throwOnInvalidSequence = true)) ?: return@post
                         if (message.type == "preview") { val element = message.element; if (element == null) previews.remove(id) else previews[id] = element }
                         else { previews.remove(id); document.apply(message) }
@@ -269,26 +377,62 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         when (p.channel?.state()) {
             DataChannel.State.OPEN -> if (!p.open) {
                 p.open = true; p.timeout?.cancel(false); attempts[id] = 0
-                send(id, p, document.snapshot()); updateRoute(id, p); report(null)
+                val board = crdt
+                if (board == null) send(id, p, document.snapshot()) else {
+                    sendY(id, p, YWire.sync(0, board.stateVector()))
+                    sendY(id, p, awareness.all()); sendY(id, p, byteArrayOf(3))
+                }
+                updateRoute(id, p); report(null)
             }
             DataChannel.State.CLOSED -> fail(id, p)
             else -> Unit
         }
     }
     private fun broadcast(message: BoardMessage) { peers.toMap().forEach { (id, p) -> if (p.open) send(id, p, message) } }
+    private fun receiveYData(id: String, p: Peer, bytes: ByteArray) {
+        val board = crdt ?: return
+        val reader = YWire.Reader(bytes)
+        when (reader.uint()) {
+            0L -> {
+                val step = reader.uint(); val update = reader.bytes(); reader.end()
+                when (step) {
+                    0L -> sendY(id, p, YWire.sync(1, board.update(update)))
+                    1L, 2L -> { board.apply(update); report() }
+                    else -> error("Invalid Yjs sync step")
+                }
+            }
+            1L -> {
+                val update = reader.bytes(); reader.end()
+                awareness.receive(update)?.let(::broadcastY)
+                previews.clear(); previews.putAll(awareness.previews()); report()
+            }
+            3L -> { reader.end(); sendY(id, p, awareness.all()) }
+            else -> error("Unsupported y-webrtc message")
+        }
+    }
+    private fun broadcastY(bytes: ByteArray) { peers.toMap().forEach { (id, p) -> if (p.open) sendY(id, p, bytes) } }
+    private fun sendY(id: String, p: Peer, bytes: ByteArray) {
+        try {
+            require(bytes.size <= YWire.MAX_MESSAGE)
+            enqueue(id, p, if (p.channel?.label() == YWire.FRAGMENT_CHANNEL && p.remoteFragments) YWire.frames(bytes) else listOf(bytes))
+        } catch (_: Exception) { fail(id, p) }
+    }
     private fun send(id: String, p: Peer, message: BoardMessage) {
         try {
-            val frames = Wire.frames(message, UUID.randomUUID().toString()); val bytes = frames.sumOf { it.encodeToByteArray().size }
-            require(p.queueBytes + bytes <= 8 * 1024 * 1024)
-            p.queue.addAll(frames); p.queueBytes += bytes; flush(id, p)
+            enqueue(id, p, Wire.frames(message, UUID.randomUUID().toString()).map { it.encodeToByteArray() })
         } catch (_: Exception) { fail(id, p) }
+    }
+    private fun enqueue(id: String, p: Peer, frames: List<ByteArray>) {
+        val bytes = frames.sumOf { it.size }
+        require(p.queueBytes + bytes <= 8 * 1024 * 1024)
+        p.queue.addAll(frames); p.queueBytes += bytes; flush(id, p)
     }
     private fun flush(id: String, p: Peer) {
         val channel = p.channel ?: return; if (!p.open) return
         try {
             while (p.queue.isNotEmpty() && channel.bufferedAmount() < 256 * 1024) {
-                val bytes = p.queue.first().encodeToByteArray()
-                check(channel.send(DataChannel.Buffer(ByteBuffer.wrap(bytes), false)))
+                val bytes = p.queue.first()
+                check(channel.send(DataChannel.Buffer(ByteBuffer.wrap(bytes), crdt != null)))
                 p.queue.removeFirst(); p.queueBytes -= bytes.size
             }
         } catch (_: Exception) { fail(id, p) }
@@ -305,15 +449,22 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private fun fail(id: String, p: Peer) {
         if (peers[id] !== p) return; drop(id)
         val current = generation
-        if (id in desired && socket != null) later(1500) { if (current == generation) ensurePeer(id) }
+        if (id in desired && socket != null) {
+            if (crdt != null) {
+                desired.remove(id)
+                later(1500) { if (current == generation && socket != null && peers.size < 7) announceY() }
+            } else later(1500) { if (current == generation) ensurePeer(id) }
+        }
     }
     private fun drop(id: String) {
         val p = peers.remove(id) ?: return; p.timeout?.cancel(false)
         p.channel?.let { it.unregisterObserver(); it.close(); it.dispose() }; p.pc.close(); p.pc.dispose()
         previews.remove(id); report()
+        if (crdt != null) { awareness.expire(id)?.let(::broadcastY); previews.clear(); previews.putAll(awareness.previews()); report() }
     }
     private fun disconnect() {
         generation++; reconnect?.cancel(false); previewTask?.cancel(false); previewTask = null
+        awarenessTask?.cancel(false); awarenessTask = null; pendingPreview = null
         desired.clear(); attempts.clear(); peers.keys.toList().forEach(::drop)
         socket?.cancel(); socket = null; self = ""; previews.clear(); http.dispatcher.cancelAll()
     }
@@ -321,7 +472,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         if (disposed) return
         disposed = true
         executor.execute {
-            disconnect(); document.reset(); factory?.dispose(); factory = null
+            disconnect(); document.reset(); crdt?.close(); crdt = null; factory?.dispose(); factory = null
             http.connectionPool.evictAll(); http.dispatcher.executorService.shutdown(); executor.shutdown()
         }
     }
@@ -341,13 +492,14 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             require(uri.scheme == "https" || (BuildConfig.DEBUG && uri.host in listOf("localhost", "127.0.0.1", "10.0.2.2"))) { "Use HTTPS for an app on another computer." }
             return "${uri.scheme}://${uri.rawAuthority}"
         }
-        fun parseInvite(value: String): Pair<String, String> {
+        fun parseInvite(value: String, crdt: Boolean = BuildConfig.CRDT_PREVIEW): Pair<String, String> {
             require(value.length <= 2048) { "The invite is too long." }
             val uri = URI(value.trim()); val base = validateOrigin(value)
-            val entries = uri.rawFragment?.split('&') ?: error("Paste the full invite, including #room=…")
+            val key = if (crdt) "crdt" else "room"
+            val entries = uri.rawFragment?.split('&') ?: error("Paste the full invite, including #$key=…")
             require(entries.size == 1) { "This invite is not supported by the connection prototype." }
             val pair = entries.single().split('=', limit = 2)
-            require(pair.size == 2 && pair[0] == "room") { "The invite must include #room=…" }
+            require(pair.size == 2 && pair[0] == key) { "This invite belongs to another protocol. Use the matching app mode." }
             val room = URLDecoder.decode(pair[1], "UTF-8"); require(uuidPattern.matches(room)) { "This invite has an invalid room ID." }
             return base to room
         }

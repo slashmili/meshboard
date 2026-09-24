@@ -59,7 +59,7 @@ and [iOS README](../packages/native/iosApp/README.md).
    testing by default, as requested by the user; retain the phone profile for
    optional phone-specific checks.
 
-   **4c — Apple platforms, iOS sharing preview ready for feedback.** macOS and
+   **4c — Apple platforms, basic iPad/web sharing accepted.** macOS and
    iPad local drawing are accepted. Physical Apple/Android testing and Windows
    validation remain separate steps.
    Apple Silicon now builds a branded macOS app with a bundled Java runtime.
@@ -71,22 +71,26 @@ and [iOS README](../packages/native/iosApp/README.md).
    touch UI. The iPad Air simulator runs it; five iOS model tests and ten desktop
    tests pass. Drawing, rectangle, erasing, zoom/reset, rotation, and Clear were
    checked in the simulator. Local iPad drawing accepted by the user.
-   **iOS sharing preview ready for feedback:** native WebRTC/URLSession with
+   **iOS sharing accepted for basic iPad/web use:** native WebRTC/URLSession with
    link/QR, full mesh, snapshots, previews, and reconnect. Four interop tests pass
    across iOS simulator/web/macOS, including real forced TURN and creator departure.
    Eight iOS tests and ten desktop tests pass; the unsigned device app builds.
-   Physical-device/Pencil/network validation, Intel execution, and distribution
-   signing remain pending. See [iPad setup](../packages/native/iosApp/README.md).
+   User confirmed real iPad ↔ web sharing works, and macOS works with a local
+   server (2026-09-16). These manual checks do not establish pressure-sensitive
+   Pencil behavior, forced TURN on a physical device, or an iPhone check.
+   Intel execution and distribution signing remain pending.
+   See [iPad setup](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Get feedback on the iOS sharing preview.
-2. Configure reachable HTTPS/WSS and TURN for physical-device sharing, then
-   validate a real iPad/iPhone (including Pencil behavior). Simulator success
-   and an unsigned device build do not prove physical-device behavior.
+1. Run the local iPad simulator CRDT sharing checkpoint (2h below) on Apple CI/a Mac,
+   then pause for manual simulator feedback before physical-device support or migration.
+2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
+   checks. Basic iPad/web and local-server macOS sharing are user-validated.
 3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
+   Phase 1's complete platform-validation milestone remains open.
 
-Current sync is custom v1, not Yjs/yrs or y-webrtc compatible. There is no
+Default/released sync is custom v1, not Yjs/yrs or y-webrtc compatible. There is no
 application-layer encryption, authenticated admission, save/export, persistence,
 undo, or pressure-sensitive stroke width yet.
 
@@ -96,6 +100,110 @@ Integrate Yjs/yrs with explicit cross-language fixtures. Validate compatibility
 with y-webrtc's signaling and data-channel protocols, full mesh, late joining,
 reconnection, convergence, and creator departure with at least four mixed peers.
 Pause after each testable increment.
+
+**2a — Yjs/yrs binary compatibility prototype, accepted.** User ran
+`pnpm test:crdt` successfully. `packages/crdt-core` tests
+full-state and incremental updates, large boards, concurrent replacements,
+deletions, reordered/duplicate updates, and late joining without the creator.
+Run `pnpm test:crdt`; see its README for scope and candidate document format.
+This is a non-UI checkpoint, not a live app migration: mobile bindings, y-webrtc
+protocol integration, and four-device validation are still pending.
+
+**2b — Desktop Kotlin/JNI boundary ready for feedback.** Common `CrdtBoard` API,
+opt-in JVM wrapper, and a Rust shared library with opaque handle ownership.
+`pnpm test:crdt:kotlin` runs six lifecycle/validation/concurrency tests and the
+same seven Yjs scenarios through Kotlin/JNI. Verified locally on Linux; macOS
+is wired into CI but not locally validated. Normal app builds and live sync are
+unchanged in this checkpoint. Mac validation is deferred until the user returns
+to that machine. The local web/desktop follow-up is recorded in 2c below;
+Android/iOS bindings and final protocol migration remain pending.
+
+**2c — Local live web/desktop CRDT preview accepted on Linux.** User confirmed
+local browser/desktop drawing works. Mac validation remains pending. User approved
+continuing on Linux while Mac validation waits until tomorrow. Opt-in browser
+and desktop modes exchange Yjs/yrs state vectors and updates over a separately
+named channel and development-only signaling namespace. Invalid updates are
+staged and validated before committing. Linux live tests cover four mixed
+browser/desktop peers, large state, concurrent edits, creator departure/rejoin,
+reload recovery, forced TURN, and protocol isolation. See
+[CRDT preview instructions](crdt-preview.md). This is an intermediate adapter
+using the existing transport, **not y-webrtc protocol compatibility**. Default
+and packaged apps still use Phase 1 sync; mobile bindings and broader security
+and performance work remain pending. Superseded in the active preview by 2d.
+
+**2d — y-webrtc web/desktop interoperability accepted on Linux; CI passed.** The browser
+uses pinned upstream y-webrtc; desktop implements its unencrypted signaling,
+binary sync and awareness profile. A separate development-only signaling endpoint
+keeps released sessions unchanged. Large board messages use an explicitly
+negotiated Meshboard fragmentation extension, not a claimed upstream feature.
+Linux tests cover four mixed peers, large snapshots, creator departure/rejoin,
+refresh recovery, TURN, an unmodified upstream provider exchanging small raw
+sync/awareness messages with desktop, and rejection of invalid incoming updates.
+Codec fixtures, fragment limits, awareness expiry and signaling isolation/caps
+also pass. User confirmed all CI checks passed on Linux and both macOS runners
+after the four-peer convergence deadline/readiness fix. Manual Mac preview
+validation remains pending; Android/iOS still use v1.
+See [preview instructions and protocol limits](crdt-preview.md). Pause for feedback.
+
+**2e — Android CRDT JNI boundary accepted.** Opt-in debug packaging
+reuses the desktop Kotlin/JNI wrapper and Rust core for x86_64 and ARM64 Android.
+`pnpm test:crdt:android` runs the six JNI tests on the tablet and all seven existing
+Yjs scenarios through Android, including a 12,000-point stroke and deletion-only
+sync. Android CI runs the same checks. No new Android UI or live CRDT transport
+is enabled; ordinary and released apps remain on v1 without the Rust library.
+See [Android checkpoint instructions](../packages/native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e).
+Physical ARM64 execution and iOS bindings remain pending. Pause before adding
+the opt-in Android live-sharing preview.
+
+**2f — Local Android/web/desktop CRDT sharing ready for feedback.** The opt-in
+debug Android controller uses the same y-webrtc signaling, binary sync,
+awareness and negotiated fragmentation profile as desktop. JVM codecs are shared
+between Android and desktop. `pnpm android:crdt` starts the explicitly labeled,
+emulator-only UI on port 5174; normal and release builds stay on v1.
+`pnpm test:interop:android:crdt` runs the preview UI and mixed-peer live suite,
+including a 12,000-point snapshot, concurrent updates, creator departure,
+reload/rejoin, TURN, unmodified upstream-provider interoperability and input
+rejection. Android CI includes both legacy and preview suites.
+See [manual tablet checks](crdt-preview.md#try-the-android-tablet--checkpoint-2f).
+Pause for user feedback; physical-device CRDT, iOS CRDT, security hardening and
+production migration are not completed by this checkpoint.
+
+**2g — iOS CRDT C boundary CI-validated (user-confirmed).**
+Opt-in `meshboard.crdtIos=true` builds Rust static libraries for ARM64 iOS devices
+and simulators, generates C bindings, and implements `AppleCrdtBoard` behind the
+shared document API. JNI and C reuse the same validated Rust handle registry.
+`pnpm test:crdt:ios` runs five boundary tests in the simulator, then the same
+seven Yjs compatibility scenarios through a simulator-only Kotlin/Native
+executable, and links the opt-in device framework. Normal iOS app builds do not
+include this binding or require Rust; AppleBoardController remains on v1.
+See [Mac setup and CI instructions](../packages/native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g).
+The user reported successful Apple CI before proceeding to 2h. Device library
+linking does not establish physical-device execution.
+
+**2h — Local iPad simulator CRDT sharing ready for Apple CI and manual feedback.**
+`pnpm ios:crdt` opts into Debug simulator sharing with the web/desktop/Android
+CRDT previews. The UI is explicitly labeled and the controller refuses non-local
+origins and legacy invites before discarding state. Swift also requires a
+local-development RTC configuration. Release/device preview builds are refused;
+ordinary apps still use v1 and do not load Rust. Native platforms now share the
+same common-Kotlin sync/fragmentation/awareness codec and its unit tests.
+Four additional iOS controller tests exercise large snapshots, delete-only sync,
+raw messages, awareness, invalid updates and guards. `pnpm test:interop:ios:crdt`
+adds six live scenarios, including four mixed peers, a 12,000-point stroke,
+creator departure/rejoin, browser reload, real TURN and unmodified y-webrtc.
+Apple execution is pending; local Linux regressions cannot validate Swift or
+simulator behavior. Pause after CI for the [manual simulator checks](crdt-preview.md#try-the-ipad-simulator--checkpoint-2h).
+Physical iPad CRDT, Android/iOS simultaneous execution, security hardening and
+production migration remain separate work.
+
+CI follow-up: run 35340356380 passed the desktop/Android jobs and five of six
+iOS preview scenarios, but four-peer setup stalled at 1/2 native connections.
+The simulator adapter now serializes only changed state instead of rebuilding
+the 12,000-point JSON snapshot every 50 ms on the WebRTC callback thread.
+Desktop regression tests cover unchanged polling, state changes and deletion;
+the failing iOS scenario also captures bounded, content-free connection events.
+Apple CI still needs to confirm whether this resolves the setup failure; no
+connection timeout or convergence assertion has been relaxed.
 
 ## Phase 3
 

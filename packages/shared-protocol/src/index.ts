@@ -30,6 +30,18 @@ export const boardMessageSchema = z.discriminatedUnion('type', [
 export type BoardMessage = z.infer<typeof boardMessageSchema>
 export type Snapshot = Extract<BoardMessage, { type: 'snapshot' }>
 
+// Local Phase 2 preview only; not y-webrtc's final sync protocol.
+export const crdtMessageSchema = z.object({
+  v: z.literal(2), type: z.literal('crdt'), step: z.enum(['vector', 'update']),
+  data: z.string().max(2_800_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).refine(value => value.length % 4 === 0),
+}).strict()
+export type CrdtMessage = z.infer<typeof crdtMessageSchema>
+export type SessionMessage = BoardMessage | CrdtMessage
+export const previewSessionSchema = z.union([
+  crdtMessageSchema,
+  z.object({ v: z.literal(1), type: z.literal('preview'), element: elementSchema.nullable() }).strict(),
+])
+
 export const frameSchema = z.object({
   v: z.literal(1), id: z.uuid(), index: z.number().int().min(0).max(1023),
   total: z.number().int().min(1).max(1024), data: z.string().max(8_000),
