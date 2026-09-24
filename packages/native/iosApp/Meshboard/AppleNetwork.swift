@@ -56,6 +56,21 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     private var reconnect: DispatchWorkItem?
     private var reconnectDelay = 1.0
     private let forceRelay: Bool
+    #if DEBUG && targetEnvironment(simulator)
+    // Only connected by the opt-in test adapter; never log SDP, ICE addresses or content.
+    var diagnostic: ((String) -> Void)?
+    #endif
+    fileprivate func diagnose(_ event: String, _ peer: ApplePeer) {
+        #if DEBUG && targetEnvironment(simulator)
+        guard let diagnostic else { return }
+        diagnostic(json(["event": event, "peer": peer.id,
+                         "ageMs": Int((ProcessInfo.processInfo.systemUptime - peer.started) * 1000),
+                         "connection": peer.pc.connectionState.rawValue,
+                         "ice": peer.pc.iceConnectionState.rawValue,
+                         "signaling": peer.pc.signalingState.rawValue,
+                         "open": peer.open]))
+        #endif
+    }
     init(forceRelay: Bool = false) { self.forceRelay = forceRelay; super.init() }
     func listen(events: AppleNetworkEvents?) { self.events = events; if events == nil { session.invalidateAndCancel() } }
     func normalizeOrigin(value: String) -> String? {
@@ -282,8 +297,9 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         let peer = ApplePeer(id: id, owner: self)
         guard let pc = factory.peerConnection(with: configuration, constraints: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil), delegate: peer) else { return nil }
         peer.pc = pc; peers[id] = peer
+        diagnose("created", peer)
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self, weak peer] in
-            if let peer, !peer.open { self?.failed(peer) }
+            if let peer, !peer.open { self?.failed(peer, reason: "connection-timeout") }
         }
         if initiator ?? (!crdtPreview && selfID < id) {
             if crdtPreview { peer.token = Date().timeIntervalSince1970 * 1000 + Double.random(in: 0..<1) }
@@ -295,15 +311,16 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     }
     fileprivate func valid(_ peer: ApplePeer) -> Bool { peers[peer.id] === peer }
     fileprivate func opened(_ peer: ApplePeer) {
-        guard valid(peer) else { return }; attempts[peer.id] = 0; events?.opened(peer: peer.id); peer.route()
+        guard valid(peer) else { return }; diagnose("opened", peer)
+        attempts[peer.id] = 0; events?.opened(peer: peer.id); peer.route()
     }
     fileprivate func received(_ peer: ApplePeer, _ raw: String) { if valid(peer) { events?.received(peer: peer.id, frame: raw) } }
     fileprivate func receivedBinary(_ peer: ApplePeer, _ data: Data) {
         if valid(peer) { events?.receivedBinary(peer: peer.id, base64: data.base64EncodedString()) }
     }
     fileprivate func route(_ peer: ApplePeer, _ relay: Bool) { if valid(peer) { events?.route(peer: peer.id, relayed: relay) } }
-    fileprivate func failed(_ peer: ApplePeer) {
-        guard valid(peer) else { return }; drop(peer.id)
+    fileprivate func failed(_ peer: ApplePeer, reason: String = "connection-failed") {
+        guard valid(peer) else { return }; diagnose(reason, peer); drop(peer.id)
         if crdtPreview { desired.remove(peer.id); attempts.removeValue(forKey: peer.id) }
         let current = generation
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
@@ -314,6 +331,7 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     }
     private func drop(_ id: String) {
         guard let peer = peers.removeValue(forKey: id) else { return }
+        diagnose("closed", peer)
         peer.channel?.delegate = nil; peer.channel?.close(); peer.pc.delegate = nil; peer.pc.close()
         events?.closed(peer: id)
     }
@@ -341,6 +359,7 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
 
 private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDelegate {
     let id: String
+    let started = ProcessInfo.processInfo.systemUptime
     weak var owner: NativeAppleNetwork?
     var pc: RTCPeerConnection!
     var channel: RTCDataChannel?
@@ -356,8 +375,9 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
         DispatchQueue.main.async { [weak self] in guard let self, let owner = self.owner, owner.valid(self) else { return }; block(self, owner) }
     }
     func remote(type: RTCSdpType, sdp: String) {
+        owner?.diagnose(type == .offer ? "remote-offer" : "remote-answer", self)
         pc.setRemoteDescription(RTCSessionDescription(type: type, sdp: sdp)) { [weak self] error in self?.main { peer, owner in
-            guard error == nil else { owner.failed(peer); return }
+            guard error == nil else { owner.failed(peer, reason: "remote-description-failed"); return }
             peer.remoteSet = true; for c in peer.candidates { peer.pc.add(c) }; peer.candidates.removeAll()
             if type == .offer { peer.describe(offer: false) }
         } }
@@ -367,9 +387,10 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     }
     func describe(offer: Bool) {
         let completion: (RTCSessionDescription?, Error?) -> Void = { [weak self] description, error in self?.main { peer, owner in
-            guard error == nil, let description else { owner.failed(peer); return }
+            guard error == nil, let description else { owner.failed(peer, reason: "description-creation-failed"); return }
             peer.pc.setLocalDescription(description) { [weak peer] error in peer?.main { peer, owner in
-                guard error == nil else { owner.failed(peer); return }
+                guard error == nil else { owner.failed(peer, reason: "local-description-failed"); return }
+                owner.diagnose(offer ? "local-offer" : "local-answer", peer)
                 let sdp = owner.crdtPreview ? description.sdp.replacingOccurrences(of: "\r\nm=", with: "\r\n" + fragmentSDP + "\r\nm=", range: description.sdp.range(of: "\r\nm=")) : description.sdp
                 owner.signal(peer, ["description": ["type": offer ? "offer" : "answer", "sdp": sdp]])
             } }
@@ -389,7 +410,7 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     private func flush() {
         guard open, let channel else { return }
         while let first = queue.first, channel.bufferedAmount < 256 * 1024 {
-            guard channel.sendData(RTCDataBuffer(data: first, isBinary: owner?.crdtPreview == true)) else { owner?.failed(self); return }
+            guard channel.sendData(RTCDataBuffer(data: first, isBinary: owner?.crdtPreview == true)) else { owner?.failed(self, reason: "data-send-failed"); return }
             queue.removeFirst(); queueBytes -= first.count
         }
     }
@@ -408,7 +429,7 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) { main { peer, owner in
         switch dataChannel.readyState {
         case .open: if !peer.open { peer.open = true; owner.opened(peer); peer.flush() }
-        case .closed: owner.failed(peer)
+        case .closed: owner.failed(peer, reason: "data-channel-closed")
         default: break
         }
     } }
@@ -429,6 +450,7 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     } }
     func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) { main { peer, _ in peer.attach(dataChannel) } }
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCPeerConnectionState) { main { peer, owner in
+        owner.diagnose("connection-state-\(newState.rawValue)", peer)
         if newState == .failed { owner.failed(peer) }; if newState == .connected { peer.route() }
     } }
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}

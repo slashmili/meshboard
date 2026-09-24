@@ -91,6 +91,7 @@ export async function iosPeer(relay = false) {
     catch (error) { if (required) throw error }
   }
   let state: NativeState | undefined
+  const diagnostics: unknown[] = []
   let socket: Socket | undefined
   let lines: ReturnType<typeof createInterface> | undefined
   function disconnect() { lines?.close(); socket?.destroy() }
@@ -106,7 +107,13 @@ export async function iosPeer(relay = false) {
       socket.on('error', () => {})
       lines = createInterface({ input: socket })
       lines.on('error', () => {})
-      lines.on('line', line => { if (line.startsWith('MESHBOARD ')) state = JSON.parse(line.slice(10)) })
+      lines.on('line', line => {
+        if (line.startsWith('MESHBOARD ')) state = JSON.parse(line.slice(10))
+        else if (line.startsWith('MESHBOARD_DIAGNOSTIC ')) {
+          diagnostics.push(JSON.parse(line.slice(21)))
+          if (diagnostics.length > 200) diagnostics.shift()
+        }
+      })
       await new Promise(resolve => setTimeout(resolve, 250))
     }
     if (!state || !socket) throw new Error('iOS debug adapter did not start. Build and install the Debug simulator app first.')
@@ -114,6 +121,7 @@ export async function iosPeer(relay = false) {
     return {
       send(message: unknown) { if (connection.destroyed) throw new Error('iOS adapter disconnected'); connection.write(JSON.stringify(message) + '\n') },
       state(allowError = false) { if (!state || connection.destroyed) throw new Error('iOS adapter disconnected'); if (state.error && !allowError) throw new Error(`iOS peer: ${state.error}`); return state },
+      diagnostics: () => [...diagnostics],
       async close() {
         try { connection.end(); await runIos(['simctl', 'terminate', serial, 'dev.meshboard.ios']) }
         finally { disconnect() }

@@ -95,6 +95,7 @@ test('iOS creates; four peers converge on large state, survive creator departure
       catch (stateError) { return { error: String(stateError) } }
     })
     await testInfo.attach('native-peer-states-before-cleanup', { body: JSON.stringify(states, null, 2), contentType: 'application/json' })
+    await testInfo.attach('ios-connection-events', { body: JSON.stringify(ios.diagnostics(), null, 2), contentType: 'application/json' })
     throw error
   } finally { await desktop.close(); await context.close() }
 })

@@ -112,7 +112,10 @@ kotlin {
     jvmToolchain(21)
     sourceSets {
         if (providers.gradleProperty("meshboard.iosInterop").orNull == "true") {
-            matching { it.name == "iosMain" }.configureEach { kotlin.srcDir("src/iosInterop/kotlin") }
+            matching { it.name == "iosMain" }.configureEach {
+                kotlin.srcDir("src/iosInterop/kotlin")
+                kotlin.srcDir("src/interop/kotlin")
+            }
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -135,6 +138,7 @@ kotlin {
             }
         }
         val desktopTest by getting {
+            kotlin.srcDir("src/interop/kotlin")
             if (crdtInteropEnabled) kotlin.srcDir("src/crdtJvmTest/kotlin")
             dependencies { implementation(compose.desktop.uiTestJUnit4) }
         }

@@ -196,6 +196,15 @@ simulator behavior. Pause after CI for the [manual simulator checks](crdt-previe
 Physical iPad CRDT, Android/iOS simultaneous execution, security hardening and
 production migration remain separate work.
 
+CI follow-up: run 35340356380 passed the desktop/Android jobs and five of six
+iOS preview scenarios, but four-peer setup stalled at 1/2 native connections.
+The simulator adapter now serializes only changed state instead of rebuilding
+the 12,000-point JSON snapshot every 50 ms on the WebRTC callback thread.
+Desktop regression tests cover unchanged polling, state changes and deletion;
+the failing iOS scenario also captures bounded, content-free connection events.
+Apple CI still needs to confirm whether this resolves the setup failure; no
+connection timeout or convergence assertion has been relaxed.
+
 ## Phase 3
 
 Implement application-layer AES-256-GCM, secret-bearing URL fragments/QR codes,

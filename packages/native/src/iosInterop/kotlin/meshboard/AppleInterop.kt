@@ -5,6 +5,7 @@ import kotlinx.serialization.json.*
 /** Debug simulator harness; this source directory is excluded from Release builds. */
 class AppleInterop(network: AppleNetwork) {
     private val controller = AppleBoardController(network)
+    private val snapshots = InteropSnapshot()
     fun command(raw: String) {
         val value = Json.parseToJsonElement(raw).jsonObject
         when (value.text("type")) {
@@ -18,11 +19,5 @@ class AppleInterop(network: AppleNetwork) {
             "close" -> controller.close()
         }
     }
-    fun snapshot(): String = controller.state.value.let { state -> buildJsonObject {
-        put("connected", state.connected); put("relayed", state.relayed)
-        put("invite", state.invite); put("signaling", state.signaling)
-        put("error", state.error?.let(::JsonPrimitive) ?: JsonNull)
-        put("elements", JsonArray(state.elements.map(Wire::elementJson)))
-        put("previews", JsonArray(state.previews.map(Wire::elementJson)))
-    }.toString() }
+    fun snapshot(): String? = snapshots.changed(controller.state.value)
 }
