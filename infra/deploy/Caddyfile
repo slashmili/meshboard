@@ -1,0 +1,59 @@
+{
+	email {$ACME_EMAIL}
+	auto_https disable_redirects
+	# Explicit HTTP listener below also serves the TURN certificate challenge.
+	servers {
+		protocols h1 h2
+		timeouts {
+			read_header 10s
+			idle 2m
+		}
+	}
+}
+
+http://{$APP_DOMAIN}, http://{$TURN_DOMAIN} {
+	bind 0.0.0.0
+	handle /.well-known/acme-challenge/* {
+		root * /var/www/acme
+		file_server
+	}
+	handle {
+		redir https://{$APP_DOMAIN}{uri} permanent
+	}
+}
+
+https://{$APP_DOMAIN} {
+	bind {$WEB_BIND_IP:0.0.0.0}
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=86400"
+		-Server
+	}
+	@backend path /signal /api/rtc-config /health
+	handle @backend {
+		reverse_proxy 127.0.0.1:4444
+	}
+	handle /api/* {
+		respond 404
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Local-only health endpoint, not a second public API.
+http://127.0.0.1:8081 {
+	bind 127.0.0.1
+	handle /health {
+		reverse_proxy 127.0.0.1:4444
+	}
+	handle {
+		respond 404
+	}
+}
