@@ -1,4 +1,4 @@
-# Local cross-platform CRDT previews — checkpoints 2d, 2f and 2h
+# Local cross-platform CRDT previews — checkpoints 2d–2i
 
 This opt-in checkpoint uses the actual **y-webrtc 10.3.0 provider** in the browser
 and compatible signaling, binary Yjs sync, and awareness on the yrs/Kotlin desktop/mobile
@@ -82,11 +82,37 @@ use `http://127.0.0.1:5174`. Keep that origin; the simulator shares Mac loopback
    All peers should agree, and the deleted stroke must not return.
 4. Rotate the simulator and confirm the live board survives.
 
-Pause for feedback. The initial iOS binding CI passed; this live preview still
-needs Apple CI and manual validation. Physical iPad CRDT sharing is not enabled.
+CI passed for both iOS bindings and the live preview (user-confirmed). Manual
+validation is deferred while Apple hardware is unavailable; the user approved
+continuing to the next checkpoint. Physical iPad CRDT sharing is not enabled.
 The Swift host refuses non-local origins and production RTC configuration, and
 the build script refuses device/Release preview requests. `pnpm ios` restores
 normal mode; released apps are unchanged. No app-layer encryption yet.
+
+## Disconnect/reconnect regression — checkpoint 2i
+
+This checkpoint adds automated recovery coverage; it does not change the UI or
+enable CRDT in released apps. On Linux, keep the local TURN relay running and run:
+
+```sh
+pnpm test:interop:crdt
+```
+
+The new scenario creates a board in a real browser and connects another browser
+and the native desktop test peer. It checks that:
+
+1. Existing peers still exchange drawings when the creator loses signaling.
+2. After its data channels also close, the isolated browser keeps its drawing
+   and accepts edits while the other two peers keep drawing and erasing.
+3. Restoring signaling automatically reconnects the same open page. All three
+   peers converge and deleted strokes stay deleted, without reload or Retry.
+4. A second disconnection/recovery cycle works too.
+
+The fault controls are injected only by Playwright. No test switches ship in the
+app. This is controlled socket/channel closure, not a simulation of every silent
+network failure or a physical-device test. On failure, the trace includes bounded
+signaling event metadata (no SDP or board content in that diagnostic attachment).
+Pause after this checkpoint; manual Apple preview checks remain deferred.
 
 ## Automated checks
 
@@ -102,7 +128,8 @@ pnpm test:interop:ios:crdt # On Mac: iPad simulator/browser/desktop WebRTC and T
 
 The live suite covers web creation; native creation with a 12,000-point stroke;
 two browser and two native replicas; concurrent drawings; creator departure and
-rejoin; refresh recovery; forced TURN; and refusal of mismatched invite protocols.
+rejoin; refresh recovery; signaling loss; repeated partition/reconnect with offline
+edits and deletions; forced TURN; and refusal of mismatched invite protocols.
 It also runs an **unmodified upstream provider**, without Meshboard transport
 hooks, against desktop for raw sync, deletion and awareness in both directions,
 with both browser-created and desktop-created sessions.

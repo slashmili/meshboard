@@ -83,8 +83,9 @@ and [iOS README](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Run the local iPad simulator CRDT sharing checkpoint (2h below) on Apple CI/a Mac,
-   then pause for manual simulator feedback before physical-device support or migration.
+1. Run the 2i disconnect/reconnect regression checkpoint, then pause for feedback.
+   The user confirmed CI passed for 2h and approved moving on; manual simulator
+   feedback remains deferred, not completed. Keep production migration separate.
 2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
    checks. Basic iPad/web and local-server macOS sharing are user-validated.
 3. Complete the remaining Android physical-device, Intel Mac, and Windows checks.
@@ -180,7 +181,7 @@ See [Mac setup and CI instructions](../packages/native/iosApp/README.md#opt-in-c
 The user reported successful Apple CI before proceeding to 2h. Device library
 linking does not establish physical-device execution.
 
-**2h — Local iPad simulator CRDT sharing ready for Apple CI and manual feedback.**
+**2h — Local iPad simulator CRDT sharing CI-validated (user-confirmed).**
 `pnpm ios:crdt` opts into Debug simulator sharing with the web/desktop/Android
 CRDT previews. The UI is explicitly labeled and the controller refuses non-local
 origins and legacy invites before discarding state. Swift also requires a
@@ -191,8 +192,9 @@ Four additional iOS controller tests exercise large snapshots, delete-only sync,
 raw messages, awareness, invalid updates and guards. `pnpm test:interop:ios:crdt`
 adds six live scenarios, including four mixed peers, a 12,000-point stroke,
 creator departure/rejoin, browser reload, real TURN and unmodified y-webrtc.
-Apple execution is pending; local Linux regressions cannot validate Swift or
-simulator behavior. Pause after CI for the [manual simulator checks](crdt-preview.md#try-the-ipad-simulator--checkpoint-2h).
+The user confirmed the post-fix CI run passed and approved continuing without
+Apple hardware (2026-09-24). The [manual simulator checks](crdt-preview.md#try-the-ipad-simulator--checkpoint-2h)
+remain deferred; automated results do not establish physical-device behavior.
 Physical iPad CRDT, Android/iOS simultaneous execution, security hardening and
 production migration remain separate work.
 
@@ -202,8 +204,24 @@ The simulator adapter now serializes only changed state instead of rebuilding
 the 12,000-point JSON snapshot every 50 ms on the WebRTC callback thread.
 Desktop regression tests cover unchanged polling, state changes and deletion;
 the failing iOS scenario also captures bounded, content-free connection events.
-Apple CI still needs to confirm whether this resolves the setup failure; no
-connection timeout or convergence assertion has been relaxed.
+The user subsequently confirmed CI passed after this fix and the merge from
+main; no connection timeout or convergence assertion was relaxed.
+
+**2i — Browser/desktop disconnection regression checkpoint.** The local live
+CRDT suite now isolates an open browser board from signaling and closes its
+WebRTC data channels while another browser and a desktop peer continue drawing.
+Two consecutive recovery cycles must merge edits from both sides and preserve
+deletions without reloading, leaving/rejoining, or clicking Retry. A separate
+stage verifies that existing data channels still carry drawings while signaling
+is unavailable. Fault injection lives only in Playwright; production app code
+and security gates are unchanged. The existing desktop CI jobs include this test.
+Linux validation passed: all eight live CRDT scenarios (including forced TURN),
+ten consecutive runs of the new scenario (20 recovery cycles), `pnpm test`,
+`pnpm build`, and a targeted type-check of the new interop code. The new checkpoint
+still awaits CI on macOS; the earlier 2h CI pass does not cover these new tests.
+See [the runnable checkpoint](crdt-preview.md#disconnectreconnect-regression--checkpoint-2i).
+This does not establish silent packet-loss recovery, physical-device behavior,
+or a completed production migration. Pause before the next checkpoint.
 
 ## Phase 3
 

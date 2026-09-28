@@ -7,7 +7,7 @@ Start with [delivery checkpoints](docs/checkpoints.md) for current progress and 
 steps, then use the platform guide: [desktop](packages/native/README.md),
 [Android](packages/native/androidApp/README.md), or [iPad/iPhone](packages/native/iosApp/README.md).
 
-## Current checkpoint: 2h — local iPad simulator CRDT sharing (Apple CI pending)
+## Current checkpoint: 2i — CRDT disconnect/reconnect regression tests
 
 Web, Linux desktop, macOS, Android emulator, and iOS simulator support shared
 boards with link/QR invites, live previews, late-join snapshots, and TURN fallback.
@@ -21,7 +21,11 @@ the browser and yrs on native peers. Desktop CI passed on Linux and both macOS
 runners; manual Mac preview validation remains pending. Android's opt-in tablet
 preview is available for local testing. The iOS bindings passed CI (user-confirmed).
 The new [iPad simulator preview](packages/native/iosApp/README.md#local-crdt-sharing-preview--checkpoint-2h)
-adds opt-in live CRDT sharing; its Apple CI and manual checks are pending.
+adds opt-in live CRDT sharing; CI passed (user-confirmed). Manual Apple preview
+checks are deferred until the user has access to the Apple hardware again.
+The next [Linux-runnable checkpoint](docs/crdt-preview.md#disconnectreconnect-regression--checkpoint-2i)
+checks signaling outages and repeated disconnection/recovery without reloading
+the board, including offline edits and deletions.
 Released/default apps still use Phase 1 sync.
 See [delivery checkpoints](docs/checkpoints.md) for the validation record.
 

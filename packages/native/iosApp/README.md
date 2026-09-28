@@ -139,8 +139,9 @@ reinstall normal v1 mode. Switching builds can end the in-memory session.
 **This is simulator-only, not a physical-iPad build.** Only localhost/127.0.0.1
 origins with `localDevelopment=true` are allowed. Device/Release preview requests
 fail; default/device/Release apps stay on v1. Use test drawings only: application
-encryption and peer authentication are still absent. Apple CI and manual preview
-validation are pending. Pause here before enabling real-device sharing or migration.
+encryption and peer authentication are still absent. Apple CI passed
+(user-confirmed); manual preview validation is deferred while Apple hardware is
+unavailable. Real-device sharing and production migration remain separate work.
 
 ## Install on your physical iPad
 

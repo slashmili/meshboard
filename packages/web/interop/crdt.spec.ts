@@ -1,5 +1,6 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { nativePeer } from './peers'
+import { networkFault } from './network-fault'
 import type { UpstreamFixture } from './y-webrtc-peer'
 
 declare global { interface Window { upstream: UpstreamFixture } }
@@ -110,6 +111,73 @@ test('four mixed peers converge, continue after creator departure, and restore a
     await testInfo.attach('four-peer-state', { body: JSON.stringify({ nativeStates, browserStates }, null, 2), contentType: 'application/json' })
     throw error
   } finally { await secondNative.close(); await context.close() }
+})
+
+test('an open board keeps drawing through signaling loss and merges offline edits after reconnect', async ({ page, browser, native }, testInfo) => {
+  const meshExpect = expect.configure({ timeout: 30_000 })
+  const fault = await networkFault(page)
+  const context = await browser.newContext()
+  try {
+    const link = await invite(page)
+    const documentId = await fault.documentId()
+    native.send({ type: 'join', invite: link })
+    const healthy = await context.newPage()
+    await healthy.goto(link)
+    await meshExpect.poll(() => native.state().connected).toBe(2)
+    await meshExpect.poll(fault.openChannels).toBe(2)
+    await meshExpect(healthy.getByTestId('connection-status')).toHaveText('2 peers connected')
+
+    await test.step('existing data channels work without signaling', async () => {
+      await fault.pauseSignaling()
+      await draw(page)
+      await meshExpect.poll(() => native.state().elements.length).toBe(1)
+      await meshExpect(elements(healthy)).toHaveCount(1)
+      native.send({ type: 'put', element: stroke('seed') })
+      await meshExpect(elements(page)).toHaveCount(2)
+      await meshExpect(elements(healthy)).toHaveCount(2)
+      expect(await fault.openChannels()).toBe(2)
+    })
+
+    // Repeat to catch recovery that only works for the first disconnection.
+    for (let round = 1; round <= 2; round++) {
+      await test.step(`partition and automatically recover the same board (${round})`, async () => {
+        await fault.pauseSignaling()
+        // Browser offline emulation alone does not reliably cut WebRTC. Close
+        // the real channels as well, without leaving or replacing the Y.Doc.
+        await fault.closeChannels()
+        await meshExpect.poll(fault.openChannels).toBe(0)
+        await meshExpect.poll(() => native.state().connected).toBe(1)
+        await meshExpect(healthy.getByTestId('connection-status')).toHaveText('1 peer connected')
+        const before = native.state().elements.length
+        const removed = round === 1 ? 'seed' : 'online-1'
+        native.send({ type: 'remove', ids: [removed] })
+        native.send({ type: 'put', element: stroke(`online-${round}`) })
+        await meshExpect.poll(() => native.state().elements.some(element => element.id === `online-${round}`)).toBe(true)
+        await draw(healthy)
+        await meshExpect.poll(() => native.state().elements.length).toBe(before + 1)
+        // The isolated document retains its old state and accepts a local edit.
+        await expect(elements(page)).toHaveCount(before)
+        await draw(page)
+        await expect(elements(page)).toHaveCount(before + 1)
+        expect(native.state().elements.length).toBe(before + 1)
+
+        fault.resumeSignaling()
+        // No reload, rejoin, Retry click, or new provider: use normal recovery.
+        await meshExpect.poll(fault.openChannels).toBe(2)
+        await meshExpect.poll(() => native.state().connected).toBe(2)
+        await meshExpect.poll(() => native.state().elements.length).toBe(before + 2)
+        expect(native.state().elements.some(element => element.id === removed)).toBe(false)
+        for (const peer of [page, healthy]) await meshExpect(elements(peer)).toHaveCount(before + 2)
+        await meshExpect.poll(() => elements(page).evaluateAll(nodes => nodes.map(node => node.outerHTML)))
+          .toEqual(await elements(healthy).evaluateAll(nodes => nodes.map(node => node.outerHTML)))
+        expect(await fault.documentId()).toBe(documentId)
+        expect(page.url()).toBe(link)
+      })
+    }
+  } catch (error) {
+    await testInfo.attach('reconnect-signaling-events', { body: JSON.stringify(fault.events(), null, 2), contentType: 'application/json' })
+    throw error
+  } finally { fault.resumeSignaling(); await context.close() }
 })
 
 const relayTest = test.extend({ relay: true })

@@ -26,7 +26,8 @@ runs Kotlin lifecycle/validation/concurrency tests, and repeats the seven Yjs
 scenarios through Kotlin and JNI. The library is not packaged into releases yet.
 `pnpm test:interop:crdt` then tests the opt-in local preview through real WebRTC
 and TURN on a separate development server (port 5174), including four-peer
-convergence and legacy/preview protocol isolation. The preview uses actual
+convergence, signaling loss, repeated disconnection/recovery with offline edits
+and deletions, and legacy/preview protocol isolation. The preview uses actual
 y-webrtc in the browser; tests also exercise an unmodified upstream provider's
 raw sync/awareness against desktop and rejection of invalid updates. Large
 Meshboard messages use the documented, negotiated fragmentation extension.
@@ -54,7 +55,8 @@ preview and runs six live browser/iPad/desktop scenarios. These cover awareness,
 retry, large snapshots, four peers, creator departure/rejoin, reload, real TURN,
 unmodified upstream providers and input/protocol/origin guards. Its log is
 `build/ci/ios-crdt-interop.log`, with traces under `packages/web/test-results/ios-crdt`.
-The new preview still needs its first Apple CI result. Normal device compilation
+The live preview passed CI after the snapshot-polling fix (user-confirmed).
+Manual Apple preview checks remain deferred. Normal device compilation
 runs afterwards with the preview explicitly disabled. No physical-device CRDT is enabled.
 
 iOS interop scenarios retain a 60-second test timeout with no automatic retries.
