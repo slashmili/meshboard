@@ -22,7 +22,7 @@ export function nativePeer(relay = false) {
   const send = (message: unknown) => { if (child.exitCode !== null) throw new Error(`Native peer exited: ${diagnostics}`); child.stdin.write(JSON.stringify(message) + '\n') }
   return {
     send,
-    state: () => { if (child.exitCode !== null) throw new Error(`Native peer exited: ${diagnostics}`); if (state.error) throw new Error(`Native peer: ${state.error}\n${diagnostics}`); return state },
+    state: (allowError = false) => { if (child.exitCode !== null) throw new Error(`Native peer exited: ${diagnostics}`); if (state.error && !allowError) throw new Error(`Native peer: ${state.error}\n${diagnostics}`); return state },
     async close() {
       if (child.exitCode !== null) { lines.close(); return }
       send({ type: 'close' })

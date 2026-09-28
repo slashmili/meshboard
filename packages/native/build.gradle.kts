@@ -139,6 +139,7 @@ kotlin {
         }
         val desktopTest by getting {
             kotlin.srcDir("src/interop/kotlin")
+            kotlin.srcDir("src/jvmInterop/kotlin")
             if (crdtInteropEnabled) kotlin.srcDir("src/crdtJvmTest/kotlin")
             dependencies { implementation(compose.desktop.uiTestJUnit4) }
         }

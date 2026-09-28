@@ -83,7 +83,7 @@ and [iOS README](../packages/native/iosApp/README.md).
 
 ## Next steps
 
-1. Run the 2i disconnect/reconnect regression checkpoint, then pause for feedback.
+1. Run the 2j native disconnect/reconnect regression checkpoint, then pause for feedback.
    The user confirmed CI passed for 2h and approved moving on; manual simulator
    feedback remains deferred, not completed. Keep production migration separate.
 2. Follow up with iPhone, Pencil, and physical-device restrictive-network/TURN
@@ -221,7 +221,26 @@ ten consecutive runs of the new scenario (20 recovery cycles), `pnpm test`,
 still awaits CI on macOS; the earlier 2h CI pass does not cover these new tests.
 See [the runnable checkpoint](crdt-preview.md#disconnectreconnect-regression--checkpoint-2i).
 This does not establish silent packet-loss recovery, physical-device behavior,
-or a completed production migration. Pause before the next checkpoint.
+or a completed production migration. The user ran all eight tests successfully
+and confirmed local web/desktop sharing before approving the native follow-up.
+
+**2j — Native desktop/Android disconnection regression checkpoint.** A shared
+live scenario isolates the native creator through a loopback TCP proxy. Existing
+WebRTC channels must keep carrying drawings while signaling is unavailable, and
+the controller must attempt automatic reconnection. The test then closes native
+data channels through test-source-only harness code; the same open native board
+accepts edits and deletes while a browser and a healthy desktop peer keep drawing.
+Restoring the proxy must merge exact element content, preserve deletions from both
+sides, and retain the invite without Retry, leave/join, or process restart. The
+scenario repeats the outage twice and runs in both existing desktop and Android
+CI suites. No production controller, release behavior, or security gate changes.
+See [commands and scope](crdt-preview.md#native-disconnectreconnect--checkpoint-2j).
+This is controlled transport interruption, not silent packet-loss, mobile
+background/suspend, physical-device, or iOS native-outage coverage. Pause here.
+Local validation passed: nine desktop and seven Android live CRDT scenarios,
+six Pixel Tablet UI tests, three additional repeat runs per new recovery scenario,
+`pnpm test`, `pnpm build`, and targeted interop TypeScript checks. No retries were
+enabled. macOS/CI validation of this new checkpoint remains pending.
 
 ## Phase 3
 

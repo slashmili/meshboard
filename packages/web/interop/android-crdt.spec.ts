@@ -1,5 +1,6 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { androidPeer, nativePeer } from './peers'
+import { nativeReconnect } from './native-reconnect'
 import type { UpstreamFixture } from './y-webrtc-peer'
 
 declare global { interface Window { upstream: UpstreamFixture } }
@@ -97,6 +98,11 @@ test('Android creates; four peers converge on large state, survive creator depar
     await testInfo.attach('native-peer-states-before-cleanup', { body: JSON.stringify(states, null, 2), contentType: 'application/json' })
     throw error
   } finally { await desktop.close(); await context.close() }
+})
+
+test('Android recovers offline edits without leaving the board', async ({ page, android }, testInfo) => {
+  const healthy = nativePeer()
+  try { await nativeReconnect(page, android, healthy, testInfo) } finally { await healthy.close() }
 })
 
 const relayTest = test.extend({ relay: true })

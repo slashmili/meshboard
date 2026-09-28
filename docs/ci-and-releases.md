@@ -27,7 +27,8 @@ scenarios through Kotlin and JNI. The library is not packaged into releases yet.
 `pnpm test:interop:crdt` then tests the opt-in local preview through real WebRTC
 and TURN on a separate development server (port 5174), including four-peer
 convergence, signaling loss, repeated disconnection/recovery with offline edits
-and deletions, and legacy/preview protocol isolation. The preview uses actual
+and deletions (isolating browser and native desktop peers), and legacy/preview
+protocol isolation. The preview uses actual
 y-webrtc in the browser; tests also exercise an unmodified upstream provider's
 raw sync/awareness against desktop and rejection of invalid updates. Large
 Meshboard messages use the documented, negotiated fragmentation extension.
@@ -39,8 +40,9 @@ execution is not claimed. This debug-only checkpoint leaves default sync and
 release APK contents unchanged. Its instrumentation reports are kept separately
 from UI reports, and the Yjs/instrumentation console log is included in CI artifacts.
 `pnpm test:interop:android:crdt` additionally runs six tablet UI tests in the
-opt-in preview and six live Android/browser/desktop CRDT scenarios, including
-large snapshots, four-peer convergence, TURN and unmodified upstream-provider
+opt-in preview and seven live Android/browser/desktop CRDT scenarios, including
+native disconnection/offline-edit recovery, large snapshots, four-peer convergence,
+TURN and unmodified upstream-provider
 interoperability. Its log is `build/ci/android-crdt-interop.log`; preview UI
 reports are kept under `androidApp/build/reports/androidTests/crdt-preview`.
 

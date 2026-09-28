@@ -1,4 +1,4 @@
-# Local cross-platform CRDT previews — checkpoints 2d–2i
+# Local cross-platform CRDT previews — checkpoints 2d–2j
 
 This opt-in checkpoint uses the actual **y-webrtc 10.3.0 provider** in the browser
 and compatible signaling, binary Yjs sync, and awareness on the yrs/Kotlin desktop/mobile
@@ -114,6 +114,31 @@ network failure or a physical-device test. On failure, the trace includes bounde
 signaling event metadata (no SDP or board content in that diagnostic attachment).
 Pause after this checkpoint; manual Apple preview checks remain deferred.
 
+## Native disconnect/reconnect — checkpoint 2j
+
+The same recovery scenario now runs with a **desktop or Android creator** as the
+isolated peer. A loopback-only test proxy cuts its signaling connection and rejects
+retry attempts. Then a test-only harness command closes its real data channels,
+without leaving the session or replacing its document. Another desktop peer and
+a browser keep drawing; both sides add and delete elements. Reopening the proxy
+must automatically restore identical native documents with no resurrected strokes.
+The test repeats this twice and checks that the invite stays unchanged.
+
+With TURN running, run these **one at a time** from the repository root:
+
+```sh
+pnpm test:interop:crdt                 # Includes desktop-native recovery
+pnpm emulator:android                 # Separate terminal; skip if tablet is running
+pnpm test:interop:android:crdt         # Includes Android-native recovery + tablet UI
+```
+
+The harness uses reflection only in JVM/Android test sources to reach data-channel
+handles on the controller's own executor. It fails if those internals change; no
+network-fault API is added to the application. The proxy never contacts production.
+Diagnostics capture element IDs/counts and connection state, not drawing contents.
+This does not simulate silent packet loss, OS suspension, or iOS-native outages.
+No new UI needs manual checking; pause after local/CI results before the next step.
+
 ## Automated checks
 
 With the local TURN relay running:
@@ -136,9 +161,9 @@ with both browser-created and desktop-created sessions.
 An invalid upstream update must be rejected without changing the browser board.
 The dedicated Playwright configuration starts the server on 5174 when needed.
 Linux and both macOS CI desktop jobs include the desktop suite. Android CI also
-runs six preview UI tests and six live scenarios: bidirectional updates and
+runs six preview UI tests and seven live scenarios: bidirectional updates and
 awareness, retry, four mixed peers with a 12,000-point snapshot, creator departure,
-reload/rejoin recovery, large messages through TURN, unmodified upstream peers
+reload/rejoin recovery, native offline-edit recovery, large messages through TURN, unmodified upstream peers
 creating in either direction, invalid-update rejection, and local/protocol guards.
 The iOS job now runs six equivalent CRDT preview scenarios in addition to v1
 checks, plus four controller tests with the binding tests. Android and iOS

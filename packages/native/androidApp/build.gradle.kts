@@ -22,6 +22,7 @@ android {
     }
     buildTypes.getByName("debug").buildConfigField("boolean", "CRDT_PREVIEW", crdtPreview.toString())
     buildFeatures { compose = true; buildConfig = true }
+    sourceSets.getByName("androidTest").java.srcDir(rootProject.file("src/jvmInterop/kotlin"))
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

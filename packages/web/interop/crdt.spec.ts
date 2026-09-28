@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { nativePeer } from './peers'
 import { networkFault } from './network-fault'
+import { nativeReconnect } from './native-reconnect'
 import type { UpstreamFixture } from './y-webrtc-peer'
 
 declare global { interface Window { upstream: UpstreamFixture } }
@@ -178,6 +179,11 @@ test('an open board keeps drawing through signaling loss and merges offline edit
     await testInfo.attach('reconnect-signaling-events', { body: JSON.stringify(fault.events(), null, 2), contentType: 'application/json' })
     throw error
   } finally { fault.resumeSignaling(); await context.close() }
+})
+
+test('native desktop recovers offline edits without leaving the board', async ({ page, native }, testInfo) => {
+  const healthy = nativePeer()
+  try { await nativeReconnect(page, native, healthy, testInfo) } finally { await healthy.close() }
 })
 
 const relayTest = test.extend({ relay: true })
