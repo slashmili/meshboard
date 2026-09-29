@@ -65,6 +65,17 @@ it('awaits slow shutdown without blocking the event loop', async () => {
   expect(socket.destroyed).toBe(true)
 })
 
+it('retains bounded connection diagnostics without replacing board state', async () => {
+  const peer = await start()
+  for (let i = 0; i < 205; i++) socket.write(`MESHBOARD_DIAGNOSTIC ${JSON.stringify({ event: 'created', ageMs: i })}\n`)
+  expect(peer.diagnostics()).toHaveLength(200)
+  expect(peer.diagnostics()[0]).toEqual({ event: 'created', ageMs: 5 })
+  expect(peer.state()).toEqual(state)
+  peer.diagnostics().pop()
+  expect(peer.diagnostics()).toHaveLength(200)
+  await peer.close()
+})
+
 it('reports shutdown failure and still releases the socket', async () => {
   const peer = await start()
   run.mockImplementationOnce((_file, _args, _options, callback) => callback(new Error('simctl timed out'), '', ''))

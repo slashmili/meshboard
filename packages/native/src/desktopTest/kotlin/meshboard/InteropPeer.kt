@@ -30,6 +30,7 @@ fun main(args: Array<String>) = runBlocking {
                 "preview" -> controller.preview(command["element"]?.takeUnless { it == JsonNull }?.let(Wire::element))
                 "leave" -> controller.leave()
                 "retry" -> controller.retry()
+                "close-channels" -> closeInteropChannels(controller)
                 "close" -> break
                 else -> error("Unknown harness command")
             }

@@ -31,17 +31,23 @@ case "$1" in
     pnpm test
     pnpm build
     pnpm test:native
+    pnpm test:crdt:kotlin
     pnpm test:e2e
     pnpm test:interop
+    pnpm test:interop:crdt
     ;;
   android)
     ./packages/native/gradlew -p packages/native -Pmeshboard.android=true testDebugUnitTest :androidApp:testDebugUnitTest
     pnpm test:android
     pnpm test:interop:android
+    pnpm test:crdt:android | tee build/ci/android-crdt.log
+    pnpm test:interop:android:crdt | tee build/ci/android-crdt-interop.log
     ;;
   ios)
+    pnpm test:crdt:ios | tee build/ci/ios-crdt.log
     ./packages/native/gradlew -p packages/native -Pmeshboard.ios=true iosSimulatorArm64Test
     pnpm test:interop:ios
+    pnpm test:interop:ios:crdt | tee build/ci/ios-crdt-interop.log
     pnpm build:ios:device
     ;;
 esac

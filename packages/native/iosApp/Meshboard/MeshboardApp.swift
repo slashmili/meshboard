@@ -18,7 +18,7 @@ private struct BoardView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         MainViewControllerKt.MainViewController(network: NativeAppleNetwork(), origin: {
             #if targetEnvironment(simulator)
-            return "http://127.0.0.1:5173"
+            return AppleCrdtModeKt.appleCrdtPreviewEnabled() ? "http://127.0.0.1:5174" : "http://127.0.0.1:5173"
             #else
             return "https://"
             #endif

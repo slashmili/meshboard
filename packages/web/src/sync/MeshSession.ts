@@ -1,5 +1,5 @@
-import { rtcConfigSchema, serverSignalSchema, type BoardElement, type BoardMessage, type RtcConfig, type SignalPayload } from '@meshboard/shared-protocol'
-import { BoardDocument } from './BoardDocument'
+import { rtcConfigSchema, serverSignalSchema, type BoardElement, type SessionMessage, type RtcConfig, type SignalPayload } from '@meshboard/shared-protocol'
+import type { SessionDocument } from './SessionDocument'
 import { encodeFrames, FrameReceiver } from './frames'
 
 export type SessionStatus = {
@@ -30,7 +30,7 @@ export class MeshSession {
   private unsubscribe: () => void
   private status = { ...INITIAL_STATUS }
 
-  constructor(private room: string, private document: BoardDocument,
+  constructor(private room: string, private document: SessionDocument,
     private onStatus: (status: SessionStatus) => void,
     private onPreview: (peer: string, element: BoardElement | null) => void) {
     this.unsubscribe = document.onLocalMessage(message => this.broadcast(message))
@@ -38,6 +38,7 @@ export class MeshSession {
 
   async start() {
     try {
+      if (this.document.crdt && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) throw new Error('CRDT preview is local-only.')
       const response = await fetch('/api/rtc-config', { cache: 'no-store', signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(8_000)]) })
       if (!response.ok) throw new Error('Connection setup is unavailable. Try again shortly.')
       this.config = rtcConfigSchema.parse(await response.json())
@@ -58,7 +59,7 @@ export class MeshSession {
 
   private connectSocket() {
     if (this.stopped) return
-    const url = new URL('/signal', location.href)
+    const url = new URL(this.document.crdt ? '/signal-crdt' : '/signal', location.href)
     url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(url)
     this.socket = socket
@@ -122,7 +123,7 @@ export class MeshSession {
     if (attempts >= 3) { this.report({ error: 'A peer could not connect. Check the network or retry the connection.' }); return }
     this.attempts.set(id, attempts + 1)
     const pc = new RTCPeerConnection({ iceServers: this.config.iceServers, iceTransportPolicy: this.config.iceTransportPolicy })
-    const peer: Peer = { pc, queue: [], queuedBytes: 0, candidates: [], signals: Promise.resolve(), receiver: new FrameReceiver(), route: 'direct' }
+    const peer: Peer = { pc, queue: [], queuedBytes: 0, candidates: [], signals: Promise.resolve(), receiver: new FrameReceiver(this.document.crdt), route: 'direct' }
     this.peers.set(id, peer)
     pc.onicecandidate = event => {
       if (event.candidate) {
@@ -137,7 +138,7 @@ export class MeshSession {
     pc.ondatachannel = event => this.attachChannel(id, peer, event.channel)
     peer.timeout = setTimeout(() => this.failPeer(id, peer), 20_000)
     if (this.self < id) {
-      this.attachChannel(id, peer, pc.createDataChannel('meshboard.v1', { ordered: true }))
+      this.attachChannel(id, peer, pc.createDataChannel(this.document.crdt ? 'meshboard.crdt-preview' : 'meshboard.v1', { ordered: true }))
       void (async () => {
         await pc.setLocalDescription(await pc.createOffer())
         if (this.peers.get(id) === peer) this.sendSignal(id, { description: { type: 'offer', sdp: pc.localDescription!.sdp } })
@@ -164,7 +165,7 @@ export class MeshSession {
   }
 
   private attachChannel(id: string, peer: Peer, channel: RTCDataChannel) {
-    if (peer.channel || channel.label !== 'meshboard.v1' || !channel.ordered || channel.maxRetransmits !== null || channel.maxPacketLifeTime !== null) {
+    if (peer.channel || channel.label !== (this.document.crdt ? 'meshboard.crdt-preview' : 'meshboard.v1') || !channel.ordered || channel.maxRetransmits !== null || channel.maxPacketLifeTime !== null) {
       channel.close(); return
     }
     peer.channel = channel
@@ -194,7 +195,8 @@ export class MeshSession {
         if (message.type === 'preview') this.onPreview(id, message.element)
         else {
           this.onPreview(id, null)
-          this.document.receive(message)
+          const response = this.document.receive(message)
+          if (response) this.send(id, peer, response)
         }
       } catch {
         this.report({ error: 'A peer sent invalid or oversized drawing data. Its connection was closed.' })
@@ -209,7 +211,7 @@ export class MeshSession {
     if (channel.readyState === 'open') opened()
   }
 
-  private send(id: string, peer: Peer, message: BoardMessage) {
+  private send(id: string, peer: Peer, message: SessionMessage) {
     if (peer.channel?.readyState !== 'open') return
     try {
       const frames = encodeFrames(message)
@@ -234,7 +236,7 @@ export class MeshSession {
     } catch { this.failPeer(id, peer) }
   }
 
-  private broadcast(message: BoardMessage) {
+  private broadcast(message: SessionMessage) {
     for (const [id, peer] of this.peers) this.send(id, peer, message)
   }
 

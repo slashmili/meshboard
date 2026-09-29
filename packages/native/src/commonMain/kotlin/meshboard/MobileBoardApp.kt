@@ -36,7 +36,7 @@ private fun mobilePaint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16
 
 /** Touch layout shared by mobile targets; transport is deliberately independent. */
 @Composable
-fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https://", qrImage: ((String) -> ImageBitmap)? = null) {
+fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https://", boardTitle: String = "Meshboard", qrImage: ((String) -> ImageBitmap)? = null) {
     val sharing = controller as? BoardController
     val state by controller.state.collectAsState()
     val latest by rememberUpdatedState(state)
@@ -65,7 +65,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                 MeshboardLogo(Modifier.size(28.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
-                    Text("Meshboard", color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(boardTitle, color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(state.connectionLabel, Modifier.testTag("mobile-connection-status"), fontSize = 10.sp, lineHeight = 14.sp, color = MobileMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (sharing != null && qrImage != null) {

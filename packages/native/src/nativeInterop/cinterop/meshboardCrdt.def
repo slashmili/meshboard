@@ -1,0 +1,4 @@
+headers = meshboard_crdt.h
+headerFilter = meshboard_crdt.h
+package = meshboard.crdt.ffi
+staticLibraries = libmeshboard_crdt_core.a

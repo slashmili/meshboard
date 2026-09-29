@@ -14,10 +14,14 @@
   },
   "dependencies": {
     "@meshboard/shared-protocol": "workspace:*",
+    "lib0": "0.2.117",
     "lucide-react": "^1.45.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "y-protocols": "1.0.7",
+    "y-webrtc": "10.3.0",
+    "yjs": "13.6.32"
   },
   "devDependencies": {
     "@meshboard/signaling": "workspace:*",

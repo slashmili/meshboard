@@ -67,8 +67,11 @@ object Wire {
         }
     }.toString()
     fun frames(message: BoardMessage, id: String): List<String> {
+        return frameText(encode(message), id)
+    }
+    fun frameText(text: String, id: String): List<String> {
         require(uuidPattern.matches(id))
-        val text = encode(message); require(text.encodeToByteArray().size <= MAX_MESSAGE)
+        require(text.encodeToByteArray().size <= MAX_MESSAGE)
         return text.chunked(8_000).let { chunks -> chunks.mapIndexed { index, data ->
             buildJsonObject { put("v", 1); put("id", id); put("index", index); put("total", chunks.size); put("data", data) }.toString()
         } }
@@ -82,7 +85,8 @@ class FrameReceiver(private val now: () -> Long) {
     private var started = 0L
     private var bytes = 0
     private val text = StringBuilder()
-    fun accept(raw: String): BoardMessage? {
+    fun accept(raw: String): BoardMessage? = acceptJson(raw)?.let { Wire.decode(it.toString()) }
+    fun acceptJson(raw: String): JsonObject? {
         require(raw.encodeToByteArray().size <= Wire.MAX_FRAME)
         val frame = Json.parseToJsonElement(raw).jsonObject
         frame.exact("v", "id", "index", "total", "data"); frame.version()
@@ -94,7 +98,7 @@ class FrameReceiver(private val now: () -> Long) {
         bytes += chunk.encodeToByteArray().size; require(bytes <= Wire.MAX_MESSAGE)
         text.append(chunk); next++
         if (next != total) return null
-        val result = Wire.decode(text.toString())
+        val result = Json.parseToJsonElement(text.toString()).jsonObject
         id = null; text.clear()
         return result
     }

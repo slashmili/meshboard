@@ -29,7 +29,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val board: BoardViewModel = viewModel()
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                MobileBoardApp(board.controller, defaultOrigin = if (BuildConfig.DEBUG) "http://127.0.0.1:5173" else "https://", qrImage = { invite ->
+                MobileBoardApp(board.controller,
+                    boardTitle = if (BuildConfig.CRDT_PREVIEW) "Meshboard · CRDT preview · local only" else "Meshboard",
+                    defaultOrigin = if (BuildConfig.CRDT_PREVIEW) "http://127.0.0.1:5174" else if (BuildConfig.DEBUG) "http://127.0.0.1:5173" else "https://", qrImage = { invite ->
                     val matrix = QRCodeWriter().encode(invite, BarcodeFormat.QR_CODE, 512, 512)
                     val pixels = IntArray(512 * 512) { i -> if (matrix[i % 512, i / 512]) android.graphics.Color.BLACK else android.graphics.Color.WHITE }
                     Bitmap.createBitmap(pixels, 512, 512, Bitmap.Config.ARGB_8888).asImageBitmap()

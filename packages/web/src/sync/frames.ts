@@ -1,6 +1,6 @@
-import { boardMessageSchema, frameSchema, MAX_FRAME_BYTES, MAX_MESSAGE_BYTES, type BoardMessage } from '@meshboard/shared-protocol'
+import { boardMessageSchema, previewSessionSchema, frameSchema, MAX_FRAME_BYTES, MAX_MESSAGE_BYTES, type SessionMessage } from '@meshboard/shared-protocol'
 
-export function encodeFrames(message: BoardMessage): string[] {
+export function encodeFrames(message: SessionMessage): string[] {
   const text = JSON.stringify(message)
   if (new TextEncoder().encode(text).length > MAX_MESSAGE_BYTES) throw new Error('Board message is too large.')
   const id = crypto.randomUUID()
@@ -11,8 +11,9 @@ export function encodeFrames(message: BoardMessage): string[] {
 
 // One ordered, reliable channel per peer. Frames of a message stay contiguous.
 export class FrameReceiver {
+  constructor(private crdt = false) {}
   private pending: { id: string; total: number; next: number; text: string; bytes: number; started: number } | null = null
-  accept(raw: unknown): BoardMessage | null {
+  accept(raw: unknown): SessionMessage | null {
     if (typeof raw !== 'string' || new TextEncoder().encode(raw).length > MAX_FRAME_BYTES) throw new Error('Invalid board frame.')
     const frame = frameSchema.parse(JSON.parse(raw))
     if (frame.index === 0) {
@@ -29,6 +30,6 @@ export class FrameReceiver {
     if (pending.bytes > MAX_MESSAGE_BYTES) throw new Error('Board message is too large.')
     if (pending.next !== pending.total) return null
     this.pending = null
-    return boardMessageSchema.parse(JSON.parse(pending.text))
+    return (this.crdt ? previewSessionSchema : boardMessageSchema).parse(JSON.parse(pending.text))
   }
 }
