@@ -5,7 +5,7 @@ import kotlin.test.*
 import meshboard.*
 
 class AppleCrdtControllerTest {
-    private class Network(private val fragmented: Boolean = true) : AppleNetwork {
+    private class Network : AppleNetwork {
         val sent = mutableListOf<String>()
         val rejected = mutableListOf<String>()
         var starts = 0
@@ -16,9 +16,9 @@ class AppleCrdtControllerTest {
             else -> null
         }
         override fun peerId() = "local-peer"
-        override fun fragments(peer: String) = fragmented
         override fun sendBinary(peer: String, base64: String): Boolean { sent.add(base64); return true }
-        override fun start(origin: String, room: String) { starts++ }
+        override fun start(origin: String, room: String, key: String) { starts++ }
+        override fun newKey() = "A".repeat(43)
         override fun stop() {}
         override fun reject(peer: String) { rejected.add(peer) }
         override fun qrPng(value: String) = ""
@@ -46,8 +46,8 @@ class AppleCrdtControllerTest {
         } finally { a.close(); b.close() }
     }
 
-    @Test fun unfragmentedUpstreamFramesAndAwarenessWork() {
-        val net = Network(fragmented = false); val board = controller(net)
+    @Test fun authenticatedDecryptedFramesAndAwarenessWork() {
+        val net = Network(); val board = controller(net)
         val remote = AppleCrdtBoard()
         try {
             board.opened("peer")

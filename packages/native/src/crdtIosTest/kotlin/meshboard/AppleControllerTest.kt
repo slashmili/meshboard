@@ -12,7 +12,8 @@ class AppleControllerTest {
         var starts = 0
         override fun listen(events: AppleNetworkEvents?) { this.events = events }
         override fun normalizeOrigin(value: String) = if (value.startsWith("https://board.test")) "https://board.test" else null
-        override fun start(origin: String, room: String) { starts++ }
+        override fun start(origin: String, room: String, key: String) { starts++ }
+        override fun newKey() = "A".repeat(43)
         override fun stop() {}
         override fun sendBinary(peer: String, base64: String): Boolean { sent.add(peer to base64); return true }
         override fun reject(peer: String) { rejected.add(peer) }

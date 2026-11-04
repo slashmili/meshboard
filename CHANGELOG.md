@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Phase 3 foundations
+## Unreleased — Phase 3
 
 ### Added
 - Matching Web Crypto and JVM/Android AES-256-GCM record ciphers with HKDF-SHA-256 derivation, canonical 256-bit key encoding, bounded frames, strict counters and fatal-error disposal.
@@ -11,7 +11,7 @@
 - All 37 web unit tests and web/test-harness typechecks.
 - Seven JVM cipher tests and the same seven tests on the Android 35 x86_64 tablet emulator; Android debug/app-test APK builds.
 
-### Pending
+### Security decision and pending verification
 - Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the new trust model in AGENTS.md.
 - Apple compilation/runtime verification and independent security review. Live-session integration is recorded below. No pushes.
 
@@ -21,6 +21,11 @@
 - Removed: plaintext upstream-peer compatibility and negotiated plaintext fragmentation fallback.
 - Verified: 42 web unit tests, 41 desktop tests, 12 Android cipher/handshake tests and Android release compilation. Browser/Linux drawing, four-peer convergence, creator departure, reconnect and TURN; wrong-key/plaintext peers are rejected. Production browser tests cover ciphertext-only application frames, secret-free signaling, tampering and replay.
 - Pending: Apple compilation/runtime verification is tracked separately; this is not an independent security audit.
+
+### Apple secure-session integration (execution pending)
+- Added: a CryptoKit record cipher, shared Kotlin fingerprint-bound handshake, secret-bearing invites and authenticated controller admission in the Swift network adapter.
+- Added: standalone Apple crypto vector/tamper/replay/limit tests and iOS CI invocation; updated simulator interoperability expectations to reject plaintext and wrong keys.
+- Verified here: shared handshake/crypto semantics on JVM/Android, test-harness typechecks and shell syntax. Swift compilation, Kotlin/Swift bridging and iOS runtime tests require the user's Mac; tracked explicitly in the security ledger.
 
 ## Unreleased — Phase 2
 

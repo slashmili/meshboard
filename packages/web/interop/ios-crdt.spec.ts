@@ -114,39 +114,31 @@ relayTest('iOS CRDT updates use real TURN with direct candidates disabled', asyn
   await expect(elements(page)).toHaveCount(2)
 })
 
-for (const creator of ['web', 'ios']) test(`iOS exchanges raw updates and awareness with unmodified y-webrtc (${creator} creates)`, async ({ page, ios }) => {
-  let room = crypto.randomUUID() as string
-  if (creator === 'ios') {
-    ios.send({ type: 'put', element: stroke('raw-seed', 1000) })
-    ios.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
-    await expect.poll(() => ios.state().signaling).toBe(true)
-    room = new URLSearchParams(new URL(ios.state().invite).hash.slice(1)).get('crdt')!
-  }
+test('iOS rejects plaintext peers before sharing document state', async ({ page, ios }) => {
+  ios.send({ type: 'put', element: stroke('private-seed') })
+  ios.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
+  await expect.poll(() => ios.state().signaling).toBe(true)
+  const room = new URLSearchParams(new URL(ios.state().invite).hash.slice(1)).get('crdt')!
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') ios.send({ type: 'join', invite: `http://127.0.0.1:5174/#crdt=${room}` })
-  await expect.poll(() => page.evaluate(() => window.upstream.peers())).toBe(1)
-  if (creator === 'ios') {
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
-    ios.send({ type: 'remove', ids: ['raw-seed'] })
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-  }
-  await page.evaluate(element => window.upstream.put(element), stroke('upstream'))
-  await expect.poll(() => ios.state().elements.map(e => e.id)).toEqual(['upstream'])
-  ios.send({ type: 'put', element: stroke('ios') })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(2)
-  await page.evaluate(element => window.upstream.preview(element), stroke('draft'))
-  await expect.poll(() => ios.state().previews.length).toBe(1)
-  await page.evaluate(() => window.upstream.preview(null))
-  await expect.poll(() => ios.state().previews.length).toBe(0)
-  ios.send({ type: 'preview', element: stroke('ios-draft') })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(1)
-  await page.evaluate(() => window.upstream.remove('ios'))
-  await expect.poll(() => ios.state().elements.map(e => e.id)).toEqual(['upstream'])
-  // Invalid input must not poison iOS's already-validated document.
-  await page.evaluate(() => window.upstream.invalid())
-  await expect.poll(() => ios.state(true).error).toContain('invalid or oversized')
-  expect(ios.state(true).elements.map(e => e.id)).toEqual(['upstream'])
+  await expect.poll(() => ios.state(true).error).toContain('authenticate')
+  expect(await page.evaluate(() => window.upstream.elements())).toEqual([])
+  expect(ios.state(true).elements.map(e => e.id)).toEqual(['private-seed'])
+  expect(ios.state(true).connected).toBe(0)
+})
+
+test('iOS cannot join with the wrong invitation secret', async ({ page, ios }) => {
+  const link = await invite(page); await draw(page)
+  const wrong = new URL(link), params = new URLSearchParams(wrong.hash.slice(1))
+  params.set('key', 'A'.repeat(43)); wrong.hash = params.toString()
+  ios.send({ type: 'join', invite: wrong.href })
+  await expect.poll(() => ios.state(true).error).not.toBeNull()
+  expect(ios.state(true).elements).toHaveLength(0)
+  expect(ios.state(true).connected).toBe(0)
+  await expect(elements(page)).toHaveCount(1)
+  ios.send({ type: 'join', invite: link })
+  await expect.poll(() => ios.state(true).elements.length).toBe(1)
+  expect(ios.state().connected).toBe(1)
 })
 
 test('iOS app refuses legacy invites and insecure origins without clearing the board', async ({ ios }) => {

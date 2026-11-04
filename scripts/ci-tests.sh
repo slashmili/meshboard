@@ -42,6 +42,7 @@ case "$1" in
     pnpm test:crdt:android | tee build/ci/android-crdt.log
     ;;
   ios)
+    bash scripts/test-apple-crypto.sh | tee build/ci/apple-crypto.log
     pnpm test:crdt:ios | tee build/ci/ios-crdt.log
     ./packages/native/gradlew -p packages/native -Pmeshboard.ios=true iosSimulatorArm64Test
     pnpm test:interop:ios
