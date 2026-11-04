@@ -1,3 +1,4 @@
+import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { androidPeer, nativePeer } from './peers'
 import { nativeReconnect } from './native-reconnect'
@@ -156,4 +157,8 @@ test('Android app refuses legacy invites and insecure origins without clearing t
   await expect.poll(() => android.state(true).error).toContain('HTTPS')
   expect(android.state(true).invite).toBe('')
   expect(android.state(true).elements.map(e => e.id)).toEqual(['keep'])
+})
+
+test('text and sticky notes synchronize edits and late joins across web and Android', async ({ page, android, browser }) => {
+  await textElementsInterop(page, android, browser)
 })

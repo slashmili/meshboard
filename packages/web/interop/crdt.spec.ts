@@ -1,3 +1,4 @@
+import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { nativePeer } from './peers'
 import { networkFault } from './network-fault'
@@ -254,4 +255,8 @@ test('wrong-key browser and native peers cannot read or modify a board', async (
     expect(native.state(true).elements).toHaveLength(0)
     expect(native.state(true).connected).toBe(0)
   } finally { await context.close() }
+})
+
+test('text and sticky notes synchronize edits and late joins across web and native', async ({ page, native, browser }) => {
+  await textElementsInterop(page, native, browser)
 })

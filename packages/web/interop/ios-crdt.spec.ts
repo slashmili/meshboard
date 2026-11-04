@@ -1,3 +1,4 @@
+import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { iosPeer, nativePeer } from './peers'
 import type { UpstreamFixture } from './y-webrtc-peer'
@@ -151,4 +152,8 @@ test('iOS app refuses legacy invites and insecure origins without clearing the b
   await expect.poll(() => ios.state(true).error).toContain('HTTPS')
   expect(ios.state(true).invite).toBe('')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
+})
+
+test('text and sticky notes synchronize edits and late joins across web and iOS', async ({ page, ios, browser }) => {
+  await textElementsInterop(page, ios, browser)
 })

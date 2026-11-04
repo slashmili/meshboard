@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +48,9 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     var color by remember { mutableStateOf(Palette.first().second) }
     var width by remember { mutableStateOf(3.0) }
     var view by remember { mutableStateOf(View()) }
+    val textMeasurer = rememberTextMeasurer()
+    var textEdit by remember { mutableStateOf<BoardElement?>(null) }
+    var editingExisting by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf<BoardElement?>(null) }
     var space by remember { mutableStateOf(false) }
     var cancelled by remember { mutableIntStateOf(0) }
@@ -64,11 +69,11 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     val colors = appearanceColors(appearance)
     BoardTheme(colors) {
         Column(Modifier.fillMaxSize().background(Paper).onPreviewKeyEvent { event ->
-            if (dialog != null || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return@onPreviewKeyEvent false
+            if (dialog != null || textEdit != null || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return@onPreviewKeyEvent false
             if (event.key == Key.Spacebar) { space = event.type == KeyEventType.KeyDown; return@onPreviewKeyEvent true }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             if (event.key == Key.Escape) { cancel(); return@onPreviewKeyEvent true }
-            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.H -> Tool.Hand; else -> null }
+            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.H -> Tool.Hand; Key.T -> Tool.Text; Key.N -> Tool.Sticky; else -> null }
             if (next != null) { cancel(); tool = next; true } else false
         }) {
             Row(Modifier.fillMaxWidth().height(76.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -112,7 +117,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         focus.requestFocus()
                                         active = if (space || event.buttons.isTertiaryPressed) Tool.Hand else tool
                                         last = p; start = world
-                                        if (active != Tool.Hand && active != Tool.Eraser) {
+                                        if (active != Tool.Hand && active != Tool.Eraser && active != Tool.Text && active != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), active!!.wire, color, width, if (active == Tool.Pen) listOf(world) else listOf(world, world))
                                             controller.preview(draft)
                                         }
@@ -142,6 +147,11 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         }
                                         last = p
                                         if (!change.pressed) {
+                                            if ((active == Tool.Text || active == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
+                                                val existing = currentState.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
+                                                editingExisting = existing != null
+                                                textEdit = existing ?: textElement(controller.newId(), active!!.wire, world, color, "")
+                                            }
                                             draft?.let { element ->
                                                 val first = element.points.first(); val end = element.points.last()
                                                 if (element.type == "pen" || hypot(end.x - first.x, end.y - first.y) > 1 / view.zoom) controller.put(element)
@@ -164,9 +174,9 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                         translate(view.x.toFloat(), view.y.toFloat())
                         scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero)
                     }) {
-                        state.elements.forEach { drawElement(it) }
-                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, .65f) }
-                        draft?.let { drawElement(it) }
+                        state.elements.forEach { drawElement(it, textMeasurer) }
+                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, .65f) }
+                        draft?.let { drawElement(it, textMeasurer) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null && state.previews.isEmpty()) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -175,7 +185,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     Spacer(Modifier.height(12.dp)); Text("A rough sketch. A big idea. A place to start.", fontSize = 13.sp, color = Muted)
                     Spacer(Modifier.height(6.dp)); Text("Pick a tool and make it yours.", fontSize = 13.sp, color = Muted)
                 }
-                Column(Modifier.align(Alignment.TopStart).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.align(Alignment.TopStart).padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(shape = RoundedCornerShape(14.dp), shadowElevation = 3.dp, border = BorderStroke(1.dp, Border)) {
                         Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Tool.entries.forEach { item ->
@@ -221,6 +231,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                 Spacer(Modifier.weight(1f)); Text(if (state.connected == 0) "WEB ↔ DESKTOP / 03" else if (state.relayed > 0) "VIA RELAY / 03" else "DIRECT CONNECTION / 03", fontSize = 9.sp, color = colors.onSurfaceVariant, modifier = Modifier.testTag("connection-route"))
             }
         }
+        textEdit?.let { editing -> TextEditor(editing, deleted = editingExisting && state.elements.none { it.id == editing.id }, onSave = { controller.put(it); textEdit = null }, onDismiss = { textEdit = null }) }
         when (dialog) {
             "share" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Make room for a friend.") }, text = {
                 Column(Modifier.width(370.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -257,7 +268,8 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     }
 }
 
-private fun DrawScope.drawElement(element: BoardElement, alpha: Float = 1f) {
+private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
+    if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = paint(element.color).copy(alpha = alpha)
     val points = element.points
     if (points.size == 1) { drawCircle(color, element.width.toFloat() / 2, points.first().offset()); return }

@@ -303,3 +303,11 @@ activity recreation. Unit, production-browser, desktop and Android UI checks
 pass. Review the appearance checkpoint; Apple/Windows checks remain in the
 [Phase 4 ledger](phase-4-validation.md). Expanded tools and the remaining
 Phase 4 features have not been implemented yet.
+
+
+**4b — Text boxes and sticky notes.** Shared bounded plain-text schema and tools
+are implemented on web and native. Create/edit/cancel/erase, Unicode wrapping,
+concurrent replacements, remote deletion and encrypted mixed-peer late joins
+are covered. See [the Phase 4 ledger](phase-4-validation.md) for results and Mac/iPad
+checks. Remaining expanded tools, undo/redo, exports, presence, pressure and
+opt-in recovery are still pending.

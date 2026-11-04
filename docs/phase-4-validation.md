@@ -68,3 +68,37 @@ checks that both drawing and the appearance override survive activity recreation
 
 These checks are pending, not implied by Linux or shared Compose tests. Session
 recovery and the other increments above are not implemented by appearance work.
+
+## Text and sticky notes (checkpoint 4b)
+
+Text (T) and Note (N) tools are implemented on web, desktop and the shared mobile
+UI. Click/tap to create a box, or click an existing text/note with either tool to
+edit it. Save commits one element; Cancel discards the draft. Notes expand
+vertically to fit up to 500 UTF-16 code units. Erasing through a box's interior
+removes the whole object. A second touch cancels placement and starts navigation.
+
+The cross-platform format and atomic-edit semantics are documented in
+[shared schemas](../packages/shared-protocol/README.md#text-and-sticky-note-elements).
+There is no character-level collaborative text editing. Image insertion,
+connectors, selection/moving, undo/redo, export/import, presence, pressure and
+local recovery remain separate increments.
+
+Coverage includes strict shared validation and invalid-update rollback; identical
+Unicode wrapping; native and web create/edit/cancel/erase flows; Android activity
+UI; encrypted mixed-peer edits/late join/deletion while editing; Yjs/yrs Unicode
+round trips and concurrent replacements. The new live scenario is wired into
+Linux desktop, Android and iOS CI. iOS execution remains pending CI/Mac.
+
+Mac/iPad follow-up: create and edit both tools with keyboard/touch, compare
+Unicode text with web, pan/zoom, cancel a placement with a pinch, and confirm
+keyboard dismissal and text-field focus. Physical devices remain unverified here.
+
+Verified on Linux for 4b: 46 web unit tests (plus shared-protocol/signaling suites),
+eight production-browser tests, 20 repeated new text/note runs after fixing the
+queued dialog-close race, 48 desktop tests, eight Android UI tests and expanded
+pinch coverage. Eight Yjs/yrs scenarios passed through Kotlin/JNI, including
+Unicode and concurrent text replacements. Live web/desktop and web/Android text
+scenarios passed; Android requires the local TURN relay (`pnpm turn`). Rust format,
+all-target/all-feature Clippy with warnings denied, six Rust tests and docs pass.
+Desktop UI tests also exercise text creation at the minimum 650-pixel window
+height. No iOS runtime pass is claimed for this increment.

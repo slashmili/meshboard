@@ -1,6 +1,6 @@
 export type Point = { x: number; y: number }
 export type View = Point & { zoom: number }
-export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line'
+export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'sticky'
 export type Tool = DrawingTool | 'eraser' | 'hand'
 
 import type { BoardElement } from '@meshboard/shared-protocol'
@@ -40,7 +40,7 @@ export function bounds(element: BoardElement) {
 export function outline(element: BoardElement): Point[] {
   if (element.type === 'pen' || element.type === 'line') return element.points
   const { x, y, width, height } = bounds(element)
-  if (element.type === 'rectangle') {
+  if (['rectangle', 'text', 'sticky'].includes(element.type)) {
     return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }, { x, y }]
   }
   return Array.from({ length: 97 }, (_, i) => {
@@ -68,6 +68,11 @@ function segmentDistance(a: Point, b: Point, c: Point, d: Point) {
 }
 
 export function hitsElement(element: BoardElement, from: Point, to: Point, radius: number) {
+  if (element.text !== undefined) {
+    const box = bounds(element)
+    const inside = (p: Point) => p.x >= box.x && p.x <= box.x + box.width && p.y >= box.y && p.y <= box.y + box.height
+    if (inside(from) || inside(to)) return true
+  }
   const points = outline(element)
   const threshold = radius + element.width / 2
   if (points.length === 1) return pointSegmentDistance(points[0], from, to) <= threshold

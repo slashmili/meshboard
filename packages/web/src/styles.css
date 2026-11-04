@@ -181,3 +181,5 @@ kbd { font-family: inherit; color: #8a967c; padding: 2px 5px; border: 1px solid 
 [data-theme='dark'] :is(.copy-status, .leave-button) { color: #b5d6ac; }
 [data-theme='dark'] .primary-button { background: #b5d6ac; color: #193824; }
 [data-theme='dark'] .primary-button:hover { background: #c7e8be; }
+#board-text { display: block; width: 100%; min-width: 220px; max-width: 100%; font: inherit; padding: 10px; color: inherit; background: transparent; border: 1px solid #667260; border-radius: 6px; }
+@media (max-width: 800px) { .tool-button { width: 34px; } .tool-panel { gap: 2px; } }

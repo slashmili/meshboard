@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
-import { MAX_ZOOM, MIN_ZOOM, type Tool } from './board'
+import { MAX_ZOOM, MIN_ZOOM, hitsElement, type Point, type BoardElement, type Tool } from './board'
+import { textElement } from './textElements'
 import { useBoard } from './useBoard'
 import { CrdtDocument } from './sync/CrdtDocument'
 import { useSession } from './sync/useSession'
@@ -14,6 +15,8 @@ const TOOLS: { id: Tool; label: string; key: string; icon: LucideIcon }[] = [
   { id: 'rectangle', label: 'Rectangle', key: 'R', icon: Square },
   { id: 'ellipse', label: 'Ellipse', key: 'O', icon: Circle },
   { id: 'line', label: 'Line', key: 'L', icon: Slash },
+  { id: 'text', label: 'Text', key: 'T', icon: Type },
+  { id: 'sticky', label: 'Sticky note', key: 'N', icon: StickyNote },
   { id: 'hand', label: 'Pan', key: 'H', icon: Hand },
 ]
 const COLORS = [
@@ -30,6 +33,8 @@ const HINTS: Record<Tool, string> = {
   rectangle: 'Drag to draw a rectangle. Hold Shift for a square.',
   ellipse: 'Drag to draw an ellipse. Hold Shift for a circle.',
   line: 'Drag to draw a line. Hold Shift to snap the angle.',
+  text: 'Click to add text. Click existing text or a note to edit it.',
+  sticky: 'Click to add a note. Click existing text or a note to edit it.',
   hand: 'Drag to move around. Pinch with two fingers to zoom.',
 }
 
@@ -40,7 +45,27 @@ export function App() {
   const [width, setWidth] = useState(3)
   const [document] = useState(() => new CrdtDocument())
   const session = useSession(document)
-  const board = useBoard(tool, color, width, document, session.preview)
+  const [textEdit, setTextEdit] = useState<{ element: BoardElement; existing: boolean } | null>(null)
+  const [textValue, setTextValue] = useState('')
+  const [textError, setTextError] = useState('')
+  const textDialog = useRef<HTMLDialogElement>(null)
+  function editText(at: Point, kind: 'text' | 'sticky') {
+    const existing = [...document.getElements()].reverse().find(e => e.text !== undefined && hitsElement(e, at, at, 0))
+    setTextEdit({ element: existing ?? textElement(crypto.randomUUID(), kind, at, color, ''), existing: !!existing })
+    setTextValue(existing?.text ?? ''); setTextError('')
+    textDialog.current?.showModal()
+  }
+  function saveText() {
+    if (!textEdit || !textValue.trim()) return
+    if (textEdit.existing && !document.getElements().some(e => e.id === textEdit.element.id)) {
+      setTextError('This object was deleted by another participant. Cancel to close.'); return
+    }
+    const original = textEdit.element
+    if (document.put(textElement(original.id, original.type as 'text' | 'sticky', original.points[0], original.color, textValue))) {
+      textDialog.current?.close(); setTextEdit(null)
+    } else setTextError('Could not save this text. The board may have reached its size limit.')
+  }
+  const board = useBoard(tool, color, width, document, session.preview, editText)
   const [sharing, setSharing] = useState(false)
   const helpDialog = useRef<HTMLDialogElement>(null)
   const clearDialog = useRef<HTMLDialogElement>(null)
@@ -96,7 +121,7 @@ export function App() {
         </svg>
 
         <div className="tool-panel" role="toolbar" aria-label="Drawing tools">
-          {TOOLS.map(({ id, label, key, icon: Icon }, i) => <div key={id} className={i === 5 ? 'tool-item tool-item-separated' : 'tool-item'}>
+          {TOOLS.map(({ id, label, key, icon: Icon }) => <div key={id} className={id === 'hand' ? 'tool-item tool-item-separated' : 'tool-item'}>
             <button className={`tool-button ${tool === id ? 'selected' : ''}`} aria-label={`${label} (${key})`} aria-pressed={tool === id} title={`${label} (${key})`} onClick={() => { board.cancelGesture(); setTool(id) }}><Icon size={21} strokeWidth={1.7} /><span className="tool-key">{key}</span></button>
           </div>)}
         </div>
@@ -107,7 +132,7 @@ export function App() {
             {COLORS.map(item => <button key={item.name} className={`color-button ${color === item.value ? 'active' : ''}`} role="radio" aria-checked={color === item.value} aria-label={item.name} title={item.name} disabled={!drawing} onClick={() => setColor(item.value)} style={{ '--swatch': item.value } as CSSProperties}><span /></button>)}
           </div>
           <div className="width-options" role="radiogroup" aria-label="Stroke width">
-            {[{ value: 2, name: 'Fine' }, { value: 3, name: 'Medium' }, { value: 6, name: 'Bold' }].map(item => <button key={item.value} className={width === item.value ? 'active' : ''} role="radio" aria-checked={width === item.value} aria-label={`${item.name} stroke`} title={`${item.name} stroke`} disabled={!drawing} onClick={() => setWidth(item.value)}><span style={{ height: item.value }} /></button>)}
+            {[{ value: 2, name: 'Fine' }, { value: 3, name: 'Medium' }, { value: 6, name: 'Bold' }].map(item => <button key={item.value} className={width === item.value ? 'active' : ''} role="radio" aria-checked={width === item.value} aria-label={`${item.name} stroke`} title={`${item.name} stroke`} disabled={!drawing || tool === 'text' || tool === 'sticky'} onClick={() => setWidth(item.value)}><span style={{ height: item.value }} /></button>)}
           </div>
         </aside>
 
@@ -141,6 +166,14 @@ export function App() {
         <span className="checkpoint-label" data-testid="connection-route">{session.status.connected ? session.status.relay ? 'VIA RELAY' : 'DIRECT CONNECTION' : 'DRAW TOGETHER'} <span>/</span> 02</span>
       </footer>
 
+      {/* A delayed close event from the previous edit must not clear a newly opened editor. */}
+      <dialog ref={textDialog} className="dialog" aria-labelledby="text-editor-title" onClose={event => { if (!event.currentTarget.open) setTextEdit(null) }}>
+        <h2 id="text-editor-title">{textEdit?.element.type === 'sticky' ? 'Sticky note' : 'Text box'}</h2>
+        <label className="invite-label" htmlFor="board-text">Text</label>
+        <textarea id="board-text" autoFocus maxLength={500} rows={6} value={textValue} onChange={e => setTextValue(e.target.value)} />
+        {textError && <p role="alert">{textError}</p>}
+        <div className="dialog-actions"><button className="quiet-button" onClick={() => textDialog.current?.close()}>Cancel</button><button className="primary-button" disabled={!textValue.trim() || !!textError} onClick={saveText}>Save text</button></div>
+      </dialog>
       <dialog ref={helpDialog} className="dialog help-dialog" aria-labelledby="help-title">
         <button className="dialog-close" aria-label="Close help" onClick={() => helpDialog.current?.close()}><X size={20} /></button>
         <span className="eyebrow">MAKE YOURSELF AT HOME</span>

@@ -35,19 +35,23 @@ class CanvasTest {
     }
 
     @Test fun pinchCancelsDraftAndDoesNotDrawWhenOneFingerRemains() {
-        canvas().performTouchInput {
-            down(0, Offset(width * .4f, height * .4f))
-            moveBy(0, Offset(10f, 10f))
-            down(1, Offset(width * .6f, height * .6f))
-            moveBy(0, Offset(-45f, -45f))
-            moveBy(1, Offset(45f, 45f))
-            up(1)
-            moveBy(0, Offset(30f, 30f)); up(0)
+        for (tool in listOf("pen", "text", "sticky")) {
+            rule.onNodeWithTag("mobile-tool-$tool").performClick()
+            canvas().performTouchInput {
+                down(0, Offset(width * .4f, height * .4f))
+                moveBy(0, Offset(10f, 10f))
+                down(1, Offset(width * .6f, height * .6f))
+                moveBy(0, Offset(-45f, -45f))
+                moveBy(1, Offset(45f, 45f))
+                up(1)
+                moveBy(0, Offset(30f, 30f)); up(0)
+            }
+            count(0)
+            rule.onNodeWithTag("mobile-zoom").assert(!hasText("100%"))
+            rule.onNodeWithText("Reset view").performClick()
+            rule.onNodeWithTag("mobile-zoom").assertTextEquals("100%")
+            rule.onNodeWithTag("text-editor").assertDoesNotExist()
         }
-        count(0)
-        rule.onNodeWithTag("mobile-zoom").assert(!hasText("100%"))
-        rule.onNodeWithText("Reset view").performClick()
-        rule.onNodeWithTag("mobile-zoom").assertTextEquals("100%")
     }
 
     @Test fun rotationRetainsDrawingAndViewControlsWork() {
@@ -115,6 +119,23 @@ class CanvasTest {
         rule.onNodeWithText("Dark").assertIsSelected()
         rule.onNodeWithText("System").performClick()
         rule.onNodeWithText("System").assertIsSelected()
+    }
+
+    @Test fun touchNotesCanBeEditedAndErased() {
+        rule.onNodeWithTag("mobile-tool-sticky").performClick()
+        canvas().performTouchInput { click(Offset(250f, 250f)) }
+        rule.onNodeWithTag("text-editor").performTextInput("Android note")
+        rule.onNodeWithText("Save text").performClick(); count(1)
+        canvas().performTouchInput { click(Offset(270f, 270f)) }
+        rule.onNodeWithTag("text-editor").assertTextContains("Android note")
+        rule.onNodeWithTag("text-editor").performTextReplacement("Edited Android note")
+        rule.onNodeWithText("Save text").performClick(); count(1)
+        rule.onNodeWithTag("mobile-tool-eraser").performClick()
+        canvas().performTouchInput { click(Offset(270f, 270f)) }; count(0)
+        rule.onNodeWithTag("mobile-tool-text").performClick()
+        canvas().performTouchInput { click(Offset(250f, 250f)) }
+        rule.onNodeWithTag("text-editor").performTextInput("Cancel text")
+        rule.onNodeWithText("Cancel").performClick(); count(0)
     }
 
 }

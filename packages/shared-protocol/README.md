@@ -22,3 +22,25 @@ validation and encrypted fragmentation are in `YWebrtcSession.ts` and `YTranspor
 
 See [Phase 2 validation](../../docs/phase-2-validation.md) for cross-language fixtures,
 real WebRTC/TURN tests, supported limits and pending platform checks.
+
+## Text and sticky-note elements
+
+The element types `text` and `sticky` retain `id`, `color`, `width` and two
+`points`, and require an additional `text` string (1–500 UTF-16 code units,
+well-formed Unicode). Other element types must omit `text`; unknown fields and
+null text are rejected. `text-elements.json` contains shared TypeScript/Kotlin/Rust
+validation fixtures and TypeScript/Kotlin wrapping cases.
+
+The editor creates 288-unit-wide boxes, with at least 72 units of height. Explicit
+newlines are preserved (CRLF/CR normalized for display); lines wrap after 24 units,
+counting each code point above U+00FF as two units and other code points as one.
+Surrogate pairs never split. Height grows with the number of wrapped lines.
+Render at 18 units with 24-unit line spacing and 12-unit padding; notes have a
+pale yellow background. Text is plain content, never HTML or executable markup.
+
+Edits replace one atomic CRDT element under its existing ID. Concurrent edits to
+the same box resolve using Yjs/yrs map conflict resolution; this is not character-
+level collaborative editing. An editor whose object has been deleted cannot save
+and resurrect it. Text and notes use the existing encrypted update path, validation
+staging and document size limits. Older builds that lack these element types reject
+them; participants should use the same current build.

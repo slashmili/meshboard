@@ -5,11 +5,12 @@ import type { SessionDocument } from './sync/SessionDocument'
 
 type Gesture =
   | { type: 'draw'; pointer: number; element: BoardElement }
+  | { type: 'label'; pointer: number; at: Point; kind: 'text' | 'sticky' }
   | { type: 'erase'; pointer: number; last: Point }
   | { type: 'pan'; pointer: number; start: Point; view: View }
   | { type: 'pinch'; distance: number; anchor: Point; view: View }
 
-export function useBoard(tool: Tool, color: string, width: number, document: SessionDocument, preview: (element: BoardElement | null) => void) {
+export function useBoard(tool: Tool, color: string, width: number, document: SessionDocument, preview: (element: BoardElement | null) => void, editText: (at: Point, kind: 'text' | 'sticky') => void) {
   const svgRef = useRef<SVGSVGElement>(null)
   const elements = useSyncExternalStore(document.subscribe, document.getElements)
   const [draft, setDraft] = useState<BoardElement | null>(null)
@@ -102,6 +103,9 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       return
     }
     const world = toWorld(point, viewRef.current)
+    if (tool === 'text' || tool === 'sticky') {
+      gesture.current = { type: 'label', pointer: event.pointerId, at: world, kind: tool }; return
+    }
     if (tool === 'eraser') {
       gesture.current = { type: 'erase', pointer: event.pointerId, last: world }
       // Let a second touch begin a pinch before removing anything on a tap.
@@ -139,6 +143,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       active.last = world
       return
     }
+    if (active.type === 'label') return
     const element = active.element
     if (element.type === 'pen') {
       const samples = event.nativeEvent.getCoalescedEvents?.() ?? []
@@ -158,6 +163,12 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   function onPointerUp(event: ReactPointerEvent<SVGSVGElement>) {
     const active = gesture.current
     if (active && active.type !== 'pinch' && active.pointer === event.pointerId) {
+      if (active.type === 'label') {
+        const end = toWorld(localPoint(event), viewRef.current)
+        if (Math.hypot(end.x - active.at.x, end.y - active.at.y) * viewRef.current.zoom < 10) editText(active.at, active.kind)
+        cancelGesture()
+        return
+      }
       // Include the final position even when the browser coalesces the last move.
       const finalPoint = toWorld(localPoint(event), viewRef.current)
       const start = active.type === 'draw' ? active.element.points[0] : null
