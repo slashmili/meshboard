@@ -39,6 +39,11 @@
 - Verified locally: TypeScript checks and ten repeated browser/Linux plaintext-rejection scenarios passed.
 - Recorded: CI run 41798835980 passed both macOS desktop runners, Android, and Apple crypto/Kotlin tests at commit 8f6fc61. The corrected iOS host build still needs Mac/CI verification.
 
+### Android CI disk capacity
+- Fixed: remove unused hosted-runner NDK versions before installing the pinned Android NDK; run 41804767894 exhausted disk while creating emulator userdata, before any Android build or test ran.
+- Verified: eight script tests, including cleanup preservation/idempotency/error cases; a fresh Android 35 Nexus 10 emulator boot and all six Android UI tests passed locally. Hosted-runner headroom requires the next CI run.
+- Recorded: run 41804767894 passed Linux, both macOS desktop runners, and the complete iOS simulator/device-build job. Physical-device checks remain in the security ledger.
+
 ## Unreleased — Phase 2
 
 ### Changed

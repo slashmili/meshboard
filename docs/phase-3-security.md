@@ -1,8 +1,9 @@
 # Phase 3 security design and validation
 
 Status: the approved authenticated protocol is integrated into web, desktop and
-Android sessions. Apple integration is implemented but awaits Mac compilation and
-runtime validation. This is not an independently audited security release.
+Android and Apple sessions. Apple compilation and simulator runtime validation
+passed in CI run 41804767894; physical-device checks remain below. This is not an
+independently audited security release.
 
 ## Trust model and design decision
 
@@ -233,13 +234,23 @@ connection failure instead. The test now accepts either rejection report while
 asserting zero admitted peers, no leaked state and an intact original drawing.
 The same timing-independent expectation is used by Android and iOS tests.
 
-## Apple and hardware handoff (not run on Linux)
+CI run [41804767894](https://github.com/slashmili/meshboard/actions/runs/41804767894)
+at `8d73e61` passed all three desktop jobs and the complete iOS job, including
+simulator interoperability and the unsigned device build. Android never reached
+the build/test script: emulator startup failed with 6697.87 MB available versus
+7372.80 MB required for userdata. The Android workflow now removes unused
+preinstalled NDK versions before installing the pinned `28.2.13676358`, leaving
+SDK platforms, emulator, system images and the required NDK intact. Fixture tests
+cover preservation, removal, repeated runs, an empty NDK directory and an unset
+SDK path. Hosted-runner disk headroom still needs confirmation in the next CI run.
+
+## Apple and hardware handoff
 
 The iOS network adapter gates controller callbacks on the shared Kotlin handshake,
 uses CryptoKit for the identical AES-GCM format, and exposes only decrypted frames
 to the board controller. It has no plaintext fallback. The standalone CryptoKit and Kotlin controller tests passed in the CI run above.
-The corrected Swift host build, full Kotlin/Swift bridge and runtime behavior
-remain **unverified** until these run on a Mac:
+The corrected Swift host build, Kotlin/Swift bridge and simulator runtime passed
+in run 41804767894. These commands remain available for local Mac reproduction:
 
 ```
 bash scripts/test-apple-crypto.sh

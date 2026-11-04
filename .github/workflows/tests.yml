@@ -86,6 +86,7 @@ jobs:
           pnpm --filter @meshboard/web exec playwright install --with-deps chromium
       - name: Set up Rust and NDK for Android CRDT bindings
         run: |
+          bash scripts/ci-android-space.sh
           rustup toolchain install stable --profile minimal --no-self-update
           rustup default stable
           rustup target add x86_64-linux-android aarch64-linux-android
