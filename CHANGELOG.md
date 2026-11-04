@@ -33,6 +33,12 @@
 - Fixed: negative packet tests send one bad record and suppress further traffic, so a valid invite-holder's later authorized resynchronization cannot obscure rejection of the bad record.
 - Handoff: Mac/iPad compile/runtime checks are explicit and reproducible. No pushes or public deployments.
 
+### Phase 3 CI fixes
+- Fixed: implement Swift `doNewKey()` as required by the Kotlin-generated AppleNetwork protocol; the previous name blocked iOS host compilation.
+- Fixed: native plaintext-peer tests allow either authentication rejection or transport closure while retaining no-leakage/no-admission assertions; Linux CI exposed this ordering race.
+- Verified locally: TypeScript checks and ten repeated browser/Linux plaintext-rejection scenarios passed.
+- Recorded: CI run 41798835980 passed both macOS desktop runners, Android, and Apple crypto/Kotlin tests at commit 8f6fc61. The corrected iOS host build still needs Mac/CI verification.
+
 ## Unreleased — Phase 2
 
 ### Changed

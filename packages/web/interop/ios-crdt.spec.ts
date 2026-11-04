@@ -121,7 +121,7 @@ test('iOS rejects plaintext peers before sharing document state', async ({ page,
   const room = new URLSearchParams(new URL(ios.state().invite).hash.slice(1)).get('crdt')!
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  await expect.poll(() => ios.state(true).error).toContain('authenticate')
+  await expect.poll(() => ios.state(true).error).toMatch(/could not authenticate|could not connect/)
   expect(await page.evaluate(() => window.upstream.elements())).toEqual([])
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['private-seed'])
   expect(ios.state(true).connected).toBe(0)

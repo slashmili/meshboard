@@ -227,10 +227,13 @@ for (const creator of ['web', 'desktop']) test(`plaintext upstream peers cannot 
     await outsider.goto(new URL(`/interop/y-webrtc.html?room=${room}`, link).href)
     await outsider.waitForFunction(() => !!window.upstream)
     if (creator === 'web') await expect(page.getByRole('alert')).toContainText('authenticate')
-    else await expect.poll(() => native.state(true).error).toContain('authenticate')
+    else await expect.poll(() => native.state(true).error).toMatch(/could not authenticate|could not connect/)
     expect(await outsider.evaluate(() => window.upstream.elements())).toEqual([])
     if (creator === 'web') await expect(elements(page)).toHaveCount(1)
-    else expect(native.state(true).elements).toHaveLength(1)
+    else {
+      expect(native.state(true).elements.map(element => element.id)).toEqual(['private-seed'])
+      expect(native.state(true).connected).toBe(0)
+    }
   } finally { await context.close() }
 })
 

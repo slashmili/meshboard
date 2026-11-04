@@ -217,12 +217,29 @@ python3 scripts/check-security-capture.py build/security/phase3-loopback.pcap
 Stop/remove the capture container even if a test fails. Captures stay local under
 ignored `build/`; neither images nor captures are pushed.
 
+## CI follow-up (2026-11-04)
+
+[Run 41798835980](https://github.com/slashmili/meshboard/actions/runs/41798835980)
+tested commit `8f6fc61`. Both macOS desktop architectures and Android passed.
+The iOS job passed the standalone CryptoKit tests and Kotlin binding/controller
+tests, then failed Swift host compilation: Kotlin exports `newKey()` as
+`doNewKey()`, while the implementation used `newKey()`. The Swift method now
+matches the compiler-reported protocol requirement; full iOS compilation and
+runtime still require the next Mac/CI run.
+
+Linux passed its unit and browser tests, but a plaintext-peer test expected an
+authentication-specific error. A transport close can win the race and report a
+connection failure instead. The test now accepts either rejection report while
+asserting zero admitted peers, no leaked state and an intact original drawing.
+The same timing-independent expectation is used by Android and iOS tests.
+
 ## Apple and hardware handoff (not run on Linux)
 
 The iOS network adapter gates controller callbacks on the shared Kotlin handshake,
 uses CryptoKit for the identical AES-GCM format, and exposes only decrypted frames
-to the board controller. It has no plaintext fallback. The Kotlin/Swift bridge,
-Xcode build and runtime behavior remain **unverified** until these run on a Mac:
+to the board controller. It has no plaintext fallback. The standalone CryptoKit and Kotlin controller tests passed in the CI run above.
+The corrected Swift host build, full Kotlin/Swift bridge and runtime behavior
+remain **unverified** until these run on a Mac:
 
 ```
 bash scripts/test-apple-crypto.sh

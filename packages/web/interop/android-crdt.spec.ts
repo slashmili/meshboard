@@ -126,7 +126,7 @@ test('Android rejects plaintext peers before sharing document state', async ({ p
   const room = new URLSearchParams(new URL(android.state().invite).hash.slice(1)).get('crdt')!
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  await expect.poll(() => android.state(true).error).toContain('authenticate')
+  await expect.poll(() => android.state(true).error).toMatch(/could not authenticate|could not connect/)
   expect(await page.evaluate(() => window.upstream.elements())).toEqual([])
   expect(android.state(true).elements.map(e => e.id)).toEqual(['private-seed'])
   expect(android.state(true).connected).toBe(0)

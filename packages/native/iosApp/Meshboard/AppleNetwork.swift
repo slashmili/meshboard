@@ -78,7 +78,8 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         var base = URLComponents(); base.scheme = scheme; base.host = host; base.port = parts.port
         return base.string
     }
-    func newKey() -> String {
+    // Kotlin exports newKey as doNewKey to avoid Objective-C new-family semantics.
+    func doNewKey() -> String {
         guard let bytes = try? SessionCipher.random32() else { return "" }
         return bytes.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
