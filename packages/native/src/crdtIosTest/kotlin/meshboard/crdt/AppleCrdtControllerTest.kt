@@ -15,18 +15,16 @@ class AppleCrdtControllerTest {
             value.startsWith("https://example.invalid") -> "https://example.invalid"
             else -> null
         }
-        override fun previewAllowed(origin: String) = origin == "http://127.0.0.1:5174"
         override fun peerId() = "local-peer"
         override fun fragments(peer: String) = fragmented
         override fun sendBinary(peer: String, base64: String): Boolean { sent.add(base64); return true }
         override fun start(origin: String, room: String) { starts++ }
         override fun stop() {}
-        override fun send(peer: String, frame: String): Boolean = error("CRDT must send binary data")
         override fun reject(peer: String) { rejected.add(peer) }
         override fun qrPng(value: String) = ""
     }
     private val stroke = BoardElement("stroke", "pen", "#123456", 3.0, listOf(Point(1.0, 2.0)))
-    private fun controller(network: Network) = AppleBoardController(network) { AppleCrdtBoard() }
+    private fun controller(network: Network) = AppleBoardController(network)
     private fun deliver(network: Network, receiver: AppleBoardController) {
         val frames = network.sent.toList(); network.sent.clear()
         frames.forEach { receiver.receivedBinary("peer", it) }
@@ -77,16 +75,17 @@ class AppleCrdtControllerTest {
         } finally { board.close() }
     }
 
-    @Test fun protocolAndOriginGuardsDoNotDiscardDrawing() {
+    @Test fun normalAppRejectsOldInvitesAndSharesHttpsWithoutDiscardingDrawing() {
         val net = Network(); val board = controller(net)
         try {
             board.put(stroke)
             board.join("http://127.0.0.1:5174/#room=12345678-1234-4234-8234-123456789abc")
             assertTrue(board.state.value.error!!.contains("another protocol"))
             board.share("https://example.invalid")
-            assertTrue(board.state.value.error!!.contains("local-only"))
+            assertNull(board.state.value.error)
+            assertTrue(board.state.value.invite.startsWith("https://example.invalid/#crdt="))
             assertEquals(listOf(stroke), board.state.value.elements)
-            assertEquals(0, net.starts)
+            assertEquals(1, net.starts)
         } finally { board.close() }
     }
 }

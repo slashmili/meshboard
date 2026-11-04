@@ -13,12 +13,7 @@ plugins {
 // Desktop builds do not require an Android SDK. Android scripts opt in explicitly.
 val androidEnabled = providers.gradleProperty("meshboard.android").orNull == "true"
 val crdtInteropEnabled = true
-val crdtIosEnabled = providers.gradleProperty("meshboard.crdtIos").orNull == "true"
-val crdtIosPreviewEnabled = providers.gradleProperty("meshboard.crdtIosPreview").orNull == "true"
-require(!crdtIosPreviewEnabled || crdtIosEnabled) { "meshboard.crdtIosPreview requires meshboard.crdtIos=true" }
-require(!crdtIosEnabled || providers.gradleProperty("meshboard.ios").orNull == "true") {
-    "meshboard.crdtIos requires meshboard.ios=true"
-}
+val crdtIosEnabled = providers.gradleProperty("meshboard.ios").orNull == "true"
 if (androidEnabled) apply(plugin = "com.android.library")
 
 // Match the JVM architecture (including an Intel JDK under Rosetta), not the CPU.
@@ -55,15 +50,6 @@ kotlin {
     // Opt in so desktop/Android builds do not need the Apple toolchain.
     if (providers.gradleProperty("meshboard.ios").orNull == "true") {
         listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
-            val preview = crdtIosPreviewEnabled && target.name == "iosSimulatorArm64"
-            target.compilations.getByName("main").defaultSourceSet.kotlin.srcDir(
-                if (preview) "src/crdtIosPreview/kotlin" else "src/iosDefaultMain/kotlin"
-            )
-            target.binaries.configureEach {
-                if (preview && buildType == org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE) {
-                    linkTaskProvider.configure { doFirst { error("iOS CRDT preview is Debug simulator-only") } }
-                }
-            }
             target.binaries.framework {
                 baseName = "MeshboardShared"
                 isStatic = true

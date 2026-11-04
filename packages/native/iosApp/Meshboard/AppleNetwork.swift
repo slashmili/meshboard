@@ -3,7 +3,6 @@ import UIKit
 import CoreImage.CIFilterBuiltins
 import WebRTC
 import MeshboardShared
-
 private enum NetworkError: Error { case invalid }
 private let fragmentChannel = "meshboard.y-webrtc.fragments-v1"
 private let fragmentSDP = "a=meshboard-fragments:1"
@@ -23,10 +22,8 @@ private func json(_ value: [String: Any]) -> String {
 private func uuid(_ value: String) -> Bool {
     value.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
 }
-
 /// All mutable session state lives on the main queue; native callbacks enqueue copies.
 final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDelegate {
-    fileprivate let crdtPreview = AppleCrdtModeKt.appleCrdtPreviewEnabled()
     private var events: AppleNetworkEvents?
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -82,11 +79,8 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         return base.string
     }
     func start(origin: String, room: String) {
-        guard !crdtPreview || previewAllowed(origin: origin) else {
-            events?.signaling(active: false, error: "CRDT preview is local-only and requires the iPad simulator."); return
-        }
         stop(); self.origin = origin; self.room = room
-        if crdtPreview { selfID = UUID().uuidString.lowercased() }
+        selfID = UUID().uuidString.lowercased()
         let current = generation
         var request = URLRequest(url: URL(string: origin + "/api/rtc-config")!)
         request.timeoutInterval = 8
@@ -101,9 +95,6 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
                     let policy = try text(config["iceTransportPolicy"])
                     guard ["all", "relay"].contains(policy), config["localDevelopment"] is Bool,
                           let servers = config["iceServers"] as? [[String: Any]], servers.count <= 8 else { throw NetworkError.invalid }
-                    if self.crdtPreview && config["localDevelopment"] as? Bool != true {
-                        self.events?.signaling(active: false, error: "CRDT preview requires a local-development server."); return
-                    }
                     let rtc = RTCConfiguration(); rtc.sdpSemantics = .unifiedPlan
                     rtc.iceTransportPolicy = self.forceRelay || policy == "relay" ? .relay : .all
                     rtc.iceServers = try servers.map { server in
@@ -127,7 +118,7 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         for id in Array(peers.keys) { drop(id) }
     }
     private func connect() {
-        let url = origin.replacingOccurrences(of: "https:", with: "wss:").replacingOccurrences(of: "http:", with: "ws:") + (crdtPreview ? "/signal-y-webrtc" : "/signal")
+        let url = origin.replacingOccurrences(of: "https:", with: "wss:").replacingOccurrences(of: "http:", with: "ws:") + "/signal-y-webrtc"
         let ws = session.webSocketTask(with: URL(string: url)!); ws.maximumMessageSize = 32_768
         socket = ws; ws.resume()
         receiveTask = Task { [weak self, weak ws] in
@@ -151,10 +142,8 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     }
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         guard socket === webSocketTask else { return }
-        if crdtPreview {
-            sendSignal(["type": "subscribe", "topics": ["meshboard-crdt:" + room]])
-            announce(); reconnectDelay = 1; events?.signaling(active: true, error: nil)
-        } else { sendSignal(["v": 1, "type": "join", "room": room]) }
+        sendSignal(["type": "subscribe", "topics": ["meshboard-crdt:" + room]])
+        announce(); reconnectDelay = 1; events?.signaling(active: true, error: nil)
     }
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
         lost(webSocketTask, rejected: closeCode == .policyViolation)
@@ -193,18 +182,15 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     }
     fileprivate func signal(_ peer: ApplePeer, _ payload: [String: Any]) {
         guard peers[peer.id] === peer else { return }
-        if crdtPreview {
-            if peer.token == nil { peer.token = Date().timeIntervalSince1970 * 1000 + Double.random(in: 0..<1) }
-            publish(["type": "signal", "from": selfID, "to": peer.id, "token": peer.token!,
-                     "signal": payload["description"] ?? ["type": "candidate", "candidate": payload["candidate"]!]])
-        } else { sendSignal(["v": 1, "type": "signal", "to": peer.id, "payload": payload]) }
+        if peer.token == nil { peer.token = Date().timeIntervalSince1970 * 1000 + Double.random(in: 0..<1) }
+        publish(["type": "signal", "from": selfID, "to": peer.id, "token": peer.token!,
+                 "signal": payload["description"] ?? ["type": "candidate", "candidate": payload["candidate"]!]])
     }
     private func publish(_ data: [String: Any]) { sendSignal(["type": "publish", "topic": "meshboard-crdt:" + room, "data": data]) }
     private func announce() { publish(["type": "announce", "from": selfID]) }
     private func receiveSignal(_ raw: String) throws {
         let value = try object(JSONSerialization.jsonObject(with: Data(raw.utf8)))
-        if crdtPreview { try receiveYSignal(value); return }
-        try receiveLegacySignal(value)
+        try receiveYSignal(value)
     }
     private func receiveYSignal(_ value: [String: Any]) throws {
         let type = try text(value["type"])
@@ -240,55 +226,26 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
             payload = ["description": signal]
         } else if signalType == "candidate" { payload = ["candidate": try object(signal["candidate"])] }
         else { throw NetworkError.invalid }
-        try receiveLegacySignal(["v": 1, "type": "signal", "from": id, "payload": payload])
+        try applySignal(peer, payload)
     }
-    private func receiveLegacySignal(_ value: [String: Any]) throws {
-        guard let version = value["v"] as? NSNumber, CFGetTypeID(version) != CFBooleanGetTypeID(), version == 1 else { throw NetworkError.invalid }
-        switch try text(value["type"]) {
-        case "welcome":
-            try exact(value, "v", "type", "self", "peers")
-            let id = try text(value["self"])
-            guard uuid(id), let ids = value["peers"] as? [String], ids.count <= 7, ids.allSatisfy(uuid), !ids.contains(id), Set(ids).count == ids.count else { throw NetworkError.invalid }
-            if !selfID.isEmpty && selfID != id { for id in Array(peers.keys) { drop(id) } }
-            selfID = id; desired = Set(ids); attempts.removeAll(); reconnectDelay = 1
-            events?.signaling(active: true, error: nil)
-            for id in ids { _ = ensure(id) }
-        case "peer-joined":
-            try exact(value, "v", "type", "peer"); let id = try text(value["peer"])
-            guard uuid(id), id != selfID, desired.count < 7 else { throw NetworkError.invalid }
-            desired.insert(id); _ = ensure(id)
-        case "peer-left":
-            try exact(value, "v", "type", "peer"); let id = try text(value["peer"]); desired.remove(id)
-            guard let peer = peers[id] else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self, weak peer] in
-                guard let self, let peer, self.socket != nil, !self.desired.contains(id), self.peers[id] === peer else { return }; self.drop(id)
-            }
-        case "signal":
-            try exact(value, "v", "type", "from", "payload"); let id = try text(value["from"])
-            guard desired.contains(id), let peer = ensure(id) else { return }
-            let payload = try object(value["payload"])
-            if payload["description"] != nil {
-                try exact(payload, "description"); let d = try object(payload["description"]); try exact(d, "type", "sdp")
-                let type = try text(d["type"]); let sdp = try text(d["sdp"])
-                guard ["offer", "answer"].contains(type), sdp.hasPrefix("v=0"), sdp.utf8.count <= 24_000 else { throw NetworkError.invalid }
-                peer.remote(type: type == "offer" ? .offer : .answer, sdp: sdp)
-            } else {
-                try exact(payload, "candidate"); let c = try object(payload["candidate"])
-                guard Set(c.keys).isSubset(of: ["candidate", "sdpMid", "sdpMLineIndex", "usernameFragment"]) else { throw NetworkError.invalid }
-                let sdp = try text(c["candidate"]); guard sdp.count <= 2048 else { throw NetworkError.invalid }
-                if sdp.isEmpty { return }
-                let mid = c["sdpMid"] as? String
-                let index = c["sdpMLineIndex"] as? Int ?? 0
-                guard (0...16).contains(index), (mid?.count ?? 0) <= 64 else { throw NetworkError.invalid }
-                try peer.candidate(RTCIceCandidate(sdp: sdp, sdpMLineIndex: Int32(index), sdpMid: mid))
-            }
-        case "error":
-            try exact(value, "v", "type", "code")
-            events?.signaling(active: false, error: try text(value["code"]) == "room-full" ? "This board already has 8 participants." : "The connection service declined this session.")
-        default: throw NetworkError.invalid
+    private func applySignal(_ peer: ApplePeer, _ payload: [String: Any]) throws {
+        if payload["description"] != nil {
+            try exact(payload, "description"); let d = try object(payload["description"]); try exact(d, "type", "sdp")
+            let type = try text(d["type"]); let sdp = try text(d["sdp"])
+            guard ["offer", "answer"].contains(type), sdp.hasPrefix("v=0"), sdp.utf8.count <= 24_000 else { throw NetworkError.invalid }
+            peer.remote(type: type == "offer" ? .offer : .answer, sdp: sdp)
+        } else {
+            try exact(payload, "candidate"); let c = try object(payload["candidate"])
+            guard Set(c.keys).isSubset(of: ["candidate", "sdpMid", "sdpMLineIndex", "usernameFragment"]) else { throw NetworkError.invalid }
+            let sdp = try text(c["candidate"]); guard sdp.count <= 2048 else { throw NetworkError.invalid }
+            if sdp.isEmpty { return }
+            let mid = c["sdpMid"] as? String
+            let index = c["sdpMLineIndex"] as? Int ?? 0
+            guard (0...16).contains(index), (mid?.count ?? 0) <= 64 else { throw NetworkError.invalid }
+            try peer.candidate(RTCIceCandidate(sdp: sdp, sdpMLineIndex: Int32(index), sdpMid: mid))
         }
     }
-    private func ensure(_ id: String, initiator: Bool? = nil) -> ApplePeer? {
+    private func ensure(_ id: String, initiator: Bool = false) -> ApplePeer? {
         if let peer = peers[id] { return peer }
         guard desired.contains(id) else { return nil }
         let count = attempts[id, default: 0]
@@ -301,10 +258,10 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self, weak peer] in
             if let peer, !peer.open { self?.failed(peer, reason: "connection-timeout") }
         }
-        if initiator ?? (!crdtPreview && selfID < id) {
-            if crdtPreview { peer.token = Date().timeIntervalSince1970 * 1000 + Double.random(in: 0..<1) }
+        if initiator {
+            peer.token = Date().timeIntervalSince1970 * 1000 + Double.random(in: 0..<1)
             let config = RTCDataChannelConfiguration(); config.isOrdered = true
-            if let channel = pc.dataChannel(forLabel: crdtPreview ? fragmentChannel : "meshboard.v1", configuration: config) { peer.attach(channel) }
+            if let channel = pc.dataChannel(forLabel: fragmentChannel, configuration: config) { peer.attach(channel) }
             peer.describe(offer: true)
         }
         return peer
@@ -314,19 +271,17 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         guard valid(peer) else { return }; diagnose("opened", peer)
         attempts[peer.id] = 0; events?.opened(peer: peer.id); peer.route()
     }
-    fileprivate func received(_ peer: ApplePeer, _ raw: String) { if valid(peer) { events?.received(peer: peer.id, frame: raw) } }
     fileprivate func receivedBinary(_ peer: ApplePeer, _ data: Data) {
         if valid(peer) { events?.receivedBinary(peer: peer.id, base64: data.base64EncodedString()) }
     }
     fileprivate func route(_ peer: ApplePeer, _ relay: Bool) { if valid(peer) { events?.route(peer: peer.id, relayed: relay) } }
     fileprivate func failed(_ peer: ApplePeer, reason: String = "connection-failed") {
         guard valid(peer) else { return }; diagnose(reason, peer); drop(peer.id)
-        if crdtPreview { desired.remove(peer.id); attempts.removeValue(forKey: peer.id) }
+        desired.remove(peer.id); attempts.removeValue(forKey: peer.id)
         let current = generation
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self, self.generation == current, self.socket != nil else { return }
-            if self.crdtPreview { if self.peers.count < 7 { self.announce() } }
-            else { _ = self.ensure(peer.id) }
+            if self.peers.count < 7 { self.announce() }
         }
     }
     private func drop(_ id: String) {
@@ -336,19 +291,11 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         events?.closed(peer: id)
     }
     func reject(peer: String) { desired.remove(peer); drop(peer) }
-    func send(peer: String, frame: String) -> Bool { !crdtPreview && (peers[peer]?.send(Data(frame.utf8)) ?? false) }
     func peerId() -> String { selfID }
     func fragments(peer: String) -> Bool { peers[peer]?.channel?.label == fragmentChannel && peers[peer]?.remoteFragments == true }
     func sendBinary(peer: String, base64: String) -> Bool {
-        guard crdtPreview, base64.utf8.count <= (maxYMessage + 2) / 3 * 4, let data = Data(base64Encoded: base64) else { return false }
+        guard base64.utf8.count <= (maxYMessage + 2) / 3 * 4, let data = Data(base64Encoded: base64) else { return false }
         return peers[peer]?.send(data) ?? false
-    }
-    func previewAllowed(origin: String) -> Bool {
-        #if DEBUG && targetEnvironment(simulator)
-        return crdtPreview && ["localhost", "127.0.0.1"].contains(URL(string: origin)?.host ?? "")
-        #else
-        return false
-        #endif
     }
     func qrPng(value: String) -> String {
         let filter = CIFilter.qrCodeGenerator(); filter.message = Data(value.utf8); filter.correctionLevel = "M"
@@ -356,7 +303,6 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         return UIImage(cgImage: cg).pngData()!.base64EncodedString()
     }
 }
-
 private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDelegate {
     let id: String
     let started = ProcessInfo.processInfo.systemUptime
@@ -391,7 +337,7 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
             peer.pc.setLocalDescription(description) { [weak peer] error in peer?.main { peer, owner in
                 guard error == nil else { owner.failed(peer, reason: "local-description-failed"); return }
                 owner.diagnose(offer ? "local-offer" : "local-answer", peer)
-                let sdp = owner.crdtPreview ? description.sdp.replacingOccurrences(of: "\r\nm=", with: "\r\n" + fragmentSDP + "\r\nm=", range: description.sdp.range(of: "\r\nm=")) : description.sdp
+                let sdp = description.sdp.replacingOccurrences(of: "\r\nm=", with: "\r\n" + fragmentSDP + "\r\nm=", range: description.sdp.range(of: "\r\nm="))
                 owner.signal(peer, ["description": ["type": offer ? "offer" : "answer", "sdp": sdp]])
             } }
         } }
@@ -399,18 +345,18 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
         if offer { pc.offer(for: constraints, completionHandler: completion) } else { pc.answer(for: constraints, completionHandler: completion) }
     }
     func attach(_ channel: RTCDataChannel) {
-        guard self.channel == nil, let owner else { channel.close(); return }
-        guard (owner.crdtPreview ? (channel.isOrdered && channel.isReliable) : channel.label == "meshboard.v1") else { channel.close(); return }
+        guard self.channel == nil, owner != nil else { channel.close(); return }
+        guard (channel.isOrdered && channel.isReliable) else { channel.close(); return }
         self.channel = channel; channel.delegate = self; dataChannelDidChangeState(channel)
     }
     func send(_ data: Data) -> Bool {
-        guard open, data.count <= (owner?.crdtPreview == true ? maxYMessage : 16_384), queueBytes + data.count <= 8 * 1024 * 1024 else { return false }
+        guard open, data.count <= maxYMessage, queueBytes + data.count <= 8 * 1024 * 1024 else { return false }
         queue.append(data); queueBytes += data.count; flush(); return true
     }
     private func flush() {
         guard open, let channel else { return }
         while let first = queue.first, channel.bufferedAmount < 256 * 1024 {
-            guard channel.sendData(RTCDataBuffer(data: first, isBinary: owner?.crdtPreview == true)) else { owner?.failed(self, reason: "data-send-failed"); return }
+            guard channel.sendData(RTCDataBuffer(data: first, isBinary: true)) else { owner?.failed(self, reason: "data-send-failed"); return }
             queue.removeFirst(); queueBytes -= first.count
         }
     }
@@ -436,12 +382,8 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         let data = buffer.data; let binary = buffer.isBinary
         main { peer, owner in
-            if owner.crdtPreview {
-                guard binary, !data.isEmpty, data.count <= maxYMessage else { owner.reject(peer: peer.id); return }
-                owner.receivedBinary(peer, data); return
-            }
-            guard !binary, data.count <= 16_384, let raw = String(data: data, encoding: .utf8) else { owner.reject(peer: peer.id); return }
-            owner.received(peer, raw)
+            guard binary, !data.isEmpty, data.count <= maxYMessage else { owner.reject(peer: peer.id); return }
+            owner.receivedBinary(peer, data)
         }
     }
     func dataChannel(_ dataChannel: RTCDataChannel, didChangeBufferedAmount amount: UInt64) { main { peer, _ in peer.flush() } }

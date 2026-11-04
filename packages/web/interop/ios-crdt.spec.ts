@@ -18,7 +18,7 @@ async function draw(page: Page) {
   await page.mouse.move(450, 360, { steps: 8 }); await page.mouse.up()
 }
 async function invite(page: Page) {
-  await page.goto('/?crdt=1')
+  await page.goto('/')
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   const link = await page.getByLabel('Board invite', { exact: true }).inputValue()
   await page.getByRole('button', { name: 'Close sharing' }).click()
@@ -124,7 +124,7 @@ for (const creator of ['web', 'ios']) test(`iOS exchanges raw updates and awaren
   }
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') ios.send({ type: 'join', invite: `http://127.0.0.1:5174/?crdt=1#crdt=${room}` })
+  if (creator === 'web') ios.send({ type: 'join', invite: `http://127.0.0.1:5174/#crdt=${room}` })
   await expect.poll(() => page.evaluate(() => window.upstream.peers())).toBe(1)
   if (creator === 'ios') {
     await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
@@ -149,14 +149,14 @@ for (const creator of ['web', 'ios']) test(`iOS exchanges raw updates and awaren
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['upstream'])
 })
 
-test('iOS preview refuses legacy invites and non-local origins without clearing the board', async ({ ios }) => {
+test('iOS app refuses legacy invites and insecure origins without clearing the board', async ({ ios }) => {
   ios.send({ type: 'put', element: stroke('keep') })
   await expect.poll(() => ios.state().elements.length).toBe(1)
   ios.send({ type: 'join', invite: 'http://127.0.0.1:5174/#room=12345678-1234-4234-8234-123456789abc' })
   await expect.poll(() => ios.state(true).error).toContain('another protocol')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
-  ios.send({ type: 'share', origin: 'https://example.invalid' })
-  await expect.poll(() => ios.state(true).error).toContain('local-only')
+  ios.send({ type: 'share', origin: 'http://example.invalid' })
+  await expect.poll(() => ios.state(true).error).toContain('HTTPS')
   expect(ios.state(true).invite).toBe('')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
 })

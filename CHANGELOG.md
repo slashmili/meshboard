@@ -28,3 +28,9 @@
 - Changed: normal debug/release builds bundle yrs for ARM64 and x86_64 and use CRDT-only networking; remove emulator-only preview gates.
 - Changed: normal interop commands exercise the CRDT suite; obsolete protocol tests are retired.
 - Verified: six tablet UI tests, six JNI tests, seven Yjs/Android compatibility scenarios, seven real mixed-platform/ TURN scenarios, debug/release APK builds and packaged ABI contents.
+
+### iOS migration (Apple execution pending)
+- Changed: normal simulator/device and Debug/Release frameworks link yrs; the Swift/Kotlin controllers now use CRDT-only networking and HTTPS remote origins.
+- Removed: preview factory/build gates and legacy signaling/data-channel branches; debug interop remains simulator-only.
+- Added/updated: normal-factory controller tests, deletion synchronization tests, and build-script tests for all four configuration/platform combinations.
+- Verified here: build-script tests and interop TypeScript checks. Xcode compilation, iOS controller/live tests, physical iPad and packaged macOS checks require the user's Mac; tracked in docs/phase-2-validation.md.
