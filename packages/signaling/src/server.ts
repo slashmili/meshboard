@@ -11,7 +11,7 @@ type Client = { id: string; socket: WebSocket; room?: string; alive: boolean; co
 export function attachSignaling(server: EventEmitter, config: RtcConfig | (() => RtcConfig), options: { trustProxy?: boolean } = {}) {
   // Preview policy is fixed at startup; TURN credentials are issued per request.
   const localDevelopment = (typeof config === 'function' ? config() : config).localDevelopment
-  const closeYWebrtc = attachYWebrtc(server, localDevelopment)
+  const closeYWebrtc = attachYWebrtc(server, true)
   const rooms = new Map<string, Map<string, Client>>()
   const clients = new Set<Client>()
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_SIGNAL_BYTES, perMessageDeflate: false })

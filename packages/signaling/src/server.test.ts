@@ -41,13 +41,26 @@ describe('signaling-only relay', () => {
     await expect.poll(() => legacy.messages.some(message => message.type === 'error')).toBe(true)
     expect(preview.messages.some(message => message.type === 'signal')).toBe(false)
   })
-  it.each([false, true])('keeps both preview endpoints disabled in production (provider=%s)', async provider => {
+  it.each([false, true])('keeps the superseded preview endpoint disabled in production (provider=%s)', async provider => {
     const config = { ...rtcConfiguration({}, true), localDevelopment: false }
     const { base } = await fixture(provider ? () => config : config)
-    for (const path of ['/signal-crdt', '/signal-y-webrtc']) {
+    for (const path of ['/signal-crdt']) {
       const socket = new WebSocket(base.replace('http:', 'ws:') + path)
       await new Promise<void>((resolve, reject) => { socket.on('error', () => resolve()); socket.on('open', () => { socket.close(); reject(new Error('Preview endpoint was exposed')) }) })
     }
+  })
+  it.each([false, true])('serves CRDT signaling with production configuration (provider=%s)', async provider => {
+    const config = { ...rtcConfiguration({}, true), localDevelopment: false }
+    const { base } = await fixture(provider ? () => config : config)
+    const socket = new WebSocket(base.replace('http:', 'ws:') + '/signal-y-webrtc')
+    await new Promise<void>((resolve, reject) => {
+      socket.on('error', reject)
+      socket.on('open', () => socket.send(JSON.stringify({ type: 'ping' })))
+      socket.on('message', data => {
+        try { expect(JSON.parse(data.toString())).toEqual({ type: 'pong' }); socket.close(); resolve() }
+        catch (error) { reject(error) }
+      })
+    })
   })
   it('routes legacy and both preview protocols when using the development config provider', async () => {
     const { base, connect } = await fixture(rtcConfigurationProvider({}, true))

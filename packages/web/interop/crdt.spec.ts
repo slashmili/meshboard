@@ -203,11 +203,11 @@ relayTest('CRDT updates use real TURN when direct candidates are disabled', asyn
   await expect(elements(page)).toHaveCount(2)
 })
 
-test('legacy links are refused by preview mode and vice versa', async ({ page }) => {
+test('legacy links are refused by the default CRDT app', async ({ page }) => {
   const id = '12345678-1234-4234-8234-123456789abc'
   await page.goto(`/?crdt=1#room=${id}`)
   await expect(page.getByRole('alert')).toContainText('another protocol')
-  await page.goto(`/#crdt=${id}`)
+  await page.goto(`/#room=${id}`)
   await expect(page.getByRole('alert')).toContainText('another protocol')
 })
 

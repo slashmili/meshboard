@@ -37,11 +37,9 @@ export class YWebrtcSession {
 
   async start() {
     try {
-      if (!['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) throw new Error('CRDT preview is local-only.')
       const response = await fetch('/api/rtc-config', { cache: 'no-store', signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(8_000)]) })
       if (!response.ok) throw new Error('Connection setup unavailable.')
       const config = rtcConfigSchema.parse(await response.json())
-      if (!config.localDevelopment) throw new Error('CRDT preview requires a development server.')
       if (this.stopped) return
       const url = new URL('/signal-y-webrtc', location.href); url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
       const provider = this.provider = new WebrtcProvider(`meshboard-crdt:${this.room}`, this.document.ydoc, {
@@ -71,7 +69,7 @@ export class YWebrtcSession {
       if (this.stopped) return
       const room = provider.room!
       // filterBcConns=false alone does NOT disable BroadcastChannel document sync.
-      // Every preview peer must actually exercise the WebRTC path and validation.
+      // Every peer must actually exercise the WebRTC path and validation.
       bc.unsubscribe(room.name, room._bcSubscriber); room.bcconnected = false
       provider.awareness.setLocalState({ meshboard: { peerId: room.peerId, preview: null } })
       let ticks = 0
@@ -81,7 +79,7 @@ export class YWebrtcSession {
       }, 20)
       this.report()
     } catch (error) {
-      if (!this.stopped) { this.status.error = error instanceof Error ? error.message : 'Could not start CRDT preview.'; this.report() }
+      if (!this.stopped) { this.status.error = error instanceof Error ? error.message : 'Could not start this session.'; this.report() }
     }
   }
 

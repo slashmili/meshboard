@@ -6,17 +6,17 @@ const LIMIT = 2 * 1024 * 1024
 const EMPTY = new Uint8Array([0])
 function decode(data: string) {
   const raw = atob(data)
-  if (raw.length > LIMIT) throw new Error('CRDT update exceeds preview limits.')
+  if (raw.length > LIMIT) throw new Error('CRDT update exceeds session limits.')
   return Uint8Array.from(raw, char => char.charCodeAt(0))
 }
 function message(step: CrdtMessage['step'], bytes: Uint8Array): CrdtMessage {
-  if (bytes.length > LIMIT) throw new Error('CRDT state exceeds preview limits.')
+  if (bytes.length > LIMIT) throw new Error('CRDT state exceeds session limits.')
   let raw = ''
   for (let i = 0; i < bytes.length; i += 8192) raw += String.fromCharCode(...bytes.subarray(i, i + 8192))
   return { v: 2, type: 'crdt', step, data: btoa(raw) }
 }
 
-/** Isolated, local-only preview. Stage mutations so invalid state cannot replace the board. */
+/** Stage mutations so invalid state cannot replace the board. */
 export class CrdtDocument implements SessionDocument {
   readonly crdt = true
   readonly ydoc = new Y.Doc()
@@ -48,7 +48,7 @@ export class CrdtDocument implements SessionDocument {
       if (id !== element.id) throw new Error('CRDT element ID mismatch.')
       return element
     }).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
-    if (Y.encodeStateAsUpdate(candidate).length > LIMIT || new TextEncoder().encode(JSON.stringify(elements)).length > LIMIT) throw new Error('Board exceeds CRDT preview limits.')
+    if (Y.encodeStateAsUpdate(candidate).length > LIMIT || new TextEncoder().encode(JSON.stringify(elements)).length > LIMIT) throw new Error('Board exceeds CRDT session limits.')
     return elements
   }
   private validate(change: (candidate: Y.Doc) => void) {
@@ -63,7 +63,7 @@ export class CrdtDocument implements SessionDocument {
     } finally { candidate.destroy() }
   }
   validateUpdate(bytes: Uint8Array) {
-    if (bytes.length > LIMIT) throw new Error('CRDT update exceeds preview limits.')
+    if (bytes.length > LIMIT) throw new Error('CRDT update exceeds session limits.')
     this.validate(candidate => Y.applyUpdate(candidate, bytes))
   }
   private commit(change: (candidate: Y.Doc) => void, local: boolean) {
@@ -80,7 +80,7 @@ export class CrdtDocument implements SessionDocument {
   }
   private local(change: (candidate: Y.Doc) => void) {
     try { this.commit(change, true); return true }
-    catch { for (const fn of this.errors) fn('That change exceeds the CRDT preview limits or is invalid.'); return false }
+    catch { for (const fn of this.errors) fn('That change exceeds the CRDT session limits or is invalid.'); return false }
   }
   put(element: BoardElement) { return this.local(doc => doc.getMap('elements').set(element.id, elementSchema.parse(element))) }
   remove(ids: string[]) { this.local(doc => doc.transact(() => { for (const id of ids) doc.getMap('elements').delete(id) })) }
