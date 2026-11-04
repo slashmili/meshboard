@@ -7,7 +7,8 @@ import { createConnection } from 'node:net'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const sdk = process.env.ANDROID_HOME || resolve(root, '.android-sdk')
 const windows = process.platform === 'win32'
-const mode = process.argv[2] ?? 'run'
+const requestedMode = process.argv[2] ?? 'run'
+const mode = requestedMode === 'interop' ? 'crdt-interop' : requestedMode === 'crdt-run' ? 'run' : requestedMode
 const tasks = {
   build: [':androidApp:assembleDebug'], test: [':androidApp:connectedDebugAndroidTest'], run: [':androidApp:installDebug'],
   interop: [':androidApp:installDebug', ':androidApp:installDebugAndroidTest', 'prepareInterop'],
@@ -119,11 +120,7 @@ if (mode === 'emulator') {
     // Gradle's connected tests run on all devices; require an unambiguous test target.
     if (online.length !== 1) throw new Error('Keep only the intended test device connected for this command.')
   }
-  const preview = mode === 'crdt-run' || mode === 'crdt-interop'
   const properties = [
-    ...(mode.startsWith('crdt-') ? ['-Pmeshboard.crdtAndroid=true'] : []),
-    ...(preview ? ['-Pmeshboard.crdtPreview=true'] : []),
-    ...(mode === 'crdt-interop' ? ['-Pmeshboard.crdtInterop=true'] : []),
     ...(mode === 'crdt-test' ? ['-Pandroid.testInstrumentationRunnerArguments.class=meshboard.crdt.JvmCrdtBoardTest'] : []),
   ]
   if (mode === 'crdt-interop') {
@@ -139,6 +136,5 @@ if (mode === 'emulator') {
     await crdtCompatibility()
   }
   if (mode === 'run' || mode === 'crdt-run') run(adb, ['-s', serial, 'shell', 'am', 'start', '-n', 'dev.meshboard.android/.MainActivity'])
-  if (mode === 'interop') run('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.android.config.ts', ...process.argv.slice(3)])
   if (mode === 'crdt-interop') run('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.android-crdt.config.ts', ...process.argv.slice(3)])
 }

@@ -23,3 +23,8 @@
 - Changed: route production WSS to `/signal-y-webrtc`; run production browser and normal-app CRDT suites in CI; install Rust for release packaging.
 - Fixed: local deployment smoke tests run TURN as the owner of their temporary certificate, matching the production certificate ownership model.
 - Verified: 15 signaling tests, 30 web unit tests, production build and eight browser tests, all test-harness TypeScript checks, plus local HTTPS/WSS and authenticated TURN UDP/TLS data relay.
+
+### Android migration
+- Changed: normal debug/release builds bundle yrs for ARM64 and x86_64 and use CRDT-only networking; remove emulator-only preview gates.
+- Changed: normal interop commands exercise the CRDT suite; obsolete protocol tests are retired.
+- Verified: six tablet UI tests, six JNI tests, seven Yjs/Android compatibility scenarios, seven real mixed-platform/ TURN scenarios, debug/release APK builds and packaged ABI contents.

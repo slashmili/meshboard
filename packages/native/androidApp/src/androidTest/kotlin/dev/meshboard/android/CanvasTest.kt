@@ -67,10 +67,10 @@ class CanvasTest {
     @Test fun sharingControlsValidateInvitesWithoutDiscardingDrawing() {
         draw(); count(1)
         rule.onNodeWithTag("mobile-share").performClick()
-        rule.onNodeWithTag("mobile-app-address").assertTextContains(if (BuildConfig.CRDT_PREVIEW) "http://127.0.0.1:5174" else "http://127.0.0.1:5173")
+        rule.onNodeWithTag("mobile-app-address").assertTextContains("http://127.0.0.1:5173")
         rule.onNodeWithText("Done").performClick()
         rule.onNodeWithTag("mobile-join").performClick()
-        val key = if (BuildConfig.CRDT_PREVIEW) "crdt" else "room"
+        val key = "crdt"
         rule.onNodeWithTag("mobile-invite-input").performTextInput("https://example.com/#$key=invalid")
         rule.onNodeWithTag("mobile-confirm-join").performClick()
         count(1)
@@ -80,16 +80,16 @@ class CanvasTest {
 
     @Test fun mismatchedProtocolDoesNotDiscardDrawing() {
         draw(); count(1)
-        val other = if (BuildConfig.CRDT_PREVIEW) "room" else "crdt"
+        val other = "room"
         rule.onNodeWithTag("mobile-join").performClick()
         rule.onNodeWithTag("mobile-invite-input").performTextInput("http://127.0.0.1:5174/#$other=12345678-1234-4234-8234-123456789abc")
         rule.onNodeWithTag("mobile-confirm-join").performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("This invite belongs to another protocol. Use the matching app mode.").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(5000) { rule.onAllNodesWithText("This invite belongs to another protocol. Create a new board and share its invite.").fetchSemanticsNodes().isNotEmpty() }
         count(1)
     }
 
     @Test fun compactHeaderKeepsSharingVisibleAndSecondaryActionsInMenu() {
-        rule.onNodeWithText(if (BuildConfig.CRDT_PREVIEW) "Meshboard · CRDT preview · local only" else "Meshboard").assertIsDisplayed()
+        rule.onNodeWithText("Meshboard").assertIsDisplayed()
         rule.onNodeWithContentDescription("Meshboard logo").assertIsDisplayed()
         rule.onNodeWithTag("mobile-header").assertHeightIsEqualTo(52.dp)
         rule.onNodeWithTag("mobile-join").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
