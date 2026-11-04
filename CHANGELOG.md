@@ -12,3 +12,8 @@
 ### Verified
 - Production web build and all eight browser drawing/sharing tests, including actual TURN, creator departure, refresh recovery, and session end.
 - All 20 signaling tests, including production configuration and room isolation.
+
+### Native desktop migration
+- Changed: normal desktop sessions use yrs and y-webrtc exclusively; remove the Phase 1 networking path.
+- Added: bundle the JNI library in desktop resources and verify loading from the packaged launcher.
+- Verified: 29 desktop model/UI/JNI tests, six additional checked-JNI tests, nine real browser/desktop scenarios (four mixed peers, creator departure/rejoin, offline edit/delete recovery, TURN, upstream interoperability), and Linux distribution startup.

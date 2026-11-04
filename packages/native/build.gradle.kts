@@ -12,7 +12,7 @@ plugins {
 
 // Desktop builds do not require an Android SDK. Android scripts opt in explicitly.
 val androidEnabled = providers.gradleProperty("meshboard.android").orNull == "true"
-val crdtInteropEnabled = providers.gradleProperty("meshboard.crdtInterop").orNull == "true"
+val crdtInteropEnabled = true
 val crdtIosEnabled = providers.gradleProperty("meshboard.crdtIos").orNull == "true"
 val crdtIosPreviewEnabled = providers.gradleProperty("meshboard.crdtIosPreview").orNull == "true"
 require(!crdtIosPreviewEnabled || crdtIosEnabled) { "meshboard.crdtIosPreview requires meshboard.crdtIos=true" }
@@ -230,7 +230,7 @@ tasks.register("prepareInterop") {
     }
 }
 
-// Opt-in only: no Rust toolchain or JNI library is needed by current app builds.
+// Rust is part of every desktop build, including packaged distributions.
 if (crdtInteropEnabled) {
     val rustTarget = when (desktopOs) {
         "macos" -> "$desktopArch-apple-darwin"
@@ -251,6 +251,12 @@ if (crdtInteropEnabled) {
         // Cargo owns incremental checking, including compiler/toolchain changes.
         outputs.upToDateWhen { false }
     }
+    val packageCrdtJvm by tasks.registering(Sync::class) {
+        dependsOn(buildCrdtJvm)
+        from(library) { into("meshboard/native") }
+        into(layout.buildDirectory.dir("generated/crdtResources"))
+    }
+    kotlin.sourceSets.getByName("desktopMain").resources.srcDir(packageCrdtJvm)
     val launcher = extensions.getByType<JavaToolchainService>().launcherFor {
         languageVersion.set(JavaLanguageVersion.of(21))
     }

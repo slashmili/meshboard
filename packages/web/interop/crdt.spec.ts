@@ -20,7 +20,7 @@ async function draw(page: Page) {
   await page.mouse.move(450, 360, { steps: 8 }); await page.mouse.up()
 }
 async function invite(page: Page) {
-  await page.goto('/?crdt=1')
+  await page.goto('/')
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   const value = await page.getByLabel('Board invite', { exact: true }).inputValue()
   await page.getByRole('button', { name: 'Close sharing' }).click()
@@ -205,7 +205,7 @@ relayTest('CRDT updates use real TURN when direct candidates are disabled', asyn
 
 test('legacy links are refused by the default CRDT app', async ({ page }) => {
   const id = '12345678-1234-4234-8234-123456789abc'
-  await page.goto(`/?crdt=1#room=${id}`)
+  await page.goto(`/#room=${id}`)
   await expect(page.getByRole('alert')).toContainText('another protocol')
   await page.goto(`/#room=${id}`)
   await expect(page.getByRole('alert')).toContainText('another protocol')
@@ -223,7 +223,7 @@ for (const creator of ['web', 'desktop']) test(`unmodified upstream y-webrtc exc
   }
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') native.send({ type: 'join', invite: `http://127.0.0.1:5174/?crdt=1#crdt=${room}` })
+  if (creator === 'web') native.send({ type: 'join', invite: `http://127.0.0.1:5174/#crdt=${room}` })
   await expect.poll(() => page.evaluate(() => window.upstream.peers()), { timeout: 30_000 }).toBe(1)
   if (creator === 'desktop') {
     await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
