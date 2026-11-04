@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BoardElement } from '@meshboard/shared-protocol'
-import { INITIAL_STATUS } from './MeshSession'
+import { INITIAL_STATUS } from './SessionStatus'
 import { CrdtDocument } from './CrdtDocument'
 import type { YWebrtcSession } from './YWebrtcSession'
 
@@ -35,10 +35,10 @@ export function useSession(document: CrdtDocument) {
     let current: YWebrtcSession | null = null
     let disposed = false
     const start = async () => {
-        // Load the provider when sharing begins.
-        const { YWebrtcSession } = await import('./YWebrtcSession')
-        if (disposed) return
-        current = new YWebrtcSession(room, document, setStatus, onPreview)
+      // Load the provider when sharing begins.
+      const { YWebrtcSession } = await import('./YWebrtcSession')
+      if (disposed) return
+      current = new YWebrtcSession(room, document, setStatus, onPreview)
       session.current = current
       await current.start()
     }

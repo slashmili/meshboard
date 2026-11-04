@@ -4,7 +4,7 @@ import * as decoding from 'lib0/decoding'
 import * as Y from 'yjs'
 import { elementSchema, rtcConfigSchema, type BoardElement } from '@meshboard/shared-protocol'
 import { CrdtDocument } from './CrdtDocument'
-import { INITIAL_STATUS, type SessionStatus } from './MeshSession'
+import { INITIAL_STATUS, type SessionStatus } from './SessionStatus'
 import { FRAGMENT_CHANNEL, FRAGMENT_SDP, fragmentYMessage, MAX_Y_MESSAGE, YMessageReceiver } from './YTransport'
 
 type SimplePeer = {

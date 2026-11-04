@@ -166,18 +166,19 @@ try {
   assert(!response.body.includes(secret))
   assert.equal(credential, createHmac('sha1', secret).update(username).digest('base64'))
   await new Promise((resolve, reject) => {
-    const socket = new WebSocket(`${origin.replace('https:', 'wss:')}/signal`, { rejectUnauthorized: false, origin })
+    const socket = new WebSocket(`${origin.replace('https:', 'wss:')}/signal-y-webrtc`, { rejectUnauthorized: false, origin })
     const timeout = setTimeout(() => { socket.terminate(); reject(new Error('WSS timeout')) }, 5000)
     socket.on('error', reject)
-    socket.on('open', () => socket.send(JSON.stringify({ v: 1, type: 'join', room: '01234567-89ab-4def-8123-456789abcdef' })))
+    socket.on('open', () => socket.send(JSON.stringify({ type: 'ping' })))
     socket.on('message', data => {
-      try { assert.equal(JSON.parse(data).type, 'welcome'); resolve() } catch (error) { reject(error) }
+      try { assert.equal(JSON.parse(data).type, 'pong'); resolve() } catch (error) { reject(error) }
       finally { clearTimeout(timeout); socket.close() }
     })
   })
   console.log('PASS: built web assets, HTTPS, proxy health, WSS, temporary credentials')
 
-  await start('turn', ['--user', '0:0', '--read-only', '--tmpfs', '/tmp', '--cap-drop', 'ALL', '--cap-add', 'NET_BIND_SERVICE',
+  // The fixture key belongs to the host user, unlike root-owned production cert volumes.
+  await start('turn', ['--user', `${process.getuid()}:${process.getgid()}`, '--read-only', '--tmpfs', '/tmp', '--cap-drop', 'ALL', '--cap-add', 'NET_BIND_SERVICE',
     '--entrypoint', '/bin/sh', '-e', `TURN_SECRET=${secret}`, '-e', 'TURN_DOMAIN=localhost',
     '-e', 'TURN_PUBLIC_IP=127.0.0.1', '-e', `TURN_TLS_PORT=${tlsPort}`, '-e', 'WEB_BIND_IP=127.0.0.1',
     '-e', 'TURN_MIN_PORT=55000', '-e', 'TURN_MAX_PORT=55099', '-e', 'TURN_TOTAL_QUOTA=100',

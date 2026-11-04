@@ -17,3 +17,9 @@
 - Changed: normal desktop sessions use yrs and y-webrtc exclusively; remove the Phase 1 networking path.
 - Added: bundle the JNI library in desktop resources and verify loading from the packaged launcher.
 - Verified: 29 desktop model/UI/JNI tests, six additional checked-JNI tests, nine real browser/desktop scenarios (four mixed peers, creator departure/rejoin, offline edit/delete recovery, TURN, upstream interoperability), and Linux distribution startup.
+
+### Protocol and deployment cleanup
+- Removed: obsolete web session implementation, legacy signaling endpoints and superseded live-protocol test suites.
+- Changed: route production WSS to `/signal-y-webrtc`; run production browser and normal-app CRDT suites in CI; install Rust for release packaging.
+- Fixed: local deployment smoke tests run TURN as the owner of their temporary certificate, matching the production certificate ownership model.
+- Verified: 15 signaling tests, 30 web unit tests, production build and eight browser tests, all test-harness TypeScript checks, plus local HTTPS/WSS and authenticated TURN UDP/TLS data relay.
