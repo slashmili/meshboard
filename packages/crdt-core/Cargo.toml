@@ -5,6 +5,9 @@ edition = "2021"
 license = "MPL-2.0"
 publish = false
 
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
 [lib]
 crate-type = ["rlib", "cdylib", "staticlib"]
 
