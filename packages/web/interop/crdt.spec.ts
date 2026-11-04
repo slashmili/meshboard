@@ -211,55 +211,44 @@ test('legacy links are refused by the default CRDT app', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('another protocol')
 })
 
-for (const creator of ['web', 'desktop']) test(`unmodified upstream y-webrtc exchanges raw sync, awareness and deletes (${creator} creates)`, async ({ page, native }) => {
-  let room = crypto.randomUUID() as string
-  if (creator === 'desktop') {
-    // Larger than a fragment, smaller than standard SCTP limits. A channel label
-    // selected by native must NOT force fragments on an unmodified provider.
-    native.send({ type: 'put', element: stroke('raw-seed', 1000) })
+for (const creator of ['web', 'desktop']) test(`plaintext upstream peers cannot read a board (${creator} creates)`, async ({ page, browser, native }) => {
+  let link: string
+  if (creator === 'web') { link = await invite(page); await draw(page) }
+  else {
     native.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
-    await expect.poll(() => native.state().signaling, { timeout: 30_000 }).toBe(true)
-    room = new URLSearchParams(new URL(native.state().invite).hash.slice(1)).get('crdt')!
+    await expect.poll(() => native.state(true).invite).not.toBe('')
+    native.send({ type: 'put', element: stroke('private-seed') })
+    link = native.state(true).invite
   }
-  await page.goto(`/interop/y-webrtc.html?room=${room}`)
-  await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') native.send({ type: 'join', invite: `http://127.0.0.1:5174/#crdt=${room}` })
-  await expect.poll(() => page.evaluate(() => window.upstream.peers()), { timeout: 30_000 }).toBe(1)
-  if (creator === 'desktop') {
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
-    native.send({ type: 'remove', ids: ['raw-seed'] })
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-  }
-  await page.evaluate(element => window.upstream.put(element), stroke('upstream'))
-  await expect.poll(() => native.state().elements.length).toBe(1)
-  native.send({ type: 'put', element: stroke('native') })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(2)
-  await page.evaluate(element => window.upstream.preview(element), stroke('draft'))
-  await expect.poll(() => native.state().previews.length).toBe(1)
-  await page.evaluate(() => window.upstream.preview(null))
-  await expect.poll(() => native.state().previews.length).toBe(0)
-  native.send({ type: 'preview', element: stroke('desktop-draft') })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(1)
-  native.send({ type: 'preview', element: null })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(0)
-  await page.evaluate(() => window.upstream.remove('native'))
-  await expect.poll(() => native.state().elements.map(e => e.id)).toEqual(['upstream'])
-  native.send({ type: 'remove', ids: ['upstream'] })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-})
-
-test('rejects an invalid upstream update before it reaches the visible browser document', async ({ page, browser }) => {
-  const link = await invite(page)
-  await draw(page)
-  const room = new URLSearchParams(new URL(link).hash.slice(1)).get('crdt')
+  const room = new URLSearchParams(new URL(link).hash.slice(1)).get('crdt')!
   const context = await browser.newContext()
   try {
-    const upstream = await context.newPage()
-    await upstream.goto(new URL(`/interop/y-webrtc.html?room=${room}`, link).href)
-    await upstream.waitForFunction(() => !!window.upstream)
-    await expect.poll(() => upstream.evaluate(() => window.upstream.elements().length)).toBe(1)
-    await upstream.evaluate(() => window.upstream.invalid())
-    await expect(page.getByRole('alert')).toContainText('invalid or oversized')
+    const outsider = await context.newPage()
+    await outsider.goto(new URL(`/interop/y-webrtc.html?room=${room}`, link).href)
+    await outsider.waitForFunction(() => !!window.upstream)
+    if (creator === 'web') await expect(page.getByRole('alert')).toContainText('authenticate')
+    else await expect.poll(() => native.state(true).error).toContain('authenticate')
+    expect(await outsider.evaluate(() => window.upstream.elements())).toEqual([])
+    if (creator === 'web') await expect(elements(page)).toHaveCount(1)
+    else expect(native.state(true).elements).toHaveLength(1)
+  } finally { await context.close() }
+})
+
+test('wrong-key browser and native peers cannot read or modify a board', async ({ page, browser, native }) => {
+  const link = await invite(page); await draw(page)
+  const wrong = new URL(link), params = new URLSearchParams(wrong.hash.slice(1))
+  params.set('key', 'A'.repeat(43)); wrong.hash = params.toString()
+  const context = await browser.newContext()
+  try {
+    const outsider = await context.newPage(); await outsider.goto(wrong.href)
+    await expect(outsider.getByRole('alert')).toContainText('authenticate')
+    await expect(elements(outsider)).toHaveCount(0)
+    await draw(outsider)
     await expect(elements(page)).toHaveCount(1)
+    await context.close()
+    native.send({ type: 'join', invite: wrong.href })
+    await expect.poll(() => native.state(true).error).not.toBeNull()
+    expect(native.state(true).elements).toHaveLength(0)
+    expect(native.state(true).connected).toBe(0)
   } finally { await context.close() }
 })

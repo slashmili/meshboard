@@ -9,7 +9,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /** One direction of a Phase 3 connection, not a complete authentication protocol.
- * The caller must provide a fresh connection salt and authenticated context. */
+ * The caller must provide fresh directional derivation inputs and authenticated context. */
 class JvmFrameCipher private constructor(private var key: ByteArray?, private val encrypt: Boolean, private val context: ByteArray) : AutoCloseable {
     private var sequence = 0L
 

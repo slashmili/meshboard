@@ -1,5 +1,5 @@
 /** Phase 3 encryption primitive. Callers must authenticate the derivation context
- * and supply a fresh salt for every connection; this alone is not a handshake. */
+ * and ensure fresh directional derivation inputs for every connection; this alone is not a handshake. */
 export const MAX_CLEAR_FRAME = 16 * 1024
 export const MAX_CIPHER_FRAMES = 1_048_576
 const MAGIC = new Uint8Array([0x4d, 0x42, 0x45, 1])

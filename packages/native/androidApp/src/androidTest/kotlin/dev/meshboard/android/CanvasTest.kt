@@ -74,7 +74,7 @@ class CanvasTest {
         rule.onNodeWithTag("mobile-invite-input").performTextInput("https://example.com/#$key=invalid")
         rule.onNodeWithTag("mobile-confirm-join").performClick()
         count(1)
-        rule.waitUntil(5000) { rule.onAllNodesWithText("This invite has an invalid room ID.").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Paste the full encrypted invite, including its key.").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("mobile-connection-status").assertTextEquals("Local only")
     }
 
@@ -84,7 +84,7 @@ class CanvasTest {
         rule.onNodeWithTag("mobile-join").performClick()
         rule.onNodeWithTag("mobile-invite-input").performTextInput("http://127.0.0.1:5174/#$other=12345678-1234-4234-8234-123456789abc")
         rule.onNodeWithTag("mobile-confirm-join").performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("This invite belongs to another protocol. Create a new board and share its invite.").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Paste the full encrypted invite, including its key.").fetchSemanticsNodes().isNotEmpty() }
         count(1)
     }
 

@@ -3,9 +3,10 @@ import * as bc from 'lib0/broadcastchannel'
 import * as decoding from 'lib0/decoding'
 import * as Y from 'yjs'
 import { elementSchema, rtcConfigSchema, type BoardElement } from '@meshboard/shared-protocol'
+import { SecureChannel, SECURE_CHANNEL } from './SecureChannel'
 import { CrdtDocument } from './CrdtDocument'
 import { INITIAL_STATUS, type SessionStatus } from './SessionStatus'
-import { FRAGMENT_CHANNEL, FRAGMENT_SDP, fragmentYMessage, MAX_Y_MESSAGE, YMessageReceiver } from './YTransport'
+import { fragmentYMessage, MAX_Y_MESSAGE, YMessageReceiver } from './YTransport'
 
 type SimplePeer = {
   connected: boolean; destroyed: boolean; _pc: RTCPeerConnection; _channel: RTCDataChannel | null
@@ -17,7 +18,7 @@ type SimplePeer = {
   prependListener(event: 'signal', fn: (signal: { sdp?: string }) => void): void
 }
 type OutgoingMessage = { message?: Uint8Array; frames?: Uint8Array[]; next: number }
-type PeerState = { queue: OutgoingMessage[]; bytes: number; relay: boolean; fragments: boolean }
+type PeerState = { queue: OutgoingMessage[]; bytes: number; relay: boolean; secure?: SecureChannel; draining: boolean; deadline: ReturnType<typeof setTimeout> }
 
 /** Actual upstream provider; hooks are limited to input validation, bounded I/O,
  * negotiated large-message fragmentation and disabling same-browser shortcuts. */
@@ -31,7 +32,7 @@ export class YWebrtcSession {
   private peers = new Map<WebrtcConn, PeerState>()
   private shown = new Set<string>()
   private status = { ...INITIAL_STATUS }
-  constructor(private room: string, private document: CrdtDocument,
+  constructor(private room: string, private key: string, private document: CrdtDocument,
     private onStatus: (status: SessionStatus) => void,
     private onPreview: (id: string, element: BoardElement | null) => void) {}
 
@@ -45,7 +46,7 @@ export class YWebrtcSession {
       const provider = this.provider = new WebrtcProvider(`meshboard-crdt:${this.room}`, this.document.ydoc, {
         signaling: [url.href], maxConns: 7, filterBcConns: false,
         peerOpts: {
-          channelName: FRAGMENT_CHANNEL,
+          channelName: SECURE_CHANNEL,
           config: { iceServers: config.iceServers, iceTransportPolicy: config.iceTransportPolicy },
         },
       })
@@ -58,11 +59,7 @@ export class YWebrtcSession {
             this.status.error = message.code === 'room-full' ? 'This board already has 8 participants.' : 'The connection service declined this session.'
             this.report()
           }
-          const data = message.data, room = provider.room
-          if (message.type === 'publish' && message.topic === room?.name && data?.type === 'signal' && data.to === room?.peerId && data.signal?.sdp) {
-            const conn = room?.webrtcConns.get(data.from), state = conn && this.peers.get(conn)
-            if (state) state.fragments = data.signal.sdp.split('\r\n').includes(FRAGMENT_SDP)
-          }
+
         })
       }
       await provider.key
@@ -124,15 +121,10 @@ export class YWebrtcSession {
     for (const conn of this.provider?.room?.webrtcConns.values() ?? []) {
       if (this.peers.has(conn)) continue
       const peer = conn.peer as SimplePeer
-      const state: PeerState = { queue: [], bytes: 0, relay: false, fragments: false }
+      const state: PeerState = { queue: [], bytes: 0, relay: false, draining: false,
+        deadline: setTimeout(() => { peer.destroy(new Error('Peer authentication timed out.')) }, 20_000) }
       this.peers.set(conn, state)
-      // Add capability to the signaled SDP, after simple-peer reads its local
-      // description: WebRTC implementations can discard unknown SDP attributes.
-      peer.prependListener('signal', signal => {
-        if (signal.sdp && !signal.sdp.split('\r\n').includes(FRAGMENT_SDP)) signal.sdp = signal.sdp.replace('\r\nm=', `\r\n${FRAGMENT_SDP}\r\nm=`)
-      })
       const send = peer.send.bind(peer)
-      const fragments = () => peer._channel?.label === FRAGMENT_CHANNEL && state.fragments
       peer.send = bytes => {
         if (peer.destroyed) return
         // Native peers may ask for state before simple-peer finishes its ICE
@@ -142,22 +134,43 @@ export class YWebrtcSession {
         state.queue.push({ message: bytes.slice(), next: 0 }); state.bytes += bytes.length
         this.drain(peer, state, send)
       }
-      peer.on('connect', () => this.drain(peer, state, send))
-      peer.on('close', () => { state.queue.length = 0; state.bytes = 0 })
+      let resolveReady: () => void
+      const ready = new Promise<void>(resolve => { resolveReady = resolve })
+      const fail = () => {
+        state.secure?.close(); peer.destroy()
+        this.status.error = 'A peer could not authenticate or sent invalid encrypted data.'; this.report()
+      }
+      peer.on('connect', () => {
+        try {
+          if (peer._channel?.label !== SECURE_CHANNEL) throw new Error('Encrypted channel required')
+          state.secure = new SecureChannel(this.key, this.room, this.provider!.room!.peerId, conn.remotePeerId,
+            peer._pc.localDescription!.sdp, peer._pc.remoteDescription!.sdp)
+          send(state.secure.hello); resolveReady!()
+        } catch { fail(); resolveReady!() }
+      })
+      peer.on('close', () => {
+        clearTimeout(state.deadline); state.secure?.close(); state.queue.length = 0; state.bytes = 0; resolveReady!()
+      })
       const receive = peer.listeners('data')
       peer.removeAllListeners('data')
       const assembler = new YMessageReceiver()
+      let chain = Promise.resolve(), incomingBytes = 0, incomingFrames = 0
       peer.on('data', bytes => {
-        try {
-          if (!(bytes instanceof Uint8Array)) throw new Error('Binary data required')
-          const message = fragments() ? assembler.accept(bytes) : bytes
-          if (!message) return
-          this.validate(message)
-          for (const listener of receive) listener(message)
-        } catch {
-          this.status.error = 'A peer sent invalid or oversized drawing data. Its connection was closed.'
-          peer.destroy(); this.report()
-        }
+        if (peer.destroyed) return
+        if (!(bytes instanceof Uint8Array) || bytes.length < 29 || ++incomingFrames > 512 || bytes.length > 16 * 1024 + 28 || (incomingBytes += bytes.length) > 8 * 1024 * 1024) { fail(); return }
+        const copy = bytes.slice()
+        chain = chain.then(async () => {
+          await ready
+          if (peer.destroyed || !state.secure) return
+          const result = await state.secure.receive(copy)
+          if (peer.destroyed) return
+          if (result.response) send(result.response)
+          if (result.admitted) { clearTimeout(state.deadline); this.report(); this.drain(peer, state, send) }
+          if (result.data) {
+            const message = assembler.accept(result.data)
+            if (message) { this.validate(message); for (const listener of receive) listener(message) }
+          }
+        }).catch(fail).finally(() => { incomingBytes -= copy.length; incomingFrames-- })
       })
       // Retain the original sender without repeatedly wrapping it during flush.
       this.senders.set(conn, send)
@@ -165,30 +178,34 @@ export class YWebrtcSession {
     for (const conn of this.peers.keys()) if (conn.closed) { this.peers.delete(conn); this.senders.delete(conn) }
   }
   private senders = new Map<WebrtcConn, (bytes: Uint8Array) => void>()
-  private drain(peer: SimplePeer, state: PeerState, send: (bytes: Uint8Array) => void) {
+  private async drain(peer: SimplePeer, state: PeerState, send: (bytes: Uint8Array) => void) {
+    if (state.draining || !state.secure?.authenticated) return
+    state.draining = true
     try {
       while (!peer.destroyed && peer.connected && peer._channel && state.queue.length && peer._channel.bufferedAmount < 256 * 1024) {
         const pending = state.queue[0]
         if (!pending.frames) {
           const bytes = pending.message!
           // Choose framing only after channel/SDP negotiation has completed.
-          pending.frames = peer._channel.label === FRAGMENT_CHANNEL && state.fragments ? fragmentYMessage(bytes) : [bytes]
+          pending.frames = fragmentYMessage(bytes)
           state.bytes += pending.frames.reduce((n, frame) => n + frame.length, 0) - bytes.length
           delete pending.message
           if (state.bytes > 8 * 1024 * 1024) throw new Error('Peer is too slow.')
         }
         const frame = pending.frames[pending.next]
-        send(frame); pending.next++; state.bytes -= frame.length
+        const encrypted = await state.secure.encrypt(frame)
+        if (peer.destroyed) return
+        send(encrypted); pending.next++; state.bytes -= frame.length
         if (pending.next === pending.frames.length) state.queue.shift()
       }
-    } catch { peer.destroy(new Error('Could not send drawing update.')) }
+    } catch { peer.destroy(new Error('Could not send drawing update.')) } finally { state.draining = false }
   }
   private flush() { for (const [conn, state] of this.peers) this.drain(conn.peer as SimplePeer, state, this.senders.get(conn)!) }
   private report() {
     if (this.stopped) return
-    const connected = [...this.peers].filter(([conn]) => conn.connected)
+    const connected = [...this.peers].filter(([conn, state]) => conn.connected && state.secure?.authenticated)
     this.status = { ...this.status, signaling: this.provider?.signalingConns.some(conn => conn.connected) ?? false,
-      connected: connected.length, connecting: [...this.peers.keys()].filter(conn => !conn.connected && !conn.closed).length,
+      connected: connected.length, connecting: [...this.peers].filter(([conn, state]) => !state.secure?.authenticated && !conn.closed).length,
       relay: connected.filter(([, state]) => state.relay).length }
     this.onStatus(this.status)
   }
@@ -229,6 +246,7 @@ export class YWebrtcSession {
   dispose() {
     this.stopped = true; this.controller.abort(); clearInterval(this.timer); clearTimeout(this.previewTimer)
     this.provider?.disconnect(); this.provider?.destroy(); this.provider?.awareness.destroy()
+    for (const state of this.peers.values()) { clearTimeout(state.deadline); state.secure?.close() }
     this.peers.clear(); this.senders.clear()
     for (const id of this.shown) this.onPreview(id, null)
   }

@@ -13,7 +13,14 @@
 
 ### Pending
 - Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the new trust model in AGENTS.md.
-- Apple crypto, live-session integration and end-to-end security tests. The new primitives are not yet used by controllers; normal sessions remain Phase 2. No pushes.
+- Apple compilation/runtime verification and independent security review. Live-session integration is recorded below. No pushes.
+
+### Phase 3 authenticated sessions
+- Changed: require a secret-bearing invite and an authenticated `meshboard.secure-v1` channel; bind directional keys to room, peer identities, actual DTLS fingerprints and fresh challenges.
+- Added: encrypted admission confirmation, AES-GCM protection for all sync/awareness/fragment traffic, handshake deadlines and bounded input queues.
+- Removed: plaintext upstream-peer compatibility and negotiated plaintext fragmentation fallback.
+- Verified: 42 web unit tests, 41 desktop tests, 12 Android cipher/handshake tests and Android release compilation. Browser/Linux drawing, four-peer convergence, creator departure, reconnect and TURN; wrong-key/plaintext peers are rejected. Production browser tests cover ciphertext-only application frames, secret-free signaling, tampering and replay.
+- Pending: Apple compilation/runtime verification is tracked separately; this is not an independent security audit.
 
 ## Unreleased — Phase 2
 

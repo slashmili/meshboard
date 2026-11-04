@@ -6,8 +6,6 @@ import kotlinx.serialization.json.*
 
 /** Shared native lib0 framing for y-webrtc / y-protocols. */
 object YWire {
-    const val FRAGMENT_CHANNEL = "meshboard.y-webrtc.fragments-v1"
-    const val FRAGMENT_SDP = "a=meshboard-fragments:1"
     const val MAX_MESSAGE = 2 * 1024 * 1024 + 1024
     private const val CHUNK = 16 * 1024 - 5
     class Writer {
