@@ -1,7 +1,7 @@
-> Current status: Phase 2 default-app migration is implemented. See
-> [current validation and pending Apple/hardware checks](phase-2-validation.md).
-> The preview restrictions and pause instructions below describe historical
-> checkpoints and are superseded by the user's request to finish Phase 2.
+> Current status: Phase 3 authenticated encryption is implemented, with Apple
+> compilation/runtime acceptance still pending. See the [security validation
+> ledger and Mac/iPad checklist](phase-3-security.md). Historical checkpoint
+> pauses below are superseded by the user's instruction to complete Phase 3.
 
 # Delivery checkpoints
 
@@ -262,12 +262,27 @@ and JVM/Android record ciphers have matching ciphertext vectors, replay/tamper
 rejection, bounded frames and nonce budgets. All 37 web tests, seven desktop cipher
 tests and seven Android-emulator cipher tests pass. See the [security design and
 validation ledger](phase-3-security.md). The replacement of the literal
-creator pin was approved on 2026-11-04; Apple and live-session work remain.
+creator pin was approved on 2026-11-04. This foundation is now integrated below.
 
-Implement application-layer AES-256-GCM, secret-bearing URL fragments/QR codes,
-authenticated peer admission, and the agreed certificate verification design.
-Verify tampered messages and wrong-key joins fail. Inspect signaling/TURN
-traffic and confirm that secrets and recoverable board content are absent.
+**3b — Authenticated sessions.** Normal web, desktop and Android sessions require
+secret-bearing invites, authenticate both DTLS fingerprints with fresh challenges,
+and encrypt all CRDT/awareness frames. Plaintext peers are rejected. Verified by
+42 web unit tests, 41 desktop tests, 12 Android crypto tests, production browser
+security tests, mixed-peer convergence/reconnect/TURN tests and Android release
+compilation. Tests cover wrong keys, reflected/stale proofs, substituted
+fingerprints, tampering, replay, limits and queued handshake flooding.
+
+**3c — Apple integration (execution pending).** Swift CryptoKit implements the
+same record cipher and uses the shared Kotlin handshake. Controller callbacks are
+gated on authenticated admission. Added standalone CryptoKit vectors/security
+tests, CI invocation and updated live rejection tests. Mac compilation, Swift/Kotlin
+bridge checks and iPad execution remain explicitly deferred to the user.
+
+**3d — Wire validation.** Local production-browser PCAP inspection decoded 50
+signaling messages and observed 98 encrypted TURN application records, with no
+board/secret fields in signaling and no board markers in relay payloads. Actual
+browser data-channel capture verifies application encryption before DTLS. No
+independent security audit is claimed. Nothing was pushed or deployed.
 
 Decision (2026-11-04): authenticate every connection's DTLS fingerprints using
 proof of possession of the invitation secret, bound to fresh challenges, room and

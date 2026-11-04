@@ -1,3 +1,6 @@
+> Historical Phase 2 acceptance record. Current encrypted-session behavior and
+> remaining platform checks are in [Phase 3 security validation](phase-3-security.md).
+
 # Phase 2 validation and handoff
 
 CRDT is now the normal session implementation: Yjs/y-webrtc on web, yrs with

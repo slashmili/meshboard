@@ -1,9 +1,8 @@
 # Phase 3 security design and validation
 
-Status: encryption primitives implemented for Web Crypto and JVM (desktop/Android
-source set). **Live sessions still use Phase 2 and are not application-layer
-encrypted.** The authentication design was approved on 2026-11-04. Apple implementation,
-integration, and live security validation remain outstanding.
+Status: the approved authenticated protocol is integrated into web, desktop and
+Android sessions. Apple integration is implemented but awaits Mac compilation and
+runtime validation. This is not an independently audited security release.
 
 ## Trust model and design decision
 
@@ -39,8 +38,8 @@ Required integration:
    fingerprints. Verify native API behavior on all platforms.
 4. Derive separate sending and receiving keys from the invitation secret with
    HKDF-SHA-256. Bind the protocol version, room, sender/receiver identities,
-   ordered fingerprints, and both fresh challenges in a canonical context. Freeze
-   the exact context serialization in cross-platform vectors before integration.
+   ordered fingerprints, and both fresh challenges in a canonical context. Use
+   the exact context serialization below, checked by cross-platform vectors.
    Challenges prevent replay across reconnects even when certificates are reused.
 5. Exchange an encrypted confirmation of the binding before admitting the peer,
    sending document state, showing it as connected, or processing CRDT/awareness.
@@ -59,11 +58,52 @@ This decision supersedes the original creator-pin requirement in AGENTS.md.
 It is not a claim that integration is complete or that the protocol has received
 an independent security audit.
 
+## Frozen handshake (secure-v1)
+
+The only accepted data-channel label is `meshboard.secure-v1`. No plaintext or
+legacy fragmentation negotiation remains. A hello is exactly the four bytes
+`4d 42 48 01` followed by 32 random bytes. Duplicate/reflected hellos are rejected.
+The connection must authenticate within 20 seconds of peer creation.
+
+Each directional HKDF context is these eight ASCII fields separated by a single
+LF (`0a`), with no trailing newline:
+
+```
+meshboard.secure-v1
+room UUID
+sender UUID
+receiver UUID
+sender SHA-256 fingerprint (64 lowercase hex characters, no colons)
+receiver SHA-256 fingerprint (64 lowercase hex characters, no colons)
+sender challenge (64 lowercase hex characters)
+receiver challenge (64 lowercase hex characters)
+```
+
+UUIDs must be lowercase version-4 UUIDs; sender and receiver must differ. Salt is
+32 zero bytes: the fresh challenges are already bound into HKDF `info`. The input
+key is the decoded 32-byte invitation secret. Each side encrypts confirmation
+`4d 42 41 01` as record zero. Only successful decryption of that exact confirmation
+admits the peer. Application records start at sequence one. Keys, challenges and
+cipher instances are never reused across reconnects.
+
+Fingerprints are extracted from the actual local/remote descriptions accepted by
+WebRTC. Only SHA-256 is supported; every fingerprint line must agree, and the SDP
+must contain an application section. WebRTC validates the remote certificate
+against its accepted description; the proof authenticates that binding to the
+invitation. Duplicate metadata, another room/identity, a substituted certificate,
+replayed proofs and wrong secrets cannot produce the matching directional key.
+
+All Yjs sync and awareness messages are fragmented before encryption into at most
+16 KiB clear frames. Authenticate/decrypt before assembly or CRDT parsing. Queued
+outgoing and incoming data is capped at 8 MiB per peer, with per-frame bounds
+and at most 512 pending input records.
+Failures close the peer while retaining the existing validated board.
+
 ## Implemented encryption primitive
 
 `FrameCipher` (Web Crypto) and `JvmFrameCipher` (JCA) implement the same one-way
-record cipher. They do not perform or bypass authentication. They are not yet
-called by the app controllers.
+record cipher. They are used by the authenticated channel in normal apps. The same Kotlin
+handshake is shared with Apple through the Swift CryptoKit adapter.
 
 Inputs: a 32-byte secret, a 32-byte salt, and 1–4096 UTF-8 context bytes. HKDF uses
 SHA-256, that salt, and the context as `info`; its 32-byte output is the AES-256
@@ -111,32 +151,102 @@ pnpm --filter @meshboard/web check
 ./packages/native/gradlew -p packages/native desktopTest --tests meshboard.crypto.JvmFrameCipherTest
 ```
 
-Validated on Linux: all 37 web unit tests, web and test-harness typechecks, seven
-JVM cipher tests, Android debug/test APK builds, and the same seven cipher tests
-on the Android 35 x86_64 tablet emulator. Android instrumentation command (with
+Validated on Linux: all 42 web unit tests, web/test-harness typechecks, 41 desktop
+tests (including 12 crypto/handshake tests), Android debug/release/test APK builds,
+and the same 12 crypto/handshake tests on the Android 35 x86_64 tablet emulator. Android instrumentation command (with
 the local SDK configured and emulator running):
 
 ```
-./packages/native/gradlew -p packages/native -Pmeshboard.android=true :androidApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=meshboard.crypto.JvmFrameCipherTest
+./packages/native/gradlew -p packages/native -Pmeshboard.android=true :androidApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=meshboard.crypto.JvmFrameCipherTest,meshboard.crypto.SecureChannelTest
 ```
 
-Still required before Phase 3 can be called complete:
+## Integration validation
 
-- Freeze and implement the approved authenticated handshake.
-- Implement Apple crypto and validate all platform bindings with the same vectors.
-- Integrate secret-bearing invitations, QR codes, admission and encryption into
-  every normal app; remove all plaintext peer compatibility paths.
-- Exercise actual browser/Linux/Android mixed peers, creator departure, late
-  joins, temporary outages, large snapshots and previews over encrypted channels.
-- Test wrong keys, missing keys, tampered/replayed packets, reflected handshakes,
-  substituted SDP fingerprints, stale reconnect traffic and handshake floods.
-- Capture signaling and TURN traffic in local tests; assert no secret, recoverable
-  drawing content or plaintext fallback. Test real relay connections.
-- On macOS: compile Debug/Release device/simulator Apple frameworks; run crypto,
-  controller and mixed-peer iOS tests; verify packaged macOS crypto.
-- On iPad: QR/link joining, background/reconnect, creator departure, wrong-key
-  rejection, and real restrictive-network/TURN behavior. Keep Apple execution
-  explicitly pending until it runs on the user's Mac/device.
+- Passed: production web build and all 12 browser E2E scenarios, including direct
+  and actual TURN sessions, creator departure, refresh recovery, tamper/replay
+  rejection, missing keys and captures of the data-channel bytes before DTLS.
+- Passed: browser/Linux four-peer convergence, large drawings, offline edits and
+  deletions, repeated reconnects, previews, TURN, plaintext rejection and wrong-key
+  rejection. Fixed vectors cover substituted fingerprints, identities/rooms,
+  reflected challenges, stale reconnect proofs and nonce exhaustion.
+- Passed: Android tablet drawing UI, web/Android/desktop four-peer large snapshots,
+  creator departure, reconnects, TURN, plaintext rejection, wrong-key rejection
+  and successful joining afterward with the correct secret.
+- Passed: a local loopback PCAP of production-browser traffic (577 packets), with
+  50 decoded WebSocket signaling messages, 108 relayed DTLS records including 98
+  encrypted application records, and no drawing/secret fields in signaling or
+  drawing markers in relay payloads. DTLS 1.3 uses the RFC 9147 unified header.
+  The capture had zero kernel drops. Artifact: `build/security/phase3-loopback.pcap`
+  (ignored/local only). Check with:
+
+```
+python3 scripts/check-security-capture.py build/security/phase3-loopback.pcap
+```
+
+Packet inspection complements the cryptographic tests; absence of recognizable
+strings alone is not a confidentiality proof. ICE/STUN connectivity checks and
+DTLS handshake metadata are expected and are not board content. The capture only
+covered local test ports 5173 and 3478, not external traffic or production users.
+
+### Reproducing the local packet capture (Linux)
+
+Use only disposable test boards. Start `pnpm turn` in another terminal. Build the
+local capture image (the signaling image is only its Node/Alpine base):
+
+```
+docker build -f infra/deploy/Dockerfile --target signaling -t meshboard-signaling:local .
+docker build -t meshboard-capture:local infra/security-capture
+pnpm build
+mkdir -p build/security
+docker run -d --name meshboard-phase3-capture --network host --cap-drop ALL --cap-add NET_RAW --cap-add SETUID --cap-add SETGID --security-opt no-new-privileges -v "$PWD/build/security:/capture" meshboard-capture:local -p -i lo -U -s 0 -Z node -w /capture/phase3-loopback.pcap 'udp port 3478 or tcp port 5173'
+docker logs meshboard-phase3-capture
+```
+
+Confirm the log says `listening on lo` before running the tests. The writer uses
+Node's container UID 1000, matching this workspace owner; adjust ownership/user
+mapping if your local UID differs. Then:
+
+```
+MESHBOARD_TEST_BUILD=1 pnpm --filter @meshboard/web exec playwright test e2e/security.spec.ts e2e/sharing.spec.ts -g 'all application frames|actual TURN relay' --output=../../build/security/browser
+docker stop --signal SIGINT meshboard-phase3-capture
+docker logs meshboard-phase3-capture
+docker rm meshboard-phase3-capture
+python3 scripts/check-security-capture.py build/security/phase3-loopback.pcap
+```
+
+Stop/remove the capture container even if a test fails. Captures stay local under
+ignored `build/`; neither images nor captures are pushed.
+
+## Apple and hardware handoff (not run on Linux)
+
+The iOS network adapter gates controller callbacks on the shared Kotlin handshake,
+uses CryptoKit for the identical AES-GCM format, and exposes only decrypted frames
+to the board controller. It has no plaintext fallback. The Kotlin/Swift bridge,
+Xcode build and runtime behavior remain **unverified** until these run on a Mac:
+
+```
+bash scripts/test-apple-crypto.sh
+pnpm test:crdt:ios
+pnpm test:interop:ios
+pnpm build:ios:device
+pnpm test:native
+```
+
+The standalone CryptoKit test compiles the production cipher and checks the same
+fixed vectors, wrong keys/contexts, every-byte tampering, replay, sizes, nonce-budget exhaustion and disposal.
+It is also included in the iOS CI script. Kotlin controller doubles exercise an
+already-authenticated/decrypted network boundary; only the real iOS interop suite
+validates the Swift adapter and WebRTC certificate binding together.
+
+Also build Release device and simulator configurations in Xcode. On iPad, verify
+QR/link joining with the full secret, background/reconnect, creator departure,
+wrong-key rejection and restrictive-network/TURN behavior. On macOS verify the
+packaged app. Windows and physical Android ARM64 execution remain hardware checks.
+
+The handshake is application-specific and has not had an independent security
+audit. Shared-link risks remain: link leakage grants all board access, individual
+members cannot be revoked, and malicious authorized members/endpoints are outside
+the outsider-authentication guarantee. CRDT parser fuzzing remains future work.
 
 ## Primary references
 

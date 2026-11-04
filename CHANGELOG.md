@@ -27,6 +27,12 @@
 - Added: standalone Apple crypto vector/tamper/replay/limit tests and iOS CI invocation; updated simulator interoperability expectations to reject plaintext and wrong keys.
 - Verified here: shared handshake/crypto semantics on JVM/Android, test-harness typechecks and shell syntax. Swift compilation, Kotlin/Swift bridging and iOS runtime tests require the user's Mac; tracked explicitly in the security ledger.
 
+### Phase 3 wire validation and handoff
+- Added: a bounded local PCAP checker and capture-image recipe; refreshed the active protocol, security design, README and delivery checkpoints.
+- Verified: final production-browser suite (12), browser/Linux suite (9), and Android mixed-platform suite (7) all pass. Packet inspection decoded 50 signaling messages and 98 encrypted TURN application records; no board/secret fields appeared in signaling and no board markers appeared in relay payloads.
+- Fixed: negative packet tests send one bad record and suppress further traffic, so a valid invite-holder's later authorized resynchronization cannot obscure rejection of the bad record.
+- Handoff: Mac/iPad compile/runtime checks are explicit and reproducible. No pushes or public deployments.
+
 ## Unreleased — Phase 2
 
 ### Changed

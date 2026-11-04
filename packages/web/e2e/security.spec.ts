@@ -1,21 +1,22 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 
 declare global {
-  interface Window { securityProbe: { frames: number[][]; mode: 'none' | 'tamper' | 'replay'; last: number[] | null } }
+  interface Window { securityProbe: { frames: number[][]; mode: 'none' | 'tamper' | 'replay'; last: number[] | null; blocked: boolean } }
 }
 async function probe(context: BrowserContext) {
   await context.addInitScript(() => {
-    window.securityProbe = { frames: [], mode: 'none', last: null }
+    window.securityProbe = { frames: [], mode: 'none', last: null, blocked: false }
     const original = RTCDataChannel.prototype.send as (this: RTCDataChannel, data: unknown) => void
     RTCDataChannel.prototype.send = function(data: unknown) {
       const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : null
       if (!bytes) throw new Error('Non-binary application frame')
       const probe = window.securityProbe
+      if (probe.blocked) return
       if (probe.frames.length < 256) probe.frames.push(Array.from(bytes))
       let outgoing = bytes
       if (bytes[2] === 69) {
-        if (probe.mode === 'tamper') { outgoing = bytes.slice(); outgoing[outgoing.length - 1] ^= 1; probe.mode = 'none' }
-        else if (probe.mode === 'replay' && probe.last) { outgoing = new Uint8Array(probe.last); probe.mode = 'none' }
+        if (probe.mode === 'tamper') { outgoing = bytes.slice(); outgoing[outgoing.length - 1] ^= 1; probe.mode = 'none'; probe.blocked = true }
+        else if (probe.mode === 'replay' && probe.last) { outgoing = new Uint8Array(probe.last); probe.mode = 'none'; probe.blocked = true }
         probe.last = Array.from(bytes)
       }
       original.call(this, outgoing)
@@ -77,6 +78,8 @@ for (const mode of ['tamper', 'replay'] as const) test(`rejects ${mode} on an au
     await expect(elements(attacker)).toHaveCount(1)
     await expect(attacker.getByTestId('connection-status')).toHaveText('1 peer connected')
     await attacker.evaluate(mode => { window.securityProbe.mode = mode }, mode)
+    // Send exactly one bad record. A legitimate key holder can otherwise
+    // reconnect and synchronize its clean local edits after rejection.
     await draw(attacker)
     await expect(creator.getByRole('alert')).toContainText('invalid encrypted')
     await expect(elements(creator)).toHaveCount(1)

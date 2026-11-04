@@ -6,12 +6,12 @@ is required by native builds. No preview flag or local-only restriction remains;
 remote devices require HTTPS/WSS and reachable TURN.
 
 For validation commands and deferred hardware checks, see
-[Phase 2 validation](phase-2-validation.md). Phase 3 encryption/authentication is
-not implemented. Use test drawings.
+[Phase 2 validation](phase-2-validation.md) and the active
+[Phase 3 security protocol and validation ledger](phase-3-security.md).
 
 ## Protocol profile
 
-- Invitations: `https://your-board.example/#crdt=<UUID>` instead of `#room=…`.
+- Invitations: `https://your-board.example/#crdt=<UUID>&key=<base64url-secret>` instead of `#room=…`.
 - Signaling: `/signal-y-webrtc`, topics `meshboard-crdt:<UUID>`. Available in development and production; `/signal` and `/signal-crdt` are retired.
   Supports y-webrtc subscribe/unsubscribe, announce, signal and ping/pong.
   The relay accepts only SDP/ICE and discovery metadata, binds sender IDs to a
@@ -29,29 +29,18 @@ not implemented. Use test drawings.
 
 ### Large-message extension
 
-Upstream y-webrtc sends a whole update in one data-channel message. That can exceed
-SCTP limits for Meshboard's large atomic strokes/snapshots. Meshboard peers opt in
-to fragmentation through the exact channel label `meshboard.y-webrtc.fragments-v1`
-**and both peers advertising** the session-level SDP attribute
-`a=meshboard-fragments:1`. A label alone is not consent: upstream providers can
-accept an arbitrary channel name without understanding its extensions. Without
-both capabilities, messages remain ordinary binary y-webrtc, with no envelope.
+The only data-channel label is `meshboard.secure-v1`. Both peers must complete
+invite-secret authentication before exchanging sync or awareness. Plain upstream
+y-webrtc peers are rejected. The pinned provider's per-peer hooks are covered by
+live tests; review them when upgrading y-webrtc.
 
-On that negotiated channel, messages over 16,379 bytes are split into at most
-16 KiB frames: byte `127`, a four-byte big-endian total message length, then payload.
-Ordered/reliable delivery, one in-flight assembly, a 30-second assembly deadline,
-and a 2 MiB + 1 KiB message ceiling bound reassembly. Small messages stay unchanged.
-Send queues are limited to 8 MiB per peer and honor channel backpressure.
-
-This fragmentation is a **Meshboard extension**, not part of y-webrtc. The upstream
-interop test deliberately uses small raw messages and an unmodified provider.
-Large-board support with arbitrary third-party providers is not claimed. Password-
-encrypted signaling, broadcast-channel peer discovery, application-layer security are outside this checkpoint. The pinned provider's
-per-peer hooks are covered by the live tests; review them when upgrading y-webrtc.
-Android creates ordered/reliable channels, but its current Java WebRTC API does
-not expose reliability settings for received channels. The transport relies on
-the matching peers' defaults; hostile DCEP/channel configuration needs further
-hardening in the security phase.
+Messages over 16,379 bytes are split into at most 16 KiB clear frames: byte `127`,
+a four-byte big-endian total message length, then payload. Each frame is encrypted
+and authenticated separately. Decrypt before assembly. Ordered delivery, a
+30-second assembly deadline, and a 2 MiB + 1 KiB message ceiling bound reassembly.
+Send and pending input queues are limited to 8 MiB per peer. Sequence enforcement
+rejects reordered, missing or replayed records even if a hostile remote requests
+an unreliable channel. There is no negotiated plaintext fallback.
 
 ## Validation and limits
 
@@ -71,4 +60,5 @@ once that identity budget is exhausted; this remains a session limitation.
 
 These checks are **not a complete hostile-input security boundary**: CRDT binary
 decoder CPU/allocation behavior still needs fuzzing and isolation/resource-budget
-work. Application-layer encryption and authenticated admission remain Phase 3.
+work. Authenticated members can still submit hostile CRDT data; encryption does
+not make authorized input inherently safe.
