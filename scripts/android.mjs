@@ -121,7 +121,7 @@ if (mode === 'emulator') {
     if (online.length !== 1) throw new Error('Keep only the intended test device connected for this command.')
   }
   const properties = [
-    ...(mode === 'crdt-test' ? ['-Pandroid.testInstrumentationRunnerArguments.class=meshboard.crdt.JvmCrdtBoardTest'] : []),
+    ...(mode === 'crdt-test' ? ['-Pandroid.testInstrumentationRunnerArguments.class=meshboard.crdt.JvmCrdtBoardTest,meshboard.crypto.JvmFrameCipherTest,meshboard.crypto.SecureChannelTest'] : []),
   ]
   if (mode === 'crdt-interop') {
     run(join(root, 'packages/native', windows ? 'gradlew.bat' : 'gradlew'), ['-p', 'packages/native', '-Pmeshboard.android=true', ...properties,

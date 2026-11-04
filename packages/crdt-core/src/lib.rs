@@ -1,4 +1,4 @@
-//! Phase 2 compatibility prototype; not yet linked into the shipped apps.
+//! Yjs-compatible board state and validated operations for native applications.
 use serde_json::Value;
 use yrs::types::ToJson;
 use yrs::updates::{decoder::Decode, encoder::Encode};
@@ -12,6 +12,11 @@ mod bridge;
 #[cfg(feature = "c-api")]
 mod c_api;
 
+mod error;
+pub use error::BoardError;
+
+/// An in-memory board replica. Use validated operations for application input.
+#[derive(Debug)]
 pub struct Board {
     doc: Doc,
     elements: MapRef,
@@ -20,8 +25,8 @@ pub struct Board {
 impl Board {
     fn staged(
         &mut self,
-        change: impl FnOnce(&Board) -> Result<(), Box<dyn std::error::Error>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+        change: impl FnOnce(&Board) -> Result<(), BoardError>,
+    ) -> Result<(), BoardError> {
         let candidate = Board::new(self.doc.client_id().get());
         candidate.apply(&self.update(&[0])?)?;
         change(&candidate)?;
@@ -30,32 +35,41 @@ impl Board {
         Ok(())
     }
 
-    pub fn validated_apply(&mut self, update: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    /// Applies a remote update atomically after validating the resulting board.
+    ///
+    /// # Errors
+    /// Rejects malformed, oversized, or invalid board state without committing it.
+    pub fn validated_apply(&mut self, update: &[u8]) -> Result<(), BoardError> {
         if update.len() > 2 * 1024 * 1024 {
             return Err("CRDT update exceeds preview limits".into());
         }
         self.staged(|candidate| candidate.apply(update))
     }
 
-    pub fn validated_put(
-        &mut self,
-        id: &str,
-        value: &Value,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    /// Inserts an element only if the resulting board passes validation.
+    ///
+    /// # Errors
+    /// Rejects invalid elements or a board exceeding its size limits.
+    pub fn validated_put(&mut self, id: &str, value: &Value) -> Result<(), BoardError> {
         self.staged(|candidate| candidate.put(id, value))
     }
 
-    pub fn validated_remove(&mut self, id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    /// Removes an element atomically, retaining the board on validation failure.
+    ///
+    /// # Errors
+    /// Returns an error if the resulting board fails validation.
+    pub fn validated_remove(&mut self, id: &str) -> Result<(), BoardError> {
         self.staged(|candidate| {
             candidate.remove(id);
             Ok(())
         })
     }
 
-    pub fn validated_remove_all(
-        &mut self,
-        ids: &[String],
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    /// Removes a batch atomically, retaining the board on validation failure.
+    ///
+    /// # Errors
+    /// Rejects oversized batches or a resulting board that fails validation.
+    pub fn validated_remove_all(&mut self, ids: &[String]) -> Result<(), BoardError> {
         if ids.len() > 10000 {
             return Err("Too many removed IDs".into());
         }
@@ -67,25 +81,7 @@ impl Board {
         })
     }
 
-    fn validate(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let txn = self.doc.transact();
-        if txn.root_refs().any(|(name, _)| name != "elements") || self.elements.len(&txn) > 2000 {
-            return Err("Invalid CRDT roots or element count".into());
-        }
-        if self
-            .elements
-            .iter(&txn)
-            .any(|(_, value)| !matches!(value, yrs::Out::Any(_)))
-        {
-            return Err("Expected atomic board elements".into());
-        }
-        drop(txn);
-        let json = self.elements();
-        if self.update(&[0])?.len() > 2 * 1024 * 1024
-            || serde_json::to_vec(&json)?.len() > 2 * 1024 * 1024
-        {
-            return Err("CRDT state exceeds preview limits".into());
-        }
+    fn validate(&self) -> Result<(), BoardError> {
         #[derive(serde::Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Point {
@@ -100,6 +96,24 @@ impl Board {
             color: String,
             width: f64,
             points: Vec<Point>,
+        }
+        let txn = self.doc.transact();
+        if txn.root_refs().any(|(name, _)| name != "elements") || self.elements.len(&txn) > 2000 {
+            return Err("Invalid CRDT roots or element count".into());
+        }
+        if self
+            .elements
+            .iter(&txn)
+            .any(|(_, value)| !matches!(value, yrs::Out::Any(_)))
+        {
+            return Err("Expected atomic board elements".into());
+        }
+        drop(txn);
+        let json = self.try_elements()?;
+        if self.update(&[0])?.len() > 2 * 1024 * 1024
+            || serde_json::to_vec(&json)?.len() > 2 * 1024 * 1024
+        {
+            return Err("CRDT state exceeds preview limits".into());
         }
         for (id, value) in json.as_object().ok_or("Invalid elements map")? {
             let e: Element = serde_json::from_value(value.clone())?;
@@ -125,6 +139,8 @@ impl Board {
         Ok(())
     }
 
+    /// Creates an empty production replica with an independently generated client ID.
+    #[must_use]
     pub fn random() -> Self {
         let doc = Doc::new();
         let elements = doc.get_or_insert_map("elements");
@@ -133,47 +149,79 @@ impl Board {
 
     /// The harness supplies unique client IDs for deterministic test replicas.
     /// Production replicas must use independently generated IDs.
+    #[must_use]
     pub fn new(client_id: u64) -> Self {
         let doc = Doc::with_client_id(client_id);
         let elements = doc.get_or_insert_map("elements");
         Self { doc, elements }
     }
 
-    pub fn apply(&self, update: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    /// Applies a binary update without board-schema validation.
+    ///
+    /// # Errors
+    /// Rejects malformed encoding or updates Yrs cannot apply. Use
+    /// [`Self::validated_apply`] for atomic validation of application input.
+    pub fn apply(&self, update: &[u8]) -> Result<(), BoardError> {
         self.doc
             .transact_mut()
             .apply_update(Update::decode_v1(update)?)?;
         Ok(())
     }
 
-    pub fn put(&self, id: &str, value: &Value) -> Result<(), Box<dyn std::error::Error>> {
+    /// Inserts JSON without board-schema validation, for compatibility tooling.
+    ///
+    /// # Errors
+    /// Returns an error if the value cannot be converted to Yrs JSON.
+    pub fn put(&self, id: &str, value: &Value) -> Result<(), BoardError> {
         let value = Any::from_json(&serde_json::to_string(value)?)?;
         self.elements
             .insert(&mut self.doc.transact_mut(), id, value);
         Ok(())
     }
 
+    /// Removes an element without validating the remaining board.
     pub fn remove(&self, id: &str) {
         self.elements.remove(&mut self.doc.transact_mut(), id);
     }
 
+    /// Encodes the replica clocks used to request missing updates.
+    #[must_use]
     pub fn state_vector(&self) -> Vec<u8> {
         self.doc.transact().state_vector().encode_v1()
     }
 
-    pub fn update(&self, target: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    /// Encodes changes missing from the supplied remote state vector.
+    ///
+    /// # Errors
+    /// Rejects malformed binary state vectors.
+    pub fn update(&self, target: &[u8]) -> Result<Vec<u8>, BoardError> {
         Ok(self
             .doc
             .transact()
             .encode_state_as_update_v1(&StateVector::decode_v1(target)?))
     }
 
+    /// Serializes the board for compatibility callers using trusted input.
+    ///
+    /// # Panics
+    /// Panics if unchecked operations introduced data that JSON cannot represent
+    /// within its parsing limits. Use [`Self::try_elements`] for external data.
+    #[must_use]
     pub fn elements(&self) -> Value {
+        self.try_elements()
+            .expect("board elements must be representable as JSON")
+    }
+
+    /// Serializes the board without panicking on JSON parsing limits.
+    ///
+    /// # Errors
+    /// Returns an error if the serialized state cannot be parsed as JSON.
+    pub fn try_elements(&self) -> Result<Value, BoardError> {
         let mut json = String::new();
         self.elements
             .to_json(&self.doc.transact())
             .to_json(&mut json);
-        serde_json::from_str(&json).expect("Yrs emitted valid JSON")
+        Ok(serde_json::from_str(&json)?)
     }
 }
 
@@ -181,6 +229,37 @@ impl Board {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn deeply_nested_remote_values_are_rejected_without_mutation() {
+        let mut board = Board::new(1);
+        let previous = board.state_vector();
+        let remote = Board::new(2);
+        let mut value = Any::Null;
+        for _ in 0..150 {
+            value = Any::Array(vec![value].into());
+        }
+        remote
+            .elements
+            .insert(&mut remote.doc.transact_mut(), "deep", value);
+        assert!(board
+            .validated_apply(&remote.update(&[0]).unwrap())
+            .is_err());
+        assert_eq!(board.state_vector(), previous);
+        let valid =
+            json!({"id":"safe","type":"pen","color":"#123456","width":3,"points":[{"x":1,"y":2}]});
+        board.validated_put("safe", &valid).unwrap();
+        assert_eq!(board.elements(), json!({"safe": valid}));
+    }
+
+    #[test]
+    fn board_errors_preserve_sources_and_are_thread_safe() {
+        fn assert_error<T: std::error::Error + Send + Sync + 'static>() {}
+        assert_error::<BoardError>();
+        let error = Board::new(1).apply(&[255]).unwrap_err();
+        assert!(std::error::Error::source(&error).is_some());
+        assert_ne!(error.to_string(), "");
+    }
 
     #[test]
     fn staged_updates_reject_bad_shapes_and_foreign_roots_without_mutation() {

@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased — Phase 3
+
+### Added
+- Matching Web Crypto and JVM/Android AES-256-GCM record ciphers with HKDF-SHA-256 derivation, canonical 256-bit key encoding, bounded frames, strict counters and fatal-error disposal.
+- Cross-platform ciphertext vectors and tests for wrong keys/contexts, every-byte tampering, replay, truncation, plaintext, size limits, nonce-budget exhaustion and disposal.
+- A concrete peer-authentication proposal and remaining Apple/live-session validation checklist in `docs/phase-3-security.md`.
+
+### Verified
+- All 37 web unit tests and web/test-harness typechecks.
+- Seven JVM cipher tests and the same seven tests on the Android 35 x86_64 tablet emulator; Android debug/app-test APK builds.
+
+### Security decision and pending verification
+- Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the new trust model in AGENTS.md.
+- Apple compilation/runtime verification and independent security review. Live-session integration is recorded below. No pushes.
+
+### Phase 3 authenticated sessions
+- Changed: require a secret-bearing invite and an authenticated `meshboard.secure-v1` channel; bind directional keys to room, peer identities, actual DTLS fingerprints and fresh challenges.
+- Added: encrypted admission confirmation, AES-GCM protection for all sync/awareness/fragment traffic, handshake deadlines and bounded input queues.
+- Removed: plaintext upstream-peer compatibility and negotiated plaintext fragmentation fallback.
+- Verified: 42 web unit tests, 41 desktop tests, 12 Android cipher/handshake tests and Android release compilation. Browser/Linux drawing, four-peer convergence, creator departure, reconnect and TURN; wrong-key/plaintext peers are rejected. Production browser tests cover ciphertext-only application frames, secret-free signaling, tampering and replay.
+- Pending: Apple compilation/runtime verification is tracked separately; this is not an independent security audit.
+
+### Apple secure-session integration (execution pending)
+- Added: a CryptoKit record cipher, shared Kotlin fingerprint-bound handshake, secret-bearing invites and authenticated controller admission in the Swift network adapter.
+- Added: standalone Apple crypto vector/tamper/replay/limit tests and iOS CI invocation; updated simulator interoperability expectations to reject plaintext and wrong keys.
+- Verified here: shared handshake/crypto semantics on JVM/Android, test-harness typechecks and shell syntax. Swift compilation, Kotlin/Swift bridging and iOS runtime tests require the user's Mac; tracked explicitly in the security ledger.
+
+### Phase 3 wire validation and handoff
+- Added: a bounded local PCAP checker and capture-image recipe; refreshed the active protocol, security design, README and delivery checkpoints.
+- Verified: final production-browser suite (12), browser/Linux suite (9), and Android mixed-platform suite (7) all pass. Packet inspection decoded 50 signaling messages and 98 encrypted TURN application records; no board/secret fields appeared in signaling and no board markers appeared in relay payloads.
+- Fixed: negative packet tests send one bad record and suppress further traffic, so a valid invite-holder's later authorized resynchronization cannot obscure rejection of the bad record.
+- Handoff: Mac/iPad compile/runtime checks are explicit and reproducible. No pushes or public deployments.
+
+### Phase 3 CI fixes
+- Fixed: implement Swift `doNewKey()` as required by the Kotlin-generated AppleNetwork protocol; the previous name blocked iOS host compilation.
+- Fixed: native plaintext-peer tests allow either authentication rejection or transport closure while retaining no-leakage/no-admission assertions; Linux CI exposed this ordering race.
+- Verified locally: TypeScript checks and ten repeated browser/Linux plaintext-rejection scenarios passed.
+- Recorded: CI run 41798835980 passed both macOS desktop runners, Android, and Apple crypto/Kotlin tests at commit 8f6fc61. The corrected iOS host build still needs Mac/CI verification.
+
+### Android CI disk capacity
+- Fixed: remove unused hosted-runner NDK versions before installing the pinned Android NDK; run 41804767894 exhausted disk while creating emulator userdata, before any Android build or test ran.
+- Verified: eight script tests, including cleanup preservation/idempotency/error cases; a fresh Android 35 Nexus 10 emulator boot and all six Android UI tests passed locally. Hosted-runner headroom requires the next CI run.
+- Recorded: run 41804767894 passed Linux, both macOS desktop runners, and the complete iOS simulator/device-build job. Physical-device checks remain in the security ledger.
+
 ## Unreleased — Phase 2
 
 ### Changed

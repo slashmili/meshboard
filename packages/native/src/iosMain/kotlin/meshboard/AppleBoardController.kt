@@ -9,12 +9,12 @@ import platform.Foundation.NSUUID
 interface AppleNetwork {
     fun listen(events: AppleNetworkEvents?)
     fun normalizeOrigin(value: String): String?
-    fun start(origin: String, room: String)
+    fun start(origin: String, room: String, key: String)
+    fun newKey(): String
     fun stop()
     fun reject(peer: String)
     fun qrPng(value: String): String
     fun peerId(): String = ""
-    fun fragments(peer: String): Boolean = false
     fun sendBinary(peer: String, base64: String): Boolean = false
 }
 interface AppleNetworkEvents {
@@ -41,6 +41,7 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
     private var pending: BoardElement? = null
     private var origin = ""
     private var room = ""
+    private var sessionKey = ""
     init { network.listen(this) }
     override fun newId() = NSUUID().UUIDString.lowercase()
     private fun report(error: String? = mutable.value.error) {
@@ -75,27 +76,30 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
         }
     }
     override fun share(origin: String) = attempt {
-        if (room.isEmpty()) begin(requireNotNull(network.normalizeOrigin(origin)) { "Enter an HTTPS app address (HTTP is allowed only for localhost)." }, newId(), true)
+        if (room.isEmpty()) {
+            val base = requireNotNull(network.normalizeOrigin(origin)) { "Enter an HTTPS app address (HTTP is allowed only for localhost)." }
+            sessionKey = network.newKey(); SecureWire.decodeKey(sessionKey)
+            begin(base, newId(), true)
+        }
     }
     override fun join(invite: String) = attempt {
         require(invite.length <= 2048) { "The invite is too long." }
         val base = requireNotNull(network.normalizeOrigin(invite)) { "Enter a valid HTTPS board invite." }
         val fragment = invite.trim().substringAfter('#', "")
-        val key = "crdt"
-        if (fragment.startsWith("room=") || fragment.startsWith("crdt=")) {
-            require(fragment.startsWith("$key=")) { "This invite belongs to another protocol. Create a new board and share its invite." }
-        }
-        require(fragment.startsWith("$key=") && '&' !in fragment) { "Paste the full invite, including #$key=…" }
-        val id = fragment.removePrefix("$key=")
-        require(uuidPattern.matches(id)) { "This invite has an invalid room ID." }
+        val entries = fragment.split('&')
+        require(entries.size == 2) { "This invite belongs to another protocol or is incomplete. Paste the full encrypted invite." }
+        val params = entries.associate { entry -> val pair = entry.split('=', limit = 2); require(pair.size == 2); pair[0] to pair[1] }
+        require(params.keys == setOf("crdt", "key")) { "Invalid encrypted invite." }
+        val id = params.getValue("crdt").lowercase(); require(SecureWire.validId(id))
+        val key = params.getValue("key"); SecureWire.decodeKey(key); sessionKey = key
         begin(base, id, false)
     }
     override fun retry() { if (room.isNotEmpty()) begin(origin, room, true) }
     private fun begin(base: String, id: String, keep: Boolean) {
         disconnect(); if (!keep) resetDocument()
         origin = base; room = id
-        mutable.value = BoardState(elements = elements, invite = "$base/#crdt=$id")
-        network.start(base, id)
+        mutable.value = BoardState(elements = elements, invite = "$base/#crdt=$id&key=$sessionKey")
+        network.start(base, id, sessionKey)
         awareness = YAwareness(); awareness.local(network.peerId(), null)
         awarenessJob = scope.launch {
             while (isActive) {
@@ -106,7 +110,7 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
             }
         }
     }
-    override fun leave() { disconnect(); room = ""; resetDocument(); mutable.value = BoardState() }
+    override fun leave() { disconnect(); room = ""; sessionKey = ""; resetDocument(); mutable.value = BoardState() }
     private fun disconnect() {
         previewJob?.cancel(); previewJob = null; pending = null
         awarenessJob?.cancel(); awarenessJob = null
@@ -143,7 +147,7 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
             val receiver = yReceivers[peer] ?: return
             require(base64.length <= (YWire.MAX_MESSAGE + 2) / 3 * 4)
             val bytes = Base64.decode(base64)
-            val message = if (network.fragments(peer)) receiver.accept(bytes) ?: return else bytes
+            val message = receiver.accept(bytes) ?: return
             val reader = YWire.Reader(message)
             when (reader.uint()) {
                 0L -> {
@@ -171,7 +175,7 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
     private fun sendY(peer: String, bytes: ByteArray) {
         try {
             require(bytes.size <= YWire.MAX_MESSAGE)
-            val frames = if (network.fragments(peer)) YWire.frames(bytes) else listOf(bytes)
+            val frames = YWire.frames(bytes)
             for (frame in frames) check(network.sendBinary(peer, Base64.encode(frame)))
         } catch (_: Exception) { network.reject(peer); closed(peer); report("A peer could not keep up. Retry the connection.") }
     }

@@ -38,5 +38,10 @@
     "test:native": "./packages/native/gradlew -p packages/native desktopTest",
     "test:interop:ios": "node scripts/ios.mjs interop",
     "test:interop": "pnpm test:interop:crdt"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "y-webrtc@10.3.0": "patches/y-webrtc@10.3.0.patch"
+    }
   }
 }

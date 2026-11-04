@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
 import meshboard.*
+import meshboard.crypto.JvmSessionCrypto
 import meshboard.crdt.CrdtBoard
 import meshboard.crdt.JvmCrdtBoard
 import okhttp3.*
@@ -28,7 +29,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private fun newCrdt(): CrdtBoard = JvmCrdtBoard()
     private var crdt = newCrdt()
     private val elements get() = crdt.elements()
-    private val channelLabel get() = YWire.FRAGMENT_CHANNEL
+    private val channelLabel get() = SecureWire.CHANNEL
     private fun resetDocument() { crdt.close(); crdt = newCrdt() }
     private var awareness = YAwareness()
     private var awarenessTask: ScheduledFuture<*>? = null
@@ -40,6 +41,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private var self = ""
     private var origin = ""
     private var room = ""
+    private var sessionKey = ""
     @Volatile private var disposed = false
     private val peers = mutableMapOf<String, Peer>()
     private val desired = mutableSetOf<String>()
@@ -51,13 +53,16 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private class Peer(val pc: PeerConnection) {
         var channel: DataChannel? = null
         var open = false
+        var secure: SecureChannel? = null
+        val incomingBytes = java.util.concurrent.atomic.AtomicInteger()
+        val incomingFrames = java.util.concurrent.atomic.AtomicInteger()
+        val invalidQueued = java.util.concurrent.atomic.AtomicBoolean()
         var remoteSet = false
         var relayed = false
         var timeout: ScheduledFuture<*>? = null
         val candidates = mutableListOf<IceCandidate>()
         val yReceiver = YWire.Receiver()
         var token: Double? = null
-        var remoteFragments = false
         val queue = ArrayDeque<ByteArray>()
         var queueBytes = 0
     }
@@ -95,10 +100,10 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             broadcastY(awareness.local(self, pendingPreview))
         }
     }
-    override fun share(origin: String) = post { if (room.isEmpty()) begin(validateOrigin(origin), UUID.randomUUID().toString(), true) }
-    override fun join(invite: String) = post { val (base, id) = parseInvite(invite); begin(base, id, false) }
+    override fun share(origin: String) = post { if (room.isEmpty()) { sessionKey = SecureWire.key(JvmSessionCrypto.random32()); begin(validateOrigin(origin), UUID.randomUUID().toString(), true) } }
+    override fun join(invite: String) = post { val (base, id, key) = parseInvite(invite); sessionKey = key; begin(base, id, false) }
     override fun retry() = post { if (room.isNotEmpty()) begin(origin, room, true) }
-    override fun leave() = post { disconnect(); room = ""; resetDocument(); mutable.value = BoardState() }
+    override fun leave() = post { disconnect(); room = ""; sessionKey = ""; resetDocument(); mutable.value = BoardState() }
     // Keep the canonical invite unchanged. Only debug emulator network destinations use its host alias.
     private fun destination(url: String): String {
         if (!emulator) return url
@@ -116,7 +121,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             awarenessTask = later(10_000) { tick() }
         }
         awarenessTask = later(10_000) { tick() }
-        mutable.value = BoardState(elements = elements, invite = "$origin/#crdt=$room")
+        mutable.value = BoardState(elements = elements, invite = "$origin/#crdt=$room&key=$sessionKey")
         val current = generation
         http.newCall(Request.Builder().url(destination("$base/api/rtc-config")).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) = post { if (current == generation) report("Could not load connection settings. Check the app address and retry.") }
@@ -229,7 +234,6 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             }
         }
         val p = ensurePeer(id, false) ?: return
-        if (type == "offer" || type == "answer") p.remoteFragments = signal.text("sdp").split("\r\n").contains(YWire.FRAGMENT_SDP)
         if (type == "answer") p.token = null
         val payload = when (type) {
             "offer", "answer" -> buildJsonObject { put("description", signal) }
@@ -301,7 +305,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             p.pc.setLocalDescription(observer(id, p, set = {
                 signal(id, buildJsonObject { putJsonObject("description") {
                         put("type", d.type.canonicalForm())
-                        put("sdp", d.description.replaceFirst("\r\nm=", "\r\n${YWire.FRAGMENT_SDP}\r\nm="))
+                        put("sdp", d.description)
                 } })
             }), d)
         })
@@ -314,13 +318,25 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             override fun onBufferedAmountChange(previousAmount: Long) = post { if (peers[id] === p) flush(id, p) }
             override fun onStateChange() = post { if (peers[id] === p) channelState(id, p) }
             override fun onMessage(buffer: DataChannel.Buffer) {
-                if (!buffer.binary || buffer.data.remaining() > YWire.MAX_MESSAGE) { post { if (peers[id] === p) reject(id) }; return }
-                val bytes = ByteArray(buffer.data.remaining()); buffer.data.get(bytes)
+                fun invalid() { if (p.invalidQueued.compareAndSet(false, true)) post { if (peers[id] === p) reject(id) } }
+                if (p.invalidQueued.get()) return
+                val size = buffer.data.remaining()
+                if (!buffer.binary || size !in 29..16 * 1024 + 28) { invalid(); return }
+                if (p.incomingBytes.addAndGet(size) > 8 * 1024 * 1024 || p.incomingFrames.incrementAndGet() > 512) { invalid(); return }
+                val bytes = ByteArray(size); buffer.data.get(bytes)
                 post {
+                    p.incomingBytes.addAndGet(-bytes.size); p.incomingFrames.decrementAndGet()
                     if (peers[id] !== p) return@post
                     try {
-                        val message = if (channel.label() == YWire.FRAGMENT_CHANNEL && p.remoteFragments) p.yReceiver.accept(bytes) else bytes
-                        if (message != null) receiveYData(id, p, message)
+                        val result = checkNotNull(p.secure).receive(bytes)
+                        result.response?.let { enqueue(id, p, listOf(it)) }
+                        if (result.admitted) {
+                            p.open = true; p.timeout?.cancel(false); attempts[id] = 0
+                            sendY(id, p, YWire.sync(0, crdt.stateVector()))
+                            sendY(id, p, awareness.all()); sendY(id, p, byteArrayOf(3))
+                            updateRoute(id, p); report(null)
+                        }
+                        result.data?.let { clear -> p.yReceiver.accept(clear)?.let { receiveYData(id, p, it) } }
                     } catch (_: Exception) { reject(id) }
                 }
             }
@@ -329,14 +345,12 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     }
     private fun channelState(id: String, p: Peer) {
         when (p.channel?.state()) {
-            DataChannel.State.OPEN -> if (!p.open) {
-                p.open = true; p.timeout?.cancel(false); attempts[id] = 0
-                val board = crdt
-                run {
-                    sendY(id, p, YWire.sync(0, board.stateVector()))
-                    sendY(id, p, awareness.all()); sendY(id, p, byteArrayOf(3))
-                }
-                updateRoute(id, p); report(null)
+            DataChannel.State.OPEN -> if (p.secure == null) {
+                try {
+                    require(p.channel!!.label() == SecureWire.CHANNEL)
+                    p.secure = SecureChannel(JvmSessionCrypto, sessionKey, room, self, id, p.pc.localDescription.description, p.pc.remoteDescription.description)
+                    enqueue(id, p, listOf(p.secure!!.hello))
+                } catch (_: Exception) { reject(id) }
             }
             DataChannel.State.CLOSED -> fail(id, p)
             else -> Unit
@@ -367,7 +381,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private fun sendY(id: String, p: Peer, bytes: ByteArray) {
         try {
             require(bytes.size <= YWire.MAX_MESSAGE)
-            enqueue(id, p, if (p.channel?.label() == YWire.FRAGMENT_CHANNEL && p.remoteFragments) YWire.frames(bytes) else listOf(bytes))
+            enqueue(id, p, YWire.frames(bytes).map { checkNotNull(p.secure).encrypt(it) })
         } catch (_: Exception) { fail(id, p) }
     }
     private fun enqueue(id: String, p: Peer, frames: List<ByteArray>) {
@@ -376,7 +390,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         p.queue.addAll(frames); p.queueBytes += bytes; flush(id, p)
     }
     private fun flush(id: String, p: Peer) {
-        val channel = p.channel ?: return; if (!p.open) return
+        val channel = p.channel ?: return; if (channel.state() != DataChannel.State.OPEN) return
         try {
             while (p.queue.isNotEmpty() && channel.bufferedAmount() < 256 * 1024) {
                 val bytes = p.queue.first()
@@ -393,7 +407,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             }
             report()
     } }
-    private fun reject(id: String) { desired.remove(id); drop(id); report("A peer sent invalid or oversized drawing data. Its connection was closed.") }
+    private fun reject(id: String) { desired.remove(id); drop(id); report("A peer could not authenticate or sent invalid encrypted data.") }
     private fun fail(id: String, p: Peer) {
         if (peers[id] !== p) return; drop(id)
         val current = generation
@@ -403,7 +417,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         }
     }
     private fun drop(id: String) {
-        val p = peers.remove(id) ?: return; p.timeout?.cancel(false)
+        val p = peers.remove(id) ?: return; p.timeout?.cancel(false); p.secure?.close()
         p.channel?.let { it.unregisterObserver(); it.close(); it.dispose() }; p.pc.close(); p.pc.dispose()
         previews.remove(id); report()
         awareness.expire(id)?.let(::broadcastY); previews.clear(); previews.putAll(awareness.previews()); report()
@@ -438,16 +452,19 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             require(uri.scheme == "https" || (BuildConfig.DEBUG && uri.host in listOf("localhost", "127.0.0.1", "10.0.2.2"))) { "Use HTTPS for an app on another computer." }
             return "${uri.scheme}://${uri.rawAuthority}"
         }
-        fun parseInvite(value: String): Pair<String, String> {
+        fun parseInvite(value: String): Triple<String, String, String> {
             require(value.length <= 2048) { "The invite is too long." }
             val uri = URI(value.trim()); val base = validateOrigin(value)
-            val key = "crdt"
-            val entries = uri.rawFragment?.split('&') ?: error("Paste the full invite, including #$key=…")
-            require(entries.size == 1) { "This invite is not supported by the connection prototype." }
-            val pair = entries.single().split('=', limit = 2)
-            require(pair.size == 2 && pair[0] == key) { "This invite belongs to another protocol. Create a new board and share its invite." }
-            val room = URLDecoder.decode(pair[1], "UTF-8"); require(uuidPattern.matches(room)) { "This invite has an invalid room ID." }
-            return base to room
+            val entries = uri.rawFragment?.split('&') ?: error("Paste the full encrypted invite.")
+            require(entries.size == 2) { "Paste the full encrypted invite, including its key." }
+            val params = entries.associate { entry ->
+                val pair = entry.split('=', limit = 2); require(pair.size == 2)
+                pair[0] to URLDecoder.decode(pair[1], "UTF-8")
+            }
+            require(params.keys == setOf("crdt", "key")) { "Invalid encrypted invite." }
+            val room = params.getValue("crdt").lowercase(); require(SecureWire.validId(room))
+            val key = params.getValue("key"); SecureWire.decodeKey(key)
+            return Triple(base, room, key)
         }
     }
 }

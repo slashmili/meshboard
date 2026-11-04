@@ -21,7 +21,7 @@ class DefaultCrdtTest {
     }
     @Test fun normalInviteParserRejectsOldProtocol() {
         val id = "12345678-1234-4234-8234-123456789abc"
-        assertEquals("https://board.example.com" to id, DesktopController.parseInvite("https://board.example.com/#crdt=$id"))
+        assertEquals(Triple("https://board.example.com", id, "A".repeat(43)), DesktopController.parseInvite("https://board.example.com/#crdt=$id&key=${"A".repeat(43)}"))
         assertFailsWith<IllegalArgumentException> { DesktopController.parseInvite("https://board.example.com/#room=$id") }
     }
 }

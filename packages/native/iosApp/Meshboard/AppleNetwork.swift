@@ -4,8 +4,7 @@ import CoreImage.CIFilterBuiltins
 import WebRTC
 import MeshboardShared
 private enum NetworkError: Error { case invalid }
-private let fragmentChannel = "meshboard.y-webrtc.fragments-v1"
-private let fragmentSDP = "a=meshboard-fragments:1"
+private let fragmentChannel = "meshboard.secure-v1"
 private let maxYMessage = 2 * 1024 * 1024 + 1024
 private func object(_ value: Any?) throws -> [String: Any] {
     guard let value = value as? [String: Any] else { throw NetworkError.invalid }; return value
@@ -45,8 +44,9 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     private var signalSending = false
     private var generation = 0
     private var origin = ""
-    private var room = ""
-    private var selfID = ""
+    fileprivate var room = ""
+    fileprivate var sessionKey = ""
+    fileprivate var selfID = ""
     private var desired = Set<String>()
     private var attempts: [String: Int] = [:]
     private var peers: [String: ApplePeer] = [:]
@@ -78,8 +78,13 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         var base = URLComponents(); base.scheme = scheme; base.host = host; base.port = parts.port
         return base.string
     }
-    func start(origin: String, room: String) {
-        stop(); self.origin = origin; self.room = room
+    // Kotlin exports newKey as doNewKey to avoid Objective-C new-family semantics.
+    func doNewKey() -> String {
+        guard let bytes = try? SessionCipher.random32() else { return "" }
+        return bytes.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    }
+    func start(origin: String, room: String, key: String) {
+        stop(); self.origin = origin; self.room = room; self.sessionKey = key
         selfID = UUID().uuidString.lowercased()
         let current = generation
         var request = URLRequest(url: URL(string: origin + "/api/rtc-config")!)
@@ -221,7 +226,6 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         guard let peer = ensure(id, initiator: false) else { return }
         var payload: [String: Any]
         if signalType == "offer" || signalType == "answer" {
-            peer.remoteFragments = try text(signal["sdp"]).components(separatedBy: "\r\n").contains(fragmentSDP)
             if signalType == "answer" { peer.token = nil }
             payload = ["description": signal]
         } else if signalType == "candidate" { payload = ["candidate": try object(signal["candidate"])] }
@@ -256,7 +260,7 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
         peer.pc = pc; peers[id] = peer
         diagnose("created", peer)
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self, weak peer] in
-            if let peer, !peer.open { self?.failed(peer, reason: "connection-timeout") }
+            if let peer, peer.secure?.authenticated != true { self?.failed(peer, reason: "connection-timeout") }
         }
         if initiator {
             peer.token = Date().timeIntervalSince1970 * 1000 + Double.random(in: 0..<1)
@@ -287,12 +291,11 @@ final class NativeAppleNetwork: NSObject, AppleNetwork, URLSessionWebSocketDeleg
     private func drop(_ id: String) {
         guard let peer = peers.removeValue(forKey: id) else { return }
         diagnose("closed", peer)
-        peer.channel?.delegate = nil; peer.channel?.close(); peer.pc.delegate = nil; peer.pc.close()
+        peer.channel?.delegate = nil; peer.secure?.close(); peer.channel?.close(); peer.pc.delegate = nil; peer.pc.close()
         events?.closed(peer: id)
     }
-    func reject(peer: String) { desired.remove(peer); drop(peer) }
+    func reject(peer: String) { desired.remove(peer); drop(peer); events?.signaling(active: socket != nil, error: "A peer could not authenticate or sent invalid encrypted data.") }
     func peerId() -> String { selfID }
-    func fragments(peer: String) -> Bool { peers[peer]?.channel?.label == fragmentChannel && peers[peer]?.remoteFragments == true }
     func sendBinary(peer: String, base64: String) -> Bool {
         guard base64.utf8.count <= (maxYMessage + 2) / 3 * 4, let data = Data(base64Encoded: base64) else { return false }
         return peers[peer]?.send(data) ?? false
@@ -310,12 +313,16 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     var pc: RTCPeerConnection!
     var channel: RTCDataChannel?
     var open = false
+    var secure: SecureChannel?
     var token: Double?
-    var remoteFragments = false
     private var remoteSet = false
     private var candidates: [RTCIceCandidate] = []
     private var queue: [Data] = []
     private var queueBytes = 0
+    private let incomingLock = NSLock()
+    private var incomingBytes = 0
+    private var incomingFrames = 0
+    private var invalidQueued = false
     init(id: String, owner: NativeAppleNetwork) { self.id = id; self.owner = owner }
     private func main(_ block: @escaping (ApplePeer, NativeAppleNetwork) -> Void) {
         DispatchQueue.main.async { [weak self] in guard let self, let owner = self.owner, owner.valid(self) else { return }; block(self, owner) }
@@ -337,7 +344,7 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
             peer.pc.setLocalDescription(description) { [weak peer] error in peer?.main { peer, owner in
                 guard error == nil else { owner.failed(peer, reason: "local-description-failed"); return }
                 owner.diagnose(offer ? "local-offer" : "local-answer", peer)
-                let sdp = description.sdp.replacingOccurrences(of: "\r\nm=", with: "\r\n" + fragmentSDP + "\r\nm=", range: description.sdp.range(of: "\r\nm="))
+                let sdp = description.sdp
                 owner.signal(peer, ["description": ["type": offer ? "offer" : "answer", "sdp": sdp]])
             } }
         } }
@@ -345,12 +352,17 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
         if offer { pc.offer(for: constraints, completionHandler: completion) } else { pc.answer(for: constraints, completionHandler: completion) }
     }
     func attach(_ channel: RTCDataChannel) {
-        guard self.channel == nil, owner != nil else { channel.close(); return }
+        guard self.channel == nil, owner != nil, channel.label == fragmentChannel else { channel.close(); return }
         guard (channel.isOrdered && channel.isReliable) else { channel.close(); return }
         self.channel = channel; channel.delegate = self; dataChannelDidChangeState(channel)
     }
     func send(_ data: Data) -> Bool {
-        guard open, data.count <= maxYMessage, queueBytes + data.count <= 8 * 1024 * 1024 else { return false }
+        guard secure?.authenticated == true else { return false }
+        do { return sendWire(cryptoData(try secure!.encrypt(bytes: cryptoBytes(data)))) }
+        catch { return false }
+    }
+    private func sendWire(_ data: Data) -> Bool {
+        guard open, data.count <= 16412, queueBytes + data.count <= 8 * 1024 * 1024 else { return false }
         queue.append(data); queueBytes += data.count; flush(); return true
     }
     private func flush() {
@@ -374,16 +386,35 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     }
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) { main { peer, owner in
         switch dataChannel.readyState {
-        case .open: if !peer.open { peer.open = true; owner.opened(peer); peer.flush() }
+        case .open: if !peer.open {
+            do {
+                guard dataChannel.label == fragmentChannel, let local = peer.pc.localDescription, let remote = peer.pc.remoteDescription else { throw NetworkError.invalid }
+                peer.open = true
+                peer.secure = try SecureChannels.shared.open(crypto: AppleSessionCrypto(), key: owner.sessionKey, room: owner.room, localId: owner.selfID, remoteId: peer.id, localSdp: local.sdp, remoteSdp: remote.sdp)
+                guard peer.sendWire(cryptoData(peer.secure!.hello)) else { throw NetworkError.invalid }
+            } catch { owner.reject(peer: peer.id) }
+        }
         case .closed: owner.failed(peer, reason: "data-channel-closed")
         default: break
         }
     } }
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         let data = buffer.data; let binary = buffer.isBinary
+        incomingLock.lock()
+        let accepted = !invalidQueued && binary && (29...16412).contains(data.count) && incomingFrames < 512 && incomingBytes + data.count <= 8 * 1024 * 1024
+        let rejectNow = !accepted && !invalidQueued
+        if accepted { incomingBytes += data.count; incomingFrames += 1 } else { invalidQueued = true }
+        incomingLock.unlock()
+        guard accepted else { if rejectNow { main { peer, owner in owner.reject(peer: peer.id) } }; return }
         main { peer, owner in
-            guard binary, !data.isEmpty, data.count <= maxYMessage else { owner.reject(peer: peer.id); return }
-            owner.receivedBinary(peer, data)
+            peer.incomingLock.lock(); peer.incomingBytes -= data.count; peer.incomingFrames -= 1; peer.incomingLock.unlock()
+            do {
+                guard let secure = peer.secure else { throw NetworkError.invalid }
+                let result = try secure.receive(bytes: cryptoBytes(data))
+                if let response = result.response, !peer.sendWire(cryptoData(response)) { throw NetworkError.invalid }
+                if result.admitted { owner.opened(peer) }
+                if let clear = result.data { owner.receivedBinary(peer, cryptoData(clear)) }
+            } catch { owner.reject(peer: peer.id) }
         }
     }
     func dataChannel(_ dataChannel: RTCDataChannel, didChangeBufferedAmount amount: UInt64) { main { peer, _ in peer.flush() } }
@@ -402,4 +433,26 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
+}
+
+// Kotlin/Swift boundary only copies bounded binary frames; no key or payload logging.
+private func cryptoData(_ bytes: KotlinByteArray) -> Data {
+    Data((0..<Int(bytes.size)).map { UInt8(bitPattern: bytes.get(index: Int32($0))) })
+}
+private func cryptoBytes(_ data: Data) -> KotlinByteArray {
+    let result = KotlinByteArray(size: Int32(data.count))
+    for (index, byte) in data.enumerated() { result.set(index: Int32(index), value: Int8(bitPattern: byte)) }
+    return result
+}
+private final class AppleSessionCrypto: NSObject, SessionCrypto {
+    func random32() throws -> KotlinByteArray { cryptoBytes(try SessionCipher.random32()) }
+    func cipher(secret: KotlinByteArray, salt: KotlinByteArray, context: String, encrypt: Bool) throws -> RecordCipher {
+        AppleRecordCipher(try SessionCipher(secret: cryptoData(secret), salt: cryptoData(salt), context: context, encrypt: encrypt))
+    }
+}
+private final class AppleRecordCipher: NSObject, RecordCipher {
+    private let cipher: SessionCipher
+    init(_ cipher: SessionCipher) { self.cipher = cipher }
+    func process(input: KotlinByteArray) throws -> KotlinByteArray { cryptoBytes(try cipher.process(cryptoData(input))) }
+    func close() { cipher.close() }
 }

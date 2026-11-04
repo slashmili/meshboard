@@ -7,7 +7,7 @@ Start with [delivery checkpoints](docs/checkpoints.md) for current progress and 
 steps, then use the platform guide: [desktop](packages/native/README.md),
 [Android](packages/native/androidApp/README.md), or [iPad/iPhone](packages/native/iosApp/README.md).
 
-## Phase 2 — default CRDT sessions
+## Phase 3 — authenticated encrypted CRDT sessions
 
 Web uses Yjs/y-webrtc; desktop, Android and iOS use compatible yrs state over
 native WebRTC. Every participant connects directly to the others. Late joiners
@@ -31,9 +31,12 @@ The board exists only in participant memory. Refreshing a shared board restores
 it from another connected participant. Once everyone leaves, the content is gone;
 opening the same link afterward starts empty. An unshared board stays local.
 
-This is a **connection prototype**: WebRTC encrypts transport with DTLS, but
-invites are not authenticated and application-layer encryption is not implemented.
-Use test drawings. Export, undo, and production security are still pending. There are no accounts, analytics, or board persistence.
+Shared sessions authenticate every peer using the invitation secret bound to both
+DTLS fingerprints, then encrypt all sync and preview data with AES-256-GCM. Anyone
+with the full link has access; old/keyless links and plaintext peers are rejected.
+See [the security design and validation ledger](docs/phase-3-security.md), including
+pending Apple verification and the lack of an independent security audit. Export,
+undo and persistence remain future work. There are no accounts or analytics.
 
 ## Switching between development machines
 

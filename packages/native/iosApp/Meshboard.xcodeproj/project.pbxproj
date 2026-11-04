@@ -4,6 +4,8 @@
  classes = {};
  objectVersion = 56;
  objects = {
+ B00000000000000000000008 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meshboard/SessionCipher.swift; sourceTree = "<group>";};
+ B00000000000000000000009 = {isa = PBXBuildFile; fileRef = B00000000000000000000008;};
  B00000000000000000000006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meshboard/DebugInterop.swift; sourceTree = "<group>";};
  B00000000000000000000007 = {isa = PBXBuildFile; fileRef = B00000000000000000000006;};
  B00000000000000000000001 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/stasel/WebRTC.git"; requirement = {kind = exactVersion; version = 153.0.0;};};
@@ -13,7 +15,7 @@
  B00000000000000000000005 = {isa = PBXBuildFile; fileRef = B00000000000000000000004;};
  A00000000000000000000001 = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600;}; buildConfigurationList = A00000000000000000000002; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; knownRegions = (en, Base); mainGroup = A00000000000000000000003; productRefGroup = A00000000000000000000004; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000005); packageReferences = (B00000000000000000000001); };
  A00000000000000000000002 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000010, A00000000000000000000011); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
- A00000000000000000000003 = {isa = PBXGroup; children = (B00000000000000000000006, B00000000000000000000004, A00000000000000000000006, A00000000000000000000007, A00000000000000000000004); sourceTree = "<group>";};
+ A00000000000000000000003 = {isa = PBXGroup; children = (B00000000000000000000008, B00000000000000000000006, B00000000000000000000004, A00000000000000000000006, A00000000000000000000007, A00000000000000000000004); sourceTree = "<group>";};
  A00000000000000000000004 = {isa = PBXGroup; children = (A00000000000000000000008); name = Products; sourceTree = "<group>";};
  A00000000000000000000005 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000009; buildPhases = (A00000000000000000000020, A00000000000000000000021, A00000000000000000000022, A00000000000000000000023); buildRules = (); dependencies = (); name = Meshboard; packageProductDependencies = (B00000000000000000000002); productName = Meshboard; productReference = A00000000000000000000008; productType = "com.apple.product-type.application";};
  A00000000000000000000006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meshboard/MeshboardApp.swift; sourceTree = "<group>";};
@@ -67,7 +69,7 @@ SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;}; name = Debug;};
  OTHER_LDFLAGS = ("$(inherited)", "-framework", MeshboardShared);
  SWIFT_COMPILATION_MODE = wholemodule;}; name = Release;};
  A00000000000000000000020 = {isa = PBXShellScriptBuildPhase; alwaysOutOfDate = 1; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = (); name = "Build Kotlin framework"; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "\"$SRCROOT/build-framework.sh\"";};
- A00000000000000000000021 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B00000000000000000000007, A00000000000000000000024, B00000000000000000000005); runOnlyForDeploymentPostprocessing = 0;};
+ A00000000000000000000021 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B00000000000000000000009, B00000000000000000000007, A00000000000000000000024, B00000000000000000000005); runOnlyForDeploymentPostprocessing = 0;};
  A00000000000000000000022 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B00000000000000000000003); runOnlyForDeploymentPostprocessing = 0;};
  A00000000000000000000023 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000025); runOnlyForDeploymentPostprocessing = 0;};
  A00000000000000000000024 = {isa = PBXBuildFile; fileRef = A00000000000000000000006;};

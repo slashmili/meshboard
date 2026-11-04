@@ -1,6 +1,4 @@
 // Negotiated only by this channel label. Other y-webrtc peers use raw messages.
-export const FRAGMENT_CHANNEL = 'meshboard.y-webrtc.fragments-v1'
-export const FRAGMENT_SDP = 'a=meshboard-fragments:1'
 export const MAX_Y_MESSAGE = 2 * 1024 * 1024 + 1024
 const CHUNK = 16 * 1024 - 5
 export function fragmentYMessage(bytes: Uint8Array): Uint8Array[] {

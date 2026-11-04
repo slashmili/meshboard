@@ -8,8 +8,11 @@ directly to every other peer; there is no privileged host. Invites include a QR 
 Pen, shapes, whole-object eraser, colors/widths, and two-finger pan/zoom are available.
 Drawing stays in memory through rotation and is lost when the app process ends or
 when you leave. Saving and Apple Pencil pressure/palm rejection remain future work.
-The app uses yrs and the y-webrtc sync profile. WebRTC encrypts transport;
-invites are unauthenticated and application-layer encryption is not implemented.
+The app uses yrs and the y-webrtc sync profile, with invite-secret authentication
+and AES-256-GCM application encryption through CryptoKit. This Phase 3 Apple
+integration requires Mac compilation and runtime verification; see the
+[security checklist](../../../docs/phase-3-security.md). Run
+`bash scripts/test-apple-crypto.sh` from the repo root on macOS before simulator tests.
 
 ## Fresh Mac setup
 

@@ -80,7 +80,9 @@ not implemented at this checkpoint.
 
 This is a CRDT collaboration prototype. Invites are unauthenticated and there
 is no application-layer encryption yet; WebRTC supplies DTLS transport encryption.
-Use test drawings. Authenticated invitations and application encryption remain Phase 3.
+Normal sessions authenticate peer DTLS fingerprints using the invite secret and
+encrypt all application data. See [the security ledger](../../docs/phase-3-security.md)
+for verified platforms and pending Apple checks.
 
 ## Verify and package
 
