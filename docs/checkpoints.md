@@ -1,3 +1,8 @@
+> Current status: Phase 2 default-app migration is implemented. See
+> [current validation and pending Apple/hardware checks](phase-2-validation.md).
+> The preview restrictions and pause instructions below describe historical
+> checkpoints and are superseded by the user's request to finish Phase 2.
+
 # Delivery checkpoints
 
 Pause for the user to try the app after each runnable checkpoint. Do not continue
@@ -241,6 +246,14 @@ Local validation passed: nine desktop and seven Android live CRDT scenarios,
 six Pixel Tablet UI tests, three additional repeat runs per new recovery scenario,
 `pnpm test`, `pnpm build`, and targeted interop TypeScript checks. No retries were
 enabled. macOS/CI validation of this new checkpoint remains pending.
+
+**2k — Default-app migration.** Normal web, desktop, Android and iOS builds use
+Yjs/yrs and y-webrtc. The app controllers and server no longer select Phase 1
+networking. Desktop distributions bundle their JNI library; Android debug/release
+APKs bundle both supported 64-bit ABIs; iOS device/simulator builds link yrs.
+Deployment routing now serves `/signal-y-webrtc`. Old invites are rejected.
+See [the validation ledger](phase-2-validation.md) for actual results and remaining
+Apple checks; do not infer an Apple pass from the earlier preview milestones.
 
 ## Phase 3
 

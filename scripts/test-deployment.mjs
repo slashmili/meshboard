@@ -203,6 +203,36 @@ try {
       `Bidirectional relay smoke test did not deliver enough packets:\n${result}`)
     console.log(`PASS: authenticated TURN ${label} allocation and bidirectional relay data (${totals[2]}/${totals[1]} packets)`)
   }
+  // Exercise the built app through Caddy and production RTC configuration,
+  // without preview flags, mocked signaling, or development-server middleware.
+  const { chromium, expect } = createRequire(new URL('../packages/web/package.json', import.meta.url))('@playwright/test')
+  const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH })
+  try {
+    const a = await browser.newContext({ ignoreHTTPSErrors: true })
+    const b = await browser.newContext({ ignoreHTTPSErrors: true })
+    const first = await a.newPage(), second = await b.newPage()
+    await first.goto(origin)
+    await first.getByRole('button', { name: 'Share board', exact: true }).click()
+    const invite = await first.getByLabel('Board invite', { exact: true }).inputValue()
+    assert.match(new URL(invite).hash, /^#crdt=/)
+    await first.getByRole('button', { name: 'Close sharing' }).click()
+    await second.goto(invite)
+    await expect(first.getByTestId('connection-status')).toHaveText('1 peer connected', { timeout: 30_000 })
+    const elements = page => page.getByTestId('drawing-elements').locator(':scope > *')
+    for (const [page, other, count] of [[first, second, 1], [second, first, 2]]) {
+      await page.mouse.move(350 + count * 100, 300)
+      await page.mouse.down()
+      await page.mouse.move(430 + count * 100, 380, { steps: 8 })
+      await page.mouse.up()
+      await expect(elements(other)).toHaveCount(count, { timeout: 15_000 })
+    }
+    await a.close()
+    const c = await browser.newContext({ ignoreHTTPSErrors: true })
+    const late = await c.newPage()
+    await late.goto(invite)
+    await expect(elements(late)).toHaveCount(2, { timeout: 30_000 })
+    console.log('PASS: production browser CRDT drawing and late join after creator departure through HTTPS/WSS')
+  } finally { await browser.close() }
 } catch (error) {
   for (const name of names) {
     try { console.error(name, (await command(['logs', '--tail', '15', name])).replaceAll(secret, '[test-secret]')) } catch { /* best effort */ }

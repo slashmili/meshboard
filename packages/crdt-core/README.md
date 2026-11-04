@@ -1,72 +1,33 @@
-# CRDT compatibility checkpoints (Phase 2a–2b)
+# CRDT core
 
-This isolated prototype tests **Yjs 13.6.32 ↔ yrs 0.27.4** using real binary
-updates. An opt-in Kotlin/JVM JNI bridge exercises the same core in-process.
-An opt-in [local web/desktop/Android preview](../../docs/crdt-preview.md) now uses this
-core for live synchronization. Released/default apps still use the Phase 1 JSON
-protocol; these checkpoints do not change their behavior.
+The native apps use **yrs 0.27.4**, compatible with the browser's **Yjs 13.6.32**.
+Desktop and Android use `JvmCrdtBoard` through JNI; iOS uses `AppleCrdtBoard`
+through the C API. Normal and release builds include these bindings.
 
-## Try it
-
-With Node 22+, pnpm and the stable Rust toolchain installed:
+## Tests
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm test:crdt
+pnpm test:crdt         # Rust tests and seven Yjs/yrs binary scenarios
+pnpm test:crdt:kotlin  # checked JNI lifecycle tests and the same scenarios through Kotlin
+pnpm test:crdt:android # device/emulator JNI and cross-language compatibility
+pnpm test:crdt:ios     # iOS binding/controller tests and compatibility (Mac required)
 ```
 
-The command builds the Rust harness, runs Rust unit tests, and runs seven
-cross-language scenarios. It is also included in `pnpm test` and the Linux and
-macOS CI test jobs. Cargo dependencies are locked in `Cargo.lock`.
-This checkpoint has no UI changes to try yet.
+Stable Rust, Node 22 and pnpm are required; JVM tests also need JDK 21. Android
+needs NDK 28.2 and both Rust Android targets; iOS needs Xcode and both Apple ARM64
+targets. See [current validation and setup](../../docs/phase-2-validation.md).
 
-## Kotlin boundary checkpoint (2b)
+The Rust side keeps opaque, non-reused handle IDs under a mutex. Calls copy byte
+arrays, cap boundary input/output at 4 MiB and translate errors into exceptions.
+Panics are caught at the FFI boundary. Close documents explicitly; Kotlin close
+is idempotent and later calls fail. The application bindings stage mutations,
+validate the shape schema and 2 MiB budget, then commit valid changes.
 
-With JDK 21 also installed, run from the repository root:
+Desktop resources bundle the shared library; the loader extracts it to a private
+temporary directory. Android packages it in ABI-specific APK directories. iOS
+links it statically. Native test adapters remain separate from production APIs.
 
-```sh
-pnpm test:crdt:kotlin
-```
-
-Gradle builds a host-specific Rust shared library, runs six Kotlin/JNI tests,
-then the same seven Yjs scenarios run through **Yjs → Kotlin → JNI → yrs** and
-back. The JVM loads the Rust library directly, not a Rust subprocess. The Node
-test driver starts a JVM for each harness request, just as checkpoint 2a starts
-the Rust CLI. Lifecycle and concurrent-access tests exercise persistent handles.
-Both test paths enable the JVM's JNI checking mode (`-Xcheck:jni`).
-
-`CrdtBoard` is a common Kotlin API. `JvmCrdtBoard` is shared with Android and
-compiled on desktop with `-Pmeshboard.crdtInterop=true`; the regular desktop distribution
-does not include its implementation or load a native CRDT library. Current
-app builds do not require Rust. CI runs this checkpoint on its existing Linux,
-Apple Silicon macOS, and Intel macOS desktop jobs. Only Linux has been run locally.
-
-The Rust side keeps opaque, non-reused handle IDs under a mutex, instead of
-passing native pointers to Kotlin. Calls copy byte arrays, cap boundary input and
-output at 4 MiB, and translate errors into JVM exceptions. Rust panics are caught
-at JNI entry points; a poisoned registry fails closed. Use `use { ... }`/`close()`
-to release documents; close is idempotent in Kotlin and further calls fail.
-Production-style constructors generate client IDs; deterministic IDs are internal
-to the compatibility harness.
-
-The JNI path now stages mutations on a separate document and validates the
-resulting shape schema, root types, and 2 MiB document budget before committing.
-The CLI remains an unrestricted compatibility harness. This is **not a complete
-untrusted-network security boundary yet**: binary decoding still needs adversarial
-CPU/allocation testing and isolation/resource-budget work before non-local use.
-An opt-in [Android JNI checkpoint](../native/androidApp/README.md#opt-in-android-crdt-bindings--checkpoint-2e)
-now reuses this wrapper and the same seven compatibility scenarios on a tablet
-with `pnpm test:crdt:android`. Live sharing requires the additional
-[Android preview opt-in](../../docs/crdt-preview.md#try-the-android-tablet--checkpoint-2f).
-The opt-in [iOS C interop checkpoint](../native/iosApp/README.md#opt-in-crdt-bindings--checkpoint-2g)
-adds `AppleCrdtBoard` and repeats the same scenarios inside an ARM64 simulator.
-It uses the same validated Rust operations as JNI, with a private C header,
-owned result buffers and caught panics. `pnpm test:crdt:ios` requires an Apple
-Silicon Mac; the binding checkpoint passed Apple CI (user-confirmed). Live iOS
-CRDT sharing now has a separate [simulator-only preview](../native/iosApp/README.md#local-crdt-sharing-preview--checkpoint-2h),
-pending its own Apple CI/manual validation. Default iOS sharing remains v1.
-
-## Candidate document format
+## Document format
 
 - One root shared map named `elements`, keyed by the existing element ID.
 - Values are atomic JSON objects using the existing board-element fields.
@@ -82,7 +43,7 @@ pending its own Apple CI/manual validation. Default iOS sharing remains v1.
 
 The CLI exchanges JSON byte arrays only to make automated tests easy to drive.
 It is not a network protocol, server, or public input boundary. Input schema and
-resource-limit enforcement remain required before integration into the apps.
+resource limits are enforced by the application bindings.
 Fixed client IDs are only for deterministic test replicas, not for production.
 
 ## Joining and reconnecting
@@ -111,11 +72,8 @@ See the [Yjs update API](https://docs.yjs.dev/api/document-updates) and
 6. Delete-only updates synchronize even with unchanged state vectors.
 7. A remaining peer seeds a newcomer and accepts its edits without the creator.
 
-The Rust CLI tests alone do **not** establish mobile FFI, live transport
-compatibility, four-device convergence, encrypted admission, or mobile performance.
-The opt-in platform binding suites above separately exercise their FFI boundaries.
-The separate local preview suite now tests actual y-webrtc signaling/sync/awareness
-against desktop, including an unmodified provider and a negotiated large-message
-extension. See the linked preview guide for the exact scope and limits.
-Release migration and mobile integration remain pending. Keep pausing at runnable checkpoints.
-Do not claim Phase 2 is complete on these tests alone.
+Binary tests alone do not establish live transport behavior. The normal-app
+interop suites test y-webrtc signaling/sync/awareness, four mixed peers, creator
+departure, recovery and TURN. See [the validation ledger](../../docs/phase-2-validation.md)
+for completed tests and pending Apple/device checks. Application encryption and
+authenticated admission remain Phase 3.

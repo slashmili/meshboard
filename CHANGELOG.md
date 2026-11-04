@@ -34,3 +34,9 @@
 - Removed: preview factory/build gates and legacy signaling/data-channel branches; debug interop remains simulator-only.
 - Added/updated: normal-factory controller tests, deletion synchronization tests, and build-script tests for all four configuration/platform combinations.
 - Verified here: build-script tests and interop TypeScript checks. Xcode compilation, iOS controller/live tests, physical iPad and packaged macOS checks require the user's Mac; tracked in docs/phase-2-validation.md.
+
+### Phase 2 handoff
+- Added: a validation ledger and explicit macOS/iPad checklist; refreshed platform and protocol documentation.
+- Changed: CI checks normal CRDT apps, production web bundles and Android release compilation.
+- Verified: production-container browser drawing and late joining after creator departure through HTTPS/WSS, in addition to actual TURN UDP/TLS traffic.
+- Scope: no pushes, deployments, encryption, persistence or Phase 4 features. Apple and other hardware-only checks are pending, not claimed complete.
