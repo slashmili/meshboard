@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Phase 3 foundations
+
+### Added
+- Matching Web Crypto and JVM/Android AES-256-GCM record ciphers with HKDF-SHA-256 derivation, canonical 256-bit key encoding, bounded frames, strict counters and fatal-error disposal.
+- Cross-platform ciphertext vectors and tests for wrong keys/contexts, every-byte tampering, replay, truncation, plaintext, size limits, nonce-budget exhaustion and disposal.
+- A concrete peer-authentication proposal and remaining Apple/live-session validation checklist in `docs/phase-3-security.md`.
+
+### Verified
+- All 37 web unit tests and web/test-harness typechecks.
+- Seven JVM cipher tests and the same seven tests on the Android 35 x86_64 tablet emulator; Android debug/app-test APK builds.
+
+### Pending
+- User decision on replacing the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints.
+- Apple crypto, live-session integration and end-to-end security tests. The new primitives are not yet used by controllers; normal sessions remain Phase 2. No pushes.
+
 ## Unreleased — Phase 2
 
 ### Changed

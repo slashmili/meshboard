@@ -257,6 +257,13 @@ Apple checks; do not infer an Apple pass from the earlier preview milestones.
 
 ## Phase 3
 
+**3a — Encryption foundations (implemented; not active in sessions).** Web Crypto
+and JVM/Android record ciphers have matching ciphertext vectors, replay/tamper
+rejection, bounded frames and nonce budgets. All 37 web tests, seven desktop cipher
+tests and seven Android-emulator cipher tests pass. See the [security design and
+validation ledger](phase-3-security.md). The proposed replacement of the literal
+creator pin is awaiting a user decision; Apple and live-session work remain.
+
 Implement application-layer AES-256-GCM, secret-bearing URL fragments/QR codes,
 authenticated peer admission, and the agreed certificate verification design.
 Verify tampered messages and wrong-key joins fail. Inspect signaling/TURN
