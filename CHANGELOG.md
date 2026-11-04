@@ -12,7 +12,7 @@
 - Seven JVM cipher tests and the same seven tests on the Android 35 x86_64 tablet emulator; Android debug/app-test APK builds.
 
 ### Pending
-- User decision on replacing the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints.
+- Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the new trust model in AGENTS.md.
 - Apple crypto, live-session integration and end-to-end security tests. The new primitives are not yet used by controllers; normal sessions remain Phase 2. No pushes.
 
 ## Unreleased — Phase 2

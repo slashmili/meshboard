@@ -67,13 +67,20 @@ any time with zero impact on the others.
   life of that session. No per-slide/per-message forward secrecy —
   this is a deliberate trade-off for usability (late joiners see full
   history).
-- **Transport authentication**: WebRTC DTLS certs are ephemeral by
-  default (auto-generated per connection). The cert fingerprint should
-  be embedded in the QR code and verified by joining peers before
-  trusting the data channel, to prevent MITM via a compromised
-  signaling server. The QR code (scanned out-of-band) is the sole
-  source of truth for both the session key and the fingerprint — never
-  relayed through the signaling server.
+- **Transport authentication**: the invitation's 256-bit secret is the
+  out-of-band trust anchor for every participant. Authenticate each connection
+  by binding both peers' actual DTLS certificate fingerprints, identities, room,
+  and fresh connection challenges to a proof of possession of that secret.
+  Verify the proof before admitting the peer or exchanging board/presence data.
+  A static creator certificate fingerprint is not required in the QR code.
+  This allows late joins and reconnects after the creator leaves without trusting
+  signaling to establish identity. Anyone holding the link has equal access;
+  this authenticates membership, not an individual person's identity.
+- **Protocol protections**: derive separate directional encryption keys, reject
+  replay/tampering and plaintext fallback, and encrypt all CRDT and awareness
+  traffic. Secrets remain in invitation fragments and local memory, never in
+  signaling messages. Compromised endpoints or malicious served app code are
+  outside this protection; signaling can still deny service and observe metadata.
 - **At rest**: no server-side storage of board content, encrypted or
   not. Signaling/TURN servers only ever handle ciphertext or
   connection metadata in transit.
@@ -118,7 +125,10 @@ any time with zero impact on the others.
   signaling infrastructure.
 - Encrypt/decrypt CRDT updates at the application layer before they
   hit the data channel.
-- DTLS fingerprint verification against QR-embedded value on join.
+- Authenticate both DTLS fingerprints on every connection using the QR/link
+  secret, fresh challenges, and room/peer binding before admitting a participant.
+- Reject wrong-key joins, fingerprint substitution, replay and plaintext fallback;
+  preserve creator-independent late joins and reconnects.
 - Confirm signaling and TURN servers only ever see ciphertext.
 - **Exit criteria**: packet capture on signaling/TURN traffic shows no
   recoverable board content; a peer without the correct link/key

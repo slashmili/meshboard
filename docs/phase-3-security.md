@@ -2,7 +2,7 @@
 
 Status: encryption primitives implemented for Web Crypto and JVM (desktop/Android
 source set). **Live sessions still use Phase 2 and are not application-layer
-encrypted.** Authentication design approval is pending. Apple implementation,
+encrypted.** The authentication design was approved on 2026-11-04. Apple implementation,
 integration, and live security validation remain outstanding.
 
 ## Trust model and design decision
@@ -19,13 +19,13 @@ another peer. It also cannot authenticate a late join when the creator is offlin
 Browsers/native WebRTC normally create certificates per connection; a room ID is
 not an identity credential.
 
-Proposed replacement (requires the user's decision): authenticate **every pair of
+Approved replacement (2026-11-04): authenticate **every pair of
 DTLS fingerprints** using the 256-bit invitation secret. Do not substitute a hash
 of the key and call it a DTLS fingerprint. The QR/link carries the secret in its
 fragment, and that secret is the out-of-band trust anchor. Certificate fingerprints
 may travel in SDP, but SDP alone is never trusted for application admission.
 
-Proposed integration:
+Required integration:
 
 1. Generate 32 random bytes using the platform CSPRNG when creating a room. Encode
    the key as canonical, unpadded base64url in the invitation fragment. Reject
@@ -55,8 +55,9 @@ No creator remains privileged. Any existing participant can authenticate a late
 joiner. This authenticates possession of the shared invitation, not a personal
 identity, and does not provide application-layer forward secrecy or revocation.
 
-This is a proposal, not a claim that the original literal creator-pin requirement
-has been implemented or that the full protocol has received an independent audit.
+This decision supersedes the original creator-pin requirement in AGENTS.md.
+It is not a claim that integration is complete or that the protocol has received
+an independent security audit.
 
 ## Implemented encryption primitive
 
@@ -121,7 +122,7 @@ the local SDK configured and emulator running):
 
 Still required before Phase 3 can be called complete:
 
-- Resolve the fingerprint requirement and freeze the authenticated handshake.
+- Freeze and implement the approved authenticated handshake.
 - Implement Apple crypto and validate all platform bindings with the same vectors.
 - Integrate secret-bearing invitations, QR codes, admission and encryption into
   every normal app; remove all plaintext peer compatibility paths.

@@ -261,20 +261,18 @@ Apple checks; do not infer an Apple pass from the earlier preview milestones.
 and JVM/Android record ciphers have matching ciphertext vectors, replay/tamper
 rejection, bounded frames and nonce budgets. All 37 web tests, seven desktop cipher
 tests and seven Android-emulator cipher tests pass. See the [security design and
-validation ledger](phase-3-security.md). The proposed replacement of the literal
-creator pin is awaiting a user decision; Apple and live-session work remain.
+validation ledger](phase-3-security.md). The replacement of the literal
+creator pin was approved on 2026-11-04; Apple and live-session work remain.
 
 Implement application-layer AES-256-GCM, secret-bearing URL fragments/QR codes,
 authenticated peer admission, and the agreed certificate verification design.
 Verify tampered messages and wrong-key joins fail. Inspect signaling/TURN
 traffic and confirm that secrets and recoverable board content are absent.
 
-Before implementation, resolve how a creator fingerprint carried in a static
-invitation authenticates additional peers and late joins after the creator
-leaves. Each peer has its own certificate; one creator fingerprint cannot
-directly pin every mesh connection. Document a design satisfying the intended
-trust model and creator-independent operation, including native feasibility,
-before treating the requirement as met.
+Decision (2026-11-04): authenticate every connection's DTLS fingerprints using
+proof of possession of the invitation secret, bound to fresh challenges, room and
+peer identities. This supersedes the static creator certificate pin and preserves
+creator-independent admission. See AGENTS.md and the security design for scope.
 
 ## Phase 4
 
