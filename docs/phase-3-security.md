@@ -255,3 +255,18 @@ the outsider-authentication guarantee. CRDT parser fuzzing remains future work.
 - [NIST SP 800-38D: GCM nonce and authentication requirements](https://csrc.nist.gov/pubs/sp/800/38/d/final)
 - [WebRTC certificate and description APIs](https://www.w3.org/TR/webrtc/)
 - [RFC 8827: WebRTC authentication and signaling trust](https://www.rfc-editor.org/rfc/rfc8827.html)
+
+## BroadcastChannel isolation
+
+The pinned y-webrtc dependency carries a pnpm patch adding `disableBc`. Normal
+web sessions enable it before provider construction. It prevents subscriptions
+and all publications, including startup snapshots, reconnects and teardown.
+Unsubscribing after `await provider.key` is insufficient: upstream has already
+scheduled a plaintext full-state publication by then. `filterBcConns` only
+controls peer filtering, not this alternate transport.
+
+`BroadcastIsolation.test.ts` exercises the real provider through session startup,
+plaintext injection, document/presence updates, reconnect and disposal. A control
+case confirms the original late-unsubscribe sequence exposes a dummy snapshot.
+Keep this patch and regression coverage when upgrading y-webrtc; the Docker build
+must copy `patches/` before installing dependencies.

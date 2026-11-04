@@ -1,0 +1,115 @@
+diff --git a/dist/src/y-webrtc.d.ts b/dist/src/y-webrtc.d.ts
+index 0499d51a20d1256cf9e28e5603db6c6aefc2049f..2ec19f18f5c0a8d71b9fd636c2cc686e42de60a6 100644
+--- a/dist/src/y-webrtc.d.ts
++++ b/dist/src/y-webrtc.d.ts
+@@ -96,9 +96,10 @@ export class WebrtcProvider extends ObservableV2<WebrtcProviderEvents> {
+      * @param {Y.Doc} doc
+      * @param {ProviderOptions?} opts
+      */
+-    constructor(roomName: string, doc: Y.Doc, { signaling, password, awareness, maxConns, filterBcConns, peerOpts }?: ProviderOptions | null);
++    constructor(roomName: string, doc: Y.Doc, { signaling, password, awareness, maxConns, disableBc, filterBcConns, peerOpts }?: ProviderOptions | null);
+     roomName: string;
+     doc: Y.Doc;
++    disableBc: boolean;
+     filterBcConns: boolean;
+     /**
+      * @type {awarenessProtocol.Awareness}
+@@ -138,6 +139,8 @@ export type ProviderOptions = {
+     password?: string;
+     awareness?: awarenessProtocol.Awareness;
+     maxConns?: number;
++    /** Disable all BroadcastChannel traffic before connecting. */
++    disableBc?: boolean;
+     filterBcConns?: boolean;
+     peerOpts?: any;
+ };
+diff --git a/dist/y-webrtc.cjs b/dist/y-webrtc.cjs
+index 71d0ec4c0ec5bf016c9e4e5907889ebf230e5c4b..b0ebf8ea86ec3bf48e355143f061386eb62fbaee 100644
+--- a/dist/y-webrtc.cjs
++++ b/dist/y-webrtc.cjs
+@@ -357,7 +357,7 @@ class WebrtcConn {
+  * @param {Room} room
+  * @param {Uint8Array} m
+  */
+-const broadcastBcMessage = (room, m) => encrypt(m, room.key).then(data =>
++const broadcastBcMessage = (room, m) => room.provider.disableBc ? Promise.resolve() : encrypt(m, room.key).then(data =>
+   room.mux(() =>
+     bc.publish(room.name, data)
+   )
+@@ -494,6 +494,7 @@ class Room {
+     this.awareness.on('update', this._awarenessUpdateHandler);
+     // signal through all available signaling connections
+     announceSignalingInfo(this);
++    if (this.provider.disableBc) return;
+     const roomName = this.name;
+     bc.subscribe(roomName, this._bcSubscriber);
+     this.bcconnected = true;
+@@ -676,6 +677,7 @@ class SignalingConn extends ws.WebsocketClient {
+  * @property {string} [password]
+  * @property {awarenessProtocol.Awareness} [awareness]
+  * @property {number} [maxConns]
++ * @property {boolean} [disableBc] Disable all BroadcastChannel traffic before connecting.
+  * @property {boolean} [filterBcConns]
+  * @property {any} [peerOpts]
+  */
+@@ -713,6 +715,7 @@ class WebrtcProvider extends observable.ObservableV2 {
+       password = null,
+       awareness = new awarenessProtocol.Awareness(doc),
+       maxConns = 20 + math.floor(random.rand() * 15), // the random factor reduces the chance that n clients form a cluster
++      disableBc = false,
+       filterBcConns = true,
+       peerOpts = {} // simple-peer options. See https://github.com/feross/simple-peer#peer--new-peeropts
+     } = {}
+@@ -720,6 +723,7 @@ class WebrtcProvider extends observable.ObservableV2 {
+     super();
+     this.roomName = roomName;
+     this.doc = doc;
++    this.disableBc = disableBc;
+     this.filterBcConns = filterBcConns;
+     /**
+      * @type {awarenessProtocol.Awareness}
+diff --git a/src/y-webrtc.js b/src/y-webrtc.js
+index 609328a25583f5000571bdec8b3e5ff53b322315..a8af04ac7999be9438937f403a20904475487709 100644
+--- a/src/y-webrtc.js
++++ b/src/y-webrtc.js
+@@ -246,7 +246,7 @@ export class WebrtcConn {
+  * @param {Room} room
+  * @param {Uint8Array} m
+  */
+-const broadcastBcMessage = (room, m) => cryptoutils.encrypt(m, room.key).then(data =>
++const broadcastBcMessage = (room, m) => room.provider.disableBc ? Promise.resolve() : cryptoutils.encrypt(m, room.key).then(data =>
+   room.mux(() =>
+     bc.publish(room.name, data)
+   )
+@@ -383,6 +383,7 @@ export class Room {
+     this.awareness.on('update', this._awarenessUpdateHandler)
+     // signal through all available signaling connections
+     announceSignalingInfo(this)
++    if (this.provider.disableBc) return
+     const roomName = this.name
+     bc.subscribe(roomName, this._bcSubscriber)
+     this.bcconnected = true
+@@ -565,6 +566,7 @@ export class SignalingConn extends ws.WebsocketClient {
+  * @property {string} [password]
+  * @property {awarenessProtocol.Awareness} [awareness]
+  * @property {number} [maxConns]
++ * @property {boolean} [disableBc] Disable all BroadcastChannel traffic before connecting.
+  * @property {boolean} [filterBcConns]
+  * @property {any} [peerOpts]
+  */
+@@ -602,6 +604,7 @@ export class WebrtcProvider extends ObservableV2 {
+       password = null,
+       awareness = new awarenessProtocol.Awareness(doc),
+       maxConns = 20 + math.floor(random.rand() * 15), // the random factor reduces the chance that n clients form a cluster
++      disableBc = false,
+       filterBcConns = true,
+       peerOpts = {} // simple-peer options. See https://github.com/feross/simple-peer#peer--new-peeropts
+     } = {}
+@@ -609,6 +612,7 @@ export class WebrtcProvider extends ObservableV2 {
+     super()
+     this.roomName = roomName
+     this.doc = doc
++    this.disableBc = disableBc
+     this.filterBcConns = filterBcConns
+     /**
+      * @type {awarenessProtocol.Awareness}

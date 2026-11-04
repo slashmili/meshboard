@@ -5,6 +5,7 @@ FROM ${NODE_IMAGE} AS dependencies
 WORKDIR /app
 RUN npm install --global pnpm@9.15.9
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches patches
 COPY packages/web/package.json packages/web/package.json
 COPY packages/signaling/package.json packages/signaling/package.json
 COPY packages/shared-protocol/package.json packages/shared-protocol/package.json

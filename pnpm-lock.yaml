@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  y-webrtc@10.3.0:
+    hash: p54aeh2wyalrdozoyume7tm44q
+    path: patches/y-webrtc@10.3.0.patch
+
 importers:
 
   .: {}
@@ -77,7 +82,7 @@ importers:
         version: 1.0.7(yjs@13.6.32)
       y-webrtc:
         specifier: 10.3.0
-        version: 10.3.0(yjs@13.6.32)
+        version: 10.3.0(patch_hash=p54aeh2wyalrdozoyume7tm44q)(yjs@13.6.32)
       yjs:
         specifier: 13.6.32
         version: 13.6.32
@@ -1697,7 +1702,7 @@ snapshots:
       lib0: 0.2.117
       yjs: 13.6.32
 
-  y-webrtc@10.3.0(yjs@13.6.32):
+  y-webrtc@10.3.0(patch_hash=p54aeh2wyalrdozoyume7tm44q)(yjs@13.6.32):
     dependencies:
       lib0: 0.2.117
       simple-peer: 9.11.1

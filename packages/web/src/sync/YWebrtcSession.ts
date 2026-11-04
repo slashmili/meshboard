@@ -1,5 +1,4 @@
 import { WebrtcProvider, type WebrtcConn } from 'y-webrtc'
-import * as bc from 'lib0/broadcastchannel'
 import * as decoding from 'lib0/decoding'
 import * as Y from 'yjs'
 import { elementSchema, rtcConfigSchema, type BoardElement } from '@meshboard/shared-protocol'
@@ -44,7 +43,7 @@ export class YWebrtcSession {
       if (this.stopped) return
       const url = new URL('/signal-y-webrtc', location.href); url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
       const provider = this.provider = new WebrtcProvider(`meshboard-crdt:${this.room}`, this.document.ydoc, {
-        signaling: [url.href], maxConns: 7, filterBcConns: false,
+        signaling: [url.href], maxConns: 7, filterBcConns: false, disableBc: true,
         peerOpts: {
           channelName: SECURE_CHANNEL,
           config: { iceServers: config.iceServers, iceTransportPolicy: config.iceTransportPolicy },
@@ -65,9 +64,6 @@ export class YWebrtcSession {
       await provider.key
       if (this.stopped) return
       const room = provider.room!
-      // filterBcConns=false alone does NOT disable BroadcastChannel document sync.
-      // Every peer must actually exercise the WebRTC path and validation.
-      bc.unsubscribe(room.name, room._bcSubscriber); room.bcconnected = false
       provider.awareness.setLocalState({ meshboard: { peerId: room.peerId, preview: null } })
       let ticks = 0
       this.timer = setInterval(() => {
