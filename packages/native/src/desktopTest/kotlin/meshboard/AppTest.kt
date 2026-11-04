@@ -90,4 +90,37 @@ class AppTest {
         rule.onNodeWithTag("mobile-confirm-clear").performClick()
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
     }
+    @Test fun desktopAppearanceChangesWithoutDiscardingDrawing() {
+        val controller = LocalController(); render(controller); drag()
+        val before = controller.state.value.elements
+        rule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("Dark").performClick()
+        rule.onNodeWithText("Dark").assertIsSelected()
+        rule.onNodeWithText("Done").performClick()
+        val dark = rule.onRoot().captureToImage().toAwtImage()
+        assertEquals(0x202922, dark.getRGB(5, 5) and 0xffffff)
+        val file = File("build/test-artifacts/desktop-dark.png"); file.parentFile.mkdirs(); ImageIO.write(dark, "png", file)
+        rule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("Light").performClick()
+        rule.onNodeWithText("Light").assertIsSelected()
+        rule.onNodeWithText("System").performClick()
+        rule.onNodeWithText("System").assertIsSelected()
+        rule.onNodeWithText("Done").performClick()
+        rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
+    }
+
+    @Test fun mobileAppearanceIsAvailableInOverflow() {
+        val controller = LocalBoardController { "theme-stroke" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithText("Appearance").performClick()
+        rule.onNodeWithText("Dark").performClick()
+        rule.onNodeWithText("Dark").assertIsSelected()
+        rule.onNodeWithText("Done").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(200f, 200f)); moveTo(Offset(300f, 280f)); up()
+        }
+        rule.runOnIdle { assertEquals("#293b36", controller.state.value.elements.single().color) }
+    }
+
 }

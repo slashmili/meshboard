@@ -6,6 +6,7 @@ import { useBoard } from './useBoard'
 import { CrdtDocument } from './sync/CrdtDocument'
 import { useSession } from './sync/useSession'
 import { ShareDialog } from './ShareDialog'
+import { useTheme, type ThemeMode } from './useTheme'
 
 const TOOLS: { id: Tool; label: string; key: string; icon: LucideIcon }[] = [
   { id: 'pen', label: 'Pen', key: 'P', icon: Pencil },
@@ -33,6 +34,7 @@ const HINTS: Record<Tool, string> = {
 }
 
 export function App() {
+  const theme = useTheme()
   const [tool, setTool] = useState<Tool>('pen')
   const [color, setColor] = useState(COLORS[0].value)
   const [width, setWidth] = useState(3)
@@ -143,9 +145,10 @@ export function App() {
         <button className="dialog-close" aria-label="Close help" onClick={() => helpDialog.current?.close()}><X size={20} /></button>
         <span className="eyebrow">MAKE YOURSELF AT HOME</span>
         <h2 id="help-title">A few handy shortcuts</h2>
+        <label className="theme-control">Appearance <select aria-label="Appearance" value={theme.mode} onChange={event => theme.setMode(event.target.value as ThemeMode)}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <div className="shortcuts">{TOOLS.map(item => <div key={item.id}><span>{item.label}</span><kbd>{item.key}</kbd></div>)}<div><span>Temporary pan</span><kbd>Space + drag</kbd></div><div><span>Square, circle, snapped line</span><kbd>Shift + drag</kbd></div></div>
         <p>Scroll to pan. Use Ctrl/⌘ + scroll to zoom, or pinch with two fingers on a touch screen. The eraser removes whole strokes and shapes.</p>
-        <div className="local-notice"><strong>A board that lives in the moment</strong><p>Use Share to invite another browser. Strokes and erasing sync live. Refreshing a shared board restores it from a connected participant; once everyone leaves, it is gone. This connection prototype does not yet authenticate invites or implement application-layer encryption.</p></div>
+        <div className="local-notice"><strong>A board that lives in the moment</strong><p>Use Share to invite another browser. Strokes and erasing sync live. Refreshing a shared board restores it from a connected participant; once everyone leaves, it is gone. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.</p></div>
         <button className="primary-button" onClick={() => helpDialog.current?.close()}>Back to the board <ArrowUpRight size={17} /></button>
       </dialog>
 

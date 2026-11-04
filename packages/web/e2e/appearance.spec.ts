@@ -1,0 +1,36 @@
+import { test, expect } from '@playwright/test'
+
+test('appearance follows live system changes and retains explicit override without changing strokes', async ({ page }, testInfo) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.goto('/')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await page.mouse.click(450, 350)
+  const drawing = await page.getByTestId('drawing-elements').innerHTML()
+  await page.getByRole('button', { name: 'Help and keyboard shortcuts' }).click()
+  await page.getByLabel('Appearance').selectOption('dark')
+  await expect(page.locator('.header')).toHaveCSS('background-color', 'rgb(32, 41, 34)')
+  await expect(page.getByTestId('drawing-elements')).toHaveJSProperty('innerHTML', drawing)
+  await page.getByRole('button', { name: 'Back to the board' }).click()
+  await page.screenshot({ path: testInfo.outputPath('dark-desktop.png') })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: testInfo.outputPath('dark-mobile.png') })
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.getByRole('button', { name: 'Help and keyboard shortcuts' }).click()
+  await page.getByLabel('Appearance').selectOption('system')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+})
+
+test('appearance still works when browser storage is blocked', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked') } })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Help and keyboard shortcuts' }).click()
+  await page.getByLabel('Appearance').selectOption('dark')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+})

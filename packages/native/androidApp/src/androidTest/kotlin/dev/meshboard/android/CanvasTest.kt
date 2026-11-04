@@ -102,4 +102,19 @@ class CanvasTest {
         rule.onNodeWithText("Back to the board").performClick()
         canvas().assertIsDisplayed()
     }
+    @Test fun appearanceOverrideSurvivesActivityRecreation() {
+        draw(); count(1)
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithText("Appearance").performClick()
+        rule.onNodeWithText("Dark").performClick()
+        rule.onNodeWithText("Done").performClick()
+        rule.activityRule.scenario.recreate()
+        count(1)
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithText("Appearance").performClick()
+        rule.onNodeWithText("Dark").assertIsSelected()
+        rule.onNodeWithText("System").performClick()
+        rule.onNodeWithText("System").assertIsSelected()
+    }
+
 }

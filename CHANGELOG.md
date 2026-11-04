@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Phase 4
+
+### Appearance and delivery decisions
+- Added: System, Light and Dark appearance on web and shared native UI. Controls and dialogs follow the selected theme; the shared paper and stroke colors stay consistent across peers.
+- Added: web appearance preference storage with a fallback when storage is blocked; native appearance survives Android activity recreation.
+- Fixed: Share/Help and mobile connection labels now describe the implemented authenticated end-to-end encryption instead of the old Phase 1 prototype.
+- Verified: 44 web unit tests, six production-browser drawing/appearance tests, 44 desktop tests and seven Android tablet UI tests; Android APK build and dark-layout screenshot review. Apple/Windows appearance checks remain tracked.
+- Spec: local board recovery will be opt-in, default off, with a delete action. Record scope, implementation order and deferred Mac/iPad checks in `docs/phase-4-validation.md`.
+
 ## Unreleased — Phase 3
 
 ### Added

@@ -6,7 +6,7 @@ A peer-to-peer, end-to-end encrypted collaborative whiteboard for teams
 sharing ideas on calls. One person creates a board; others join via a
 link or QR code and draw together in real time. No account, no central
 server storing board content, no persistence beyond the session unless
-a participant explicitly exports.
+a participant explicitly exports or opts into local recovery on their device.
 
 Target platforms: Web, iOS, Android, Linux, macOS, Windows.
 
@@ -78,14 +78,15 @@ any time with zero impact on the others.
   this authenticates membership, not an individual person's identity.
 - **Protocol protections**: derive separate directional encryption keys, reject
   replay/tampering and plaintext fallback, and encrypt all CRDT and awareness
-  traffic. Secrets remain in invitation fragments and local memory, never in
-  signaling messages. Compromised endpoints or malicious served app code are
+  traffic. Secrets remain in invitation fragments and local memory (or device-local
+  storage when recovery is explicitly enabled), never in signaling messages. Compromised endpoints or malicious served app code are
   outside this protection; signaling can still deny service and observe metadata.
 - **At rest**: no server-side storage of board content, encrypted or
   not. Signaling/TURN servers only ever handle ciphertext or
   connection metadata in transit.
 - **Session end**: when the last peer disconnects, board state is
-  gone. No recovery unless a peer exported before leaving.
+  gone unless a participant explicitly enabled device-local recovery or exported
+  before leaving. Local recovery does not introduce server-side storage.
 
 ## 5. Phased Delivery
 
@@ -146,8 +147,12 @@ any time with zero impact on the others.
   once peers disconnect).
 - Presence indicators: show connected peers, live cursors/names.
 - support Pressure-sensitive stylus in all platforms
-- store session and metadata(keys and certificartes) in localstorage
-for web and local storage on native platform to resume the drawing
+- Opt-in local recovery: “Remember this board on this device” stores board state
+  and the invite secret locally to resume drawing. Default is off; provide an
+  explicit delete action. Use browser storage on web and device-local storage on
+  native platforms. Generate fresh connection challenges and encryption counters
+  on every reconnect; do not restore live cipher state or require persistent DTLS
+  certificates. Imports always create a new session with a fresh key.
 
 ## 6. Open Questions for Implementation
 

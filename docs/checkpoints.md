@@ -1,7 +1,6 @@
-> Current status: Phase 3 authenticated encryption is implemented, with Apple
-> compilation/runtime acceptance still pending. See the [security validation
-> ledger and Mac/iPad checklist](phase-3-security.md). Historical checkpoint
-> pauses below are superseded by the user's instruction to complete Phase 3.
+> Current status: Phase 3 CI is green (user-confirmed). Phase 4 is in progress.
+> See the [Phase 4 validation ledger](phase-4-validation.md) for current work and
+> remaining platform checks. Phase 1–3 entries below are historical records.
 
 # Delivery checkpoints
 
@@ -291,5 +290,16 @@ creator-independent admission. See AGENTS.md and the security design for scope.
 
 ## Phase 4
 
-Expand tools, add CRDT-aware undo/redo, theme support, export/import, and
-presence. Continue to offer small runnable checkpoints for user review.
+Expand tools, add CRDT-aware undo/redo, theme support, export/import, presence,
+pressure-sensitive input, and opt-in device-local recovery. See the
+[implementation and validation ledger](phase-4-validation.md) for the ordered
+increments, approved recovery behavior, and pending hardware checks.
+
+
+**4a — Appearance.** System/Light/Dark controls are implemented on web and shared
+native UI; the canvas keeps paper and stroke colors consistent. Web stores the
+appearance preference; native retains it for the app instance and across Android
+activity recreation. Unit, production-browser, desktop and Android UI checks
+pass. Review the appearance checkpoint; Apple/Windows checks remain in the
+[Phase 4 ledger](phase-4-validation.md). Expanded tools and the remaining
+Phase 4 features have not been implemented yet.
