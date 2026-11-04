@@ -13,6 +13,8 @@ async function createShared(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   const invite = await page.getByLabel('Board invite', { exact: true }).inputValue()
+  expect(new URL(invite).hash).toMatch(/^#crdt=/)
+  expect(new URL(invite).search).toBe('')
   await expect(page.getByRole('img', { name: 'QR code for this board’s invite link' })).toBeVisible()
   await page.getByRole('button', { name: 'Close sharing' }).click()
   return invite
@@ -39,7 +41,7 @@ test('two separate browsers share strokes, previews, erasing, and clear without 
   const errors: string[] = []
   const signals: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  page.on('websocket', socket => { if (socket.url().endsWith('/signal')) socket.on('framesent', frame => signals.push(String(frame.payload))) })
+  page.on('websocket', socket => { if (socket.url().endsWith('/signal-y-webrtc')) socket.on('framesent', frame => signals.push(String(frame.payload))) })
   const invite = await createShared(page)
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   await page.screenshot({ path: testInfo.outputPath('share-dialog.png') })
@@ -64,7 +66,7 @@ test('two separate browsers share strokes, previews, erasing, and clear without 
     await b.page.getByRole('dialog', { name: 'Clear this board?' }).getByRole('button', { name: 'Clear board', exact: true }).click()
     await expect(elements(page)).toHaveCount(0)
     expect(signals.length).toBeGreaterThan(1)
-    expect(signals.map(signal => JSON.parse(signal).type).every(type => ['join', 'signal'].includes(type))).toBe(true)
+    expect(signals.map(signal => JSON.parse(signal).type).every(type => ['subscribe', 'publish', 'ping'].includes(type))).toBe(true)
     expect(signals.some(signal => /"points"|"color"|"element"|"snapshot"/.test(signal))).toBe(false)
     expect(errors).toEqual([])
   } finally { await b.context.close() }

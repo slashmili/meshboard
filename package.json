@@ -4,7 +4,9 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@9.15.9",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "pnpm --filter @meshboard/web dev",
     "dev:crdt": "pnpm --filter @meshboard/web dev --port 5174",
@@ -13,7 +15,7 @@
     "test": "pnpm -r test",
     "test:crdt": "pnpm --filter @meshboard/crdt-core test",
     "test:crdt:kotlin": "./packages/native/gradlew -p packages/native -Pmeshboard.crdtInterop=true prepareCrdtInterop && pnpm --filter @meshboard/crdt-core run test:kotlin",
-    "native:crdt": "./packages/native/gradlew -p packages/native -Pmeshboard.crdtInterop=true runCrdtPreview",
+    "native:crdt": "pnpm native",
     "test:interop:crdt": "./packages/native/gradlew -p packages/native -Pmeshboard.crdtInterop=true prepareCrdtInterop prepareInterop && pnpm --filter @meshboard/web exec playwright test -c playwright.crdt.config.ts",
     "test:e2e": "pnpm --filter @meshboard/web test:e2e",
     "turn": "node scripts/turn.mjs",
@@ -35,6 +37,6 @@
     "test:interop:android": "node scripts/android.mjs interop",
     "test:native": "./packages/native/gradlew -p packages/native desktopTest",
     "test:interop:ios": "node scripts/ios.mjs interop",
-    "test:interop": "./packages/native/gradlew -p packages/native prepareInterop && pnpm --filter @meshboard/web exec playwright test -c playwright.native.config.ts"
+    "test:interop": "pnpm test:interop:crdt"
   }
 }

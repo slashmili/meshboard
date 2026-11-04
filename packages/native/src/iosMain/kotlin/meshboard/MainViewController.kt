@@ -15,7 +15,7 @@ fun MainViewController(network: AppleNetwork, origin: String) = ComposeUIViewCon
     val controller = remember { AppleBoardController(network) }
     DisposableEffect(controller) { onDispose { controller.close() } }
     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-        MobileBoardApp(controller, origin, boardTitle = if (appleCrdtPreviewEnabled()) "Meshboard · CRDT preview · local only" else "Meshboard") {
+        MobileBoardApp(controller, origin, boardTitle = "Meshboard") {
             Image.makeFromEncoded(Base64.decode(network.qrPng(it))).toComposeImageBitmap()
         }
     }

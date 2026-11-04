@@ -7,32 +7,20 @@ Start with [delivery checkpoints](docs/checkpoints.md) for current progress and 
 steps, then use the platform guide: [desktop](packages/native/README.md),
 [Android](packages/native/androidApp/README.md), or [iPad/iPhone](packages/native/iosApp/README.md).
 
-## Current checkpoint: 2j — native CRDT disconnect/reconnect regression tests
+## Phase 2 — default CRDT sessions
 
-Web, Linux desktop, macOS, Android emulator, and iOS simulator support shared
-boards with link/QR invites, live previews, late-join snapshots, and TURN fallback.
-Basic real iPad/web sharing and local-server macOS sharing are user-validated.
-iPhone, Pencil, physical-device restrictive-network/TURN checks, Intel Mac
-execution, and Windows validation remain pending. An isolated
-[Yjs/yrs compatibility checkpoint](packages/crdt-core/README.md) starts Phase 2;
-default apps still use the existing sync implementation. An opt-in
-[local web/desktop/Android CRDT preview](docs/crdt-preview.md) uses y-webrtc in
-the browser and yrs on native peers. Desktop CI passed on Linux and both macOS
-runners; manual Mac preview validation remains pending. Android's opt-in tablet
-preview is available for local testing. The iOS bindings passed CI (user-confirmed).
-The new [iPad simulator preview](packages/native/iosApp/README.md#local-crdt-sharing-preview--checkpoint-2h)
-adds opt-in live CRDT sharing; CI passed (user-confirmed). Manual Apple preview
-checks are deferred until the user has access to the Apple hardware again.
-The [Linux-runnable recovery checkpoint](docs/crdt-preview.md#native-disconnectreconnect--checkpoint-2j)
-now covers isolating desktop and Android peers as well as the browser, including
-offline edits and deletions without leaving or reopening the board.
-Released/default apps still use Phase 1 sync.
-See [delivery checkpoints](docs/checkpoints.md) for the validation record.
+Web uses Yjs/y-webrtc; desktop, Android and iOS use compatible yrs state over
+native WebRTC. Every participant connects directly to the others. Late joiners
+receive full state, and peers reconnect without discarding offline edits or
+resurrecting deleted objects. The creator has no special runtime role.
 
-Default apps remain on Phase 1; its full platform-validation milestone is still
-open. You can
-draw with a pen, erase whole objects, create rectangles/ellipses/lines, choose
-colors and stroke widths, and pan/zoom. Mouse, pen, and touch input are supported.
+Normal app builds now include the Rust bindings. No preview flags are required.
+See [Phase 2 validation and the Apple checklist](docs/phase-2-validation.md) for
+verified coverage, commands and hardware checks that remain pending. Historical
+incremental checkpoints are retained in [delivery checkpoints](docs/checkpoints.md).
+
+You can draw with a pen, erase whole objects, create rectangles/ellipses/lines,
+choose colors and stroke widths, and pan/zoom. Mouse, pen and touch are supported.
 
 Use **Share** to create an invite link and QR code. Peers exchange live previews,
 completed strokes, erasing, and existing board state over WebRTC data channels.
@@ -45,13 +33,12 @@ opening the same link afterward starts empty. An unshared board stays local.
 
 This is a **connection prototype**: WebRTC encrypts transport with DTLS, but
 invites are not authenticated and application-layer encryption is not implemented.
-Use test drawings. Yjs/yrs rollout to released/mobile apps, export, undo, and
-production security are still pending. There are no accounts, analytics, or board persistence.
+Use test drawings. Export, undo, and production security are still pending. There are no accounts, analytics, or board persistence.
 
 ## Switching between development machines
 
-Commit and push source changes before switching, then pull them on the other
-machine. Read [AGENTS.md](AGENTS.md), [delivery checkpoints](docs/checkpoints.md),
+Transfer committed source changes using your chosen Git workflow before switching
+machines. This Phase 2 work was committed locally and was not pushed. Read [AGENTS.md](AGENTS.md), [delivery checkpoints](docs/checkpoints.md),
 and the relevant platform README. Update the checkpoints after validation so the
 next session knows what passed and what remains.
 
@@ -59,7 +46,7 @@ Keep toolchains and generated files local: do not copy `node_modules`, Gradle or
 Kotlin caches, native build outputs, `.android-sdk`, or `.android-avd` between
 Linux and macOS. Install the pinned tools with `mise install node pnpm java`, use
 the checked-in Gradle wrapper, and run `pnpm install --frozen-lockfile`. A separate
-system Gradle/Kotlin installation is unnecessary; Rust is for the later yrs phase.
+system Gradle/Kotlin installation is unnecessary. Stable Rust is required for native builds.
 Install Playwright Chromium on each machine and do not carry over a
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` pointing to another machine's browser.
 
@@ -164,7 +151,7 @@ packages/web/                React + TypeScript + Vite
   src/ShareDialog.tsx        Link and QR invitations
   e2e/                      Canvas and shared-session browser tests
 packages/signaling/          WebSocket membership/SDP/ICE relay; no board state
-packages/shared-protocol/    Versioned Phase 1 schemas and protocol notes
+packages/shared-protocol/    Element schemas and protocol notes
   fixtures/                 Messages accepted/rejected by both TypeScript and Kotlin
 packages/native/             Kotlin Multiplatform + Compose desktop (JVM)
   src/commonMain/           Drawing model, protocol, controller contract, and UI
@@ -208,14 +195,10 @@ operator-specific values live in an ignored environment file; no domain, IP, or
 secret needs to be committed. This is a testing deployment, not completion of the
 planned application-layer encryption or authenticated-invite work.
 
-Limits: 8 participants, 2,000 objects, 10,000 deleted IDs, 12,000 points per
-stroke segment, and a 4 MiB document. Long strokes split into segments. This
-temporary insert/delete protocol is **not Yjs or y-webrtc compatible**; Phase 2
-replaces it. Network reconnection performs a fresh state exchange, but prolonged
-partitions and cross-platform convergence remain Phase 2 validation work.
-
-The next checkpoint expands native platform coverage. See
-[delivery checkpoints](docs/checkpoints.md) and [protocol notes](packages/shared-protocol/README.md).
+Limits: eight participants, 2,000 objects, 12,000 points per stroke segment and
+2 MiB CRDT state/update size. Long strokes split into segments. Native and web
+peers use the y-webrtc signaling/sync profile with a negotiated fragmentation
+extension for large drawings. See [protocol notes](docs/crdt-preview.md).
 
 Tooling references: [Vite guide](https://vite.dev/guide/) and
 [React documentation](https://react.dev/learn).

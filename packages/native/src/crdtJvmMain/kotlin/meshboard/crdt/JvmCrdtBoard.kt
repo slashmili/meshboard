@@ -7,12 +7,24 @@ import kotlinx.serialization.json.JsonPrimitive
 import meshboard.BoardElement
 import meshboard.Wire
 
-/** Loaded only in opt-in desktop/Android CRDT checkpoints. */
+/** Shared JNI binding, packaged with every desktop and Android app. */
 internal object CrdtJni {
     init {
         val desktopLibrary = System.getProperty("meshboard.crdt.library")
         if (desktopLibrary != null) System.load(desktopLibrary)
-        else System.loadLibrary("meshboard_crdt_core") // Android's ABI-specific APK library.
+        else {
+            val name = System.mapLibraryName("meshboard_crdt_core")
+            val resource = CrdtJni::class.java.getResourceAsStream("/meshboard/native/$name")
+            if (resource == null) System.loadLibrary("meshboard_crdt_core") // Android APK ABI directory.
+            else resource.use { input ->
+                val directory = java.nio.file.Files.createTempDirectory("meshboard-crdt-").toFile()
+                directory.deleteOnExit()
+                val library = java.io.File(directory, name)
+                library.deleteOnExit()
+                library.outputStream().use { input.copyTo(it) }
+                System.load(library.absolutePath)
+            }
+        }
     }
     external fun create(clientId: Long): Long
     external fun call(handle: Long, operation: Int, input: ByteArray): ByteArray

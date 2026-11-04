@@ -21,12 +21,16 @@ fun main(args: Array<String>) {
     if (args.contentEquals(arrayOf("--print-build-info"))) {
         println("Meshboard ${System.getProperty("meshboard.app.version", "development")}")
         println("App origin: ${desktopAppOrigin()}")
+        meshboard.crdt.JvmCrdtBoard().use { board ->
+            check(board.elements().isEmpty())
+            println("Sync: Yjs/yrs")
+        }
         return
     }
     val controller = DesktopController(forceRelay = System.getenv("MESHBOARD_RELAY_ONLY") == "true")
     if (args.isNotEmpty()) controller.join(args[0])
     application {
-        Window(onCloseRequest = { controller.close(); exitApplication() }, title = if (System.getProperty("meshboard.crdt.preview") == "true") "Meshboard — CRDT preview (local only)" else "Meshboard", icon = painterResource(Res.drawable.meshboard_icon), state = rememberWindowState(width = 1200.dp, height = 820.dp)) {
+        Window(onCloseRequest = { controller.close(); exitApplication() }, title = "Meshboard", icon = painterResource(Res.drawable.meshboard_icon), state = rememberWindowState(width = 1200.dp, height = 820.dp)) {
             window.minimumSize = Dimension(940, 650)
             val origin = remember { desktopAppOrigin() }
             MeshboardApp(controller, origin, ::qrImage)
