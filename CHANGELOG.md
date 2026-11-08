@@ -15,6 +15,11 @@
 - Fixed: an editor cannot save an object already deleted by another peer; delayed browser dialog-close events cannot clear a newly opened edit. Desktop stroke controls sit beside the expanded toolbar to fit the minimum window height.
 - Verified: workspace unit checks, Rust format/Clippy/tests/docs, 48 desktop tests, eight Android tablet UI tests, eight production-browser tests and 20 repeated text/note runs; eight Yjs/yrs scenarios through Kotlin/JNI and live web↔desktop/web↔Android text scenarios. Expanded pinch checks pass on web and Android. iOS scenario is wired into CI; Mac/iPad execution remains pending.
 
+### iPad convergence investigation
+- Tested: the Linux four-peer regression now includes concurrent edits from both native replicas; ten repeated runs, three single-CPU runs and workspace typechecks pass.
+- Added: element IDs in the iPad convergence assertion and browser-state capture before cleanup. Native failure capture retains errors and omits the invite secret.
+- Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in `docs/phase-4-validation.md`.
+
 ## Unreleased — Phase 3
 
 ### Added

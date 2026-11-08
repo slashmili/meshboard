@@ -102,3 +102,27 @@ scenarios passed; Android requires the local TURN relay (`pnpm turn`). Rust form
 all-target/all-feature Clippy with warnings denied, six Rust tests and docs pass.
 Desktop UI tests also exercise text creation at the minimum 650-pixel window
 height. No iOS runtime pass is claimed for this increment.
+
+## iPad CI convergence investigation (2026-11-08)
+
+Run [41929821839](https://github.com/slashmili/meshboard/actions/runs/41929821839)
+at appearance commit `43dabd0` compiled iOS successfully, then failed the four-peer
+large-state interoperability test. Five other iPad scenarios passed. Before
+cleanup, both native replicas reported three connected peers, no error, the large
+seed and both browser strokes. Each had its own native stroke but lacked the
+other native stroke (four elements instead of five). This is an unresolved
+convergence failure; neither compilation nor a missing browser gesture explains it.
+
+The Linux four-peer regression now makes both native replicas edit concurrently,
+matching the iPad scenario. Ten repeated runs passed, followed by three more with all test processes pinned
+to one CPU. Workspace typechecks passed with the repository Node 22 toolchain.
+The iPad assertion now includes element IDs in failure output and captures both
+browser states before cleanup; native failure attachments omit the invite secret
+and preserve error states. The original count and equality requirements and
+30-second assertion timeout remain intact. No production workaround was added
+without a reproduced cause.
+
+The failed iPad job was rerun with `gh` on the same commit (attempt 2). Its result
+is pending; this does not validate the later text/note commit or the new local
+diagnostics. Follow up on that rerun and run the updated iPad suite on macOS/CI.
+Do not mark this issue resolved solely because the Linux repetitions pass.
