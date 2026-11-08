@@ -1,6 +1,7 @@
+import { importImage } from './images'
 import { marquee, selectionBounds } from './selection'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { Undo2, Redo2, ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
+import { ImagePlus, Undo2, Redo2, ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
 import { MAX_ZOOM, MIN_ZOOM, hitsElement, type Point, type BoardElement, type Tool } from './board'
 import { textElement } from './textElements'
@@ -71,6 +72,9 @@ export function App() {
     } else setTextError('Could not save this text. The board may have reached its size limit.')
   }
   const board = useBoard(tool, color, width, document, session.preview, editText)
+  const imageInput = useRef<HTMLInputElement>(null)
+  const [imageError, setImageError] = useState('')
+  const [imageBusy, setImageBusy] = useState(false)
   const [sharing, setSharing] = useState(false)
   const helpDialog = useRef<HTMLDialogElement>(null)
   const clearDialog = useRef<HTMLDialogElement>(null)
@@ -119,6 +123,18 @@ export function App() {
       </header>
 
       <section className="workspace" aria-label="Whiteboard workspace">
+        <input ref={imageInput} type="file" accept="image/png,image/jpeg" aria-label="Image file" hidden onChange={async event => {
+          const file = event.target.files?.[0]; event.target.value = ''
+          if (!file) return
+          setImageBusy(true); setImageError(''); board.cancelGesture()
+          try {
+            const canvas = window.document.querySelector('[aria-label="Drawing canvas"]')!.getBoundingClientRect()
+            const element = await importImage(file, {x:(canvas.width/2-board.view.x)/board.view.zoom,y:(canvas.height/2-board.view.y)/board.view.zoom})
+            if (!document.put(element)) setImageError('Could not insert image. This board has reached its size or image limit.')
+          } catch { setImageError('Cannot insert this image. Choose a valid PNG or JPEG up to 512 KiB and 1024 × 1024 pixels.') }
+          finally { setImageBusy(false) }
+        }} />
+        {imageError && <div className="connection-error" role="alert">{imageError}<button onClick={() => setImageError('')}>Dismiss</button></div>}
         {session.error && <div className="connection-error" role="alert"><span>{session.error}</span>{session.room && <button onClick={session.retry}>Retry</button>}</div>}
         <svg ref={board.svgRef} className={`canvas ${board.spaceDown || tool === 'hand' ? 'canvas-pan' : tool === 'eraser' ? 'canvas-eraser' : ''}`} aria-label="Drawing canvas" aria-describedby="canvas-instructions" tabIndex={0} {...board.pointerHandlers} onContextMenu={event => event.preventDefault()}>
           <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill="#cbd3ca" /></pattern></defs>
@@ -174,6 +190,7 @@ export function App() {
             <button aria-label="Reset view" title="Reset view to 100% and original position" onClick={board.resetView}><RotateCcw size={15} /></button>
           </div>
           <div className="zoom-panel" role="group" aria-label="Edit history">
+            <button aria-label="Insert image" title="Insert PNG or JPEG" disabled={imageBusy} onClick={() => imageInput.current?.click()}><ImagePlus size={17} /></button>
             <button className="quiet-button history-button" aria-label="Undo" title="Undo (Ctrl/⌘ Z)" disabled={!document.canUndo} onClick={() => { board.cancelGesture(); document.undo() }}><Undo2 size={17} /></button>
             <button className="quiet-button history-button" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" disabled={!document.canRedo} onClick={() => { board.cancelGesture(); document.redo() }}><Redo2 size={17} /></button>
           </div>

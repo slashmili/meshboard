@@ -175,6 +175,23 @@ class AppTest {
         }
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
+    @Test fun mobileImagesPaintPixelsAndEraseThroughTheirInterior() {
+        val controller = LocalBoardController { "unused" }
+        val bytes = File(System.getProperty("meshboard.fixtures"),"image.png").readBytes()
+        controller.put(imageElement("image",bytes,Point(200.0,200.0)))
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("insert-image").assertIsDisplayed()
+        val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
+        val scale = image.width / 1024.0
+        val pixel = java.awt.Color(image.getRGB((200*scale).toInt(),(200*scale).toInt()))
+        assertTrue(pixel.red > 180 && pixel.green < 80, "Embedded image must paint its pixels")
+        rule.onNodeWithTag("mobile-tool-eraser").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { click(Offset(200f,200f)) }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        rule.onNodeWithTag("mobile-undo").performClick()
+        rule.runOnIdle { assertEquals(1,controller.state.value.elements.size) }
+    }
+
     @Test fun mobilePressureStrokePaintsDifferentWidths() {
         val controller = LocalBoardController { "pressure" }
         controller.put(BoardElement("pressure", "pen", "#293b36", 8.0, listOf(

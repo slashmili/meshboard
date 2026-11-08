@@ -105,6 +105,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(compose.runtime)
+            implementation("io.github.vinceglb:filekit-compose:0.8.8")
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
@@ -175,7 +176,7 @@ compose.desktop {
                 bundleID = "dev.meshboard.desktop"
                 iconFile.set(rootProject.file("../../icons/meshboard.icns"))
             }
-            modules("java.net.http", "jdk.unsupported", "java.desktop", "java.logging")
+            modules("jdk.security.auth", "java.net.http", "jdk.unsupported", "java.desktop", "java.logging")
         }
     }
 }

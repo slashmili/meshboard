@@ -13,6 +13,7 @@ mod bridge;
 mod c_api;
 
 mod history;
+mod images;
 use history::History;
 
 #[derive(Clone, Copy)]
@@ -236,6 +237,8 @@ impl Board {
             points: Vec<Point>,
             #[serde(default)]
             text: Option<String>,
+            #[serde(default)]
+            image: Option<String>,
         }
         let txn = self.doc.transact();
         if txn.root_refs().any(|(name, _)| name != "elements") || self.elements.len(&txn) > 2000 {
@@ -254,6 +257,16 @@ impl Board {
             || serde_json::to_vec(&json)?.len() > 2 * 1024 * 1024
         {
             return Err("CRDT state exceeds preview limits".into());
+        }
+        if json
+            .as_object()
+            .ok_or("Invalid elements")?
+            .values()
+            .filter(|v| v["type"] == "image")
+            .count()
+            > 8
+        {
+            return Err("Too many images".into());
         }
         for (id, value) in json.as_object().ok_or("Invalid elements map")? {
             let e: Element = serde_json::from_value(value.clone())?;
@@ -275,7 +288,13 @@ impl Board {
                     }
                 })
             });
-            if !valid_text
+            let valid_image = if e.r#type == "image" {
+                e.image.as_deref().is_some_and(images::valid)
+            } else {
+                value.get("image").is_none()
+            };
+            if !valid_image
+                || !valid_text
                 || !valid_pressure
                 || e.id != *id
                 || id.is_empty()
@@ -289,6 +308,7 @@ impl Board {
                     "arrow",
                     "text",
                     "sticky",
+                    "image",
                 ]
                 .contains(&e.r#type.as_str())
                 || e.color.len() != 7
@@ -552,6 +572,39 @@ mod tests {
         invalid["points"] = json!([{"x":0,"y":0}]);
         assert!(b.validated_put("arrow", &invalid).is_err());
         assert_eq!(a.elements(), b.elements());
+    }
+
+    #[test]
+    fn image_fixtures_and_history_round_trip() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../shared-protocol/fixtures/image-elements.json"
+        ))
+        .unwrap();
+        let mut a = Board::new(901);
+        let mut b = Board::new(902);
+        for element in fixtures["valid"].as_array().unwrap() {
+            a.validated_put(element["id"].as_str().unwrap(), element)
+                .unwrap();
+        }
+        b.validated_apply(&a.update(&[0]).unwrap()).unwrap();
+        assert_eq!(a.elements(), b.elements());
+        for element in fixtures["invalid"].as_array().unwrap() {
+            let before = a.elements();
+            assert!(a.validated_put("image-png", element).is_err());
+            assert_eq!(a.elements(), before);
+        }
+        let before = a.elements();
+        a.undo().unwrap();
+        a.redo().unwrap();
+        assert_eq!(a.elements(), before);
+        for i in 0..6 {
+            let mut e = fixtures["valid"][0].clone();
+            e["id"] = Value::from(format!("extra-{i}"));
+            a.validated_put(e["id"].as_str().unwrap(), &e).unwrap();
+        }
+        let mut e = fixtures["valid"][0].clone();
+        e["id"] = Value::from("too-many");
+        assert!(a.validated_put("too-many", &e).is_err());
     }
 
     #[test]

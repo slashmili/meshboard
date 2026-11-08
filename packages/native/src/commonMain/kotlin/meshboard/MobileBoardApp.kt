@@ -40,6 +40,7 @@ private fun mobilePaint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16
 fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https://", boardTitle: String = "Meshboard", qrImage: ((String) -> ImageBitmap)? = null) {
     val sharing = controller as? BoardController
     val state by controller.state.collectAsState()
+    val images = rememberBoardImages(state.elements)
     val latest by rememberUpdatedState(state)
     var toolName by rememberSaveable { mutableStateOf(Tool.Pen.name) }
     val tool = Tool.valueOf(toolName)
@@ -102,6 +103,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                 }
             }
             Row(Modifier.fillMaxWidth().background(colors.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                InsertImageButton(controller, { view.world(Point(canvasSize.width / density / 2, canvasSize.height / density / 2)) }, ::cancel)
                 TextButton(onClick = { cancel(); controller.undo() }, enabled = state.canUndo, modifier = Modifier.testTag("mobile-undo")) { Text("Undo") }
                 TextButton(onClick = { cancel(); controller.redo() }, enabled = state.canRedo, modifier = Modifier.testTag("mobile-redo")) { Text("Redo") }
                 MobilePalette.forEach { (name, hex) ->
@@ -214,10 +216,10 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                     }
                     withTransform({ scale(d, d, Offset.Zero); translate(view.x.toFloat(), view.y.toFloat()); scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero) }) {
                         val displayed = selection.display(state.elements)
-                        displayed.forEach { mobileElement(it, textMeasurer) }
+                        displayed.forEach { mobileElement(it, textMeasurer, images) }
                         if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
-                        state.previews.forEach { mobileElement(it, textMeasurer, .65f) }
-                        draft?.let { mobileElement(it, textMeasurer) }
+                        state.previews.forEach { mobileElement(it, textMeasurer, images, .65f) }
+                        draft?.let { mobileElement(it, textMeasurer, images) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null) Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -286,7 +288,8 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     }
 }
 
-private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
+private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f) {
+    if (element.image != null) { drawImageElement(element, images, alpha); return }
     if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = mobilePaint(element.color).copy(alpha = alpha)
     if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }

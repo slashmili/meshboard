@@ -20,7 +20,7 @@ export function zoomAt(view: View, anchor: Point, zoom: number): View {
   return { x: anchor.x - world.x * nextZoom, y: anchor.y - world.y * nextZoom, zoom: nextZoom }
 }
 
-export function constrainEnd(start: Point, end: Point, type: DrawingTool): Point {
+export function constrainEnd(start: Point, end: Point, type: BoardElement['type']): Point {
   const dx = end.x - start.x
   const dy = end.y - start.y
   if (type === 'line' || type === 'arrow') {
@@ -51,7 +51,7 @@ export function outline(element: BoardElement): Point[] {
       { x: end.x - ux * head + uy * head / 2, y: end.y - uy * head - ux * head / 2 }]
   }
   const { x, y, width, height } = bounds(element)
-  if (['rectangle', 'text', 'sticky'].includes(element.type)) {
+  if (['rectangle', 'text', 'sticky', 'image'].includes(element.type)) {
     return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }, { x, y }]
   }
   return Array.from({ length: 97 }, (_, i) => {
@@ -79,7 +79,7 @@ function segmentDistance(a: Point, b: Point, c: Point, d: Point) {
 }
 
 export function hitsElement(element: BoardElement, from: Point, to: Point, radius: number) {
-  if (element.text !== undefined) {
+  if (element.text !== undefined || element.image !== undefined) {
     const box = bounds(element)
     const inside = (p: Point) => p.x >= box.x && p.x <= box.x + box.width && p.y >= box.y && p.y <= box.y + box.height
     if (inside(from) || inside(to)) return true

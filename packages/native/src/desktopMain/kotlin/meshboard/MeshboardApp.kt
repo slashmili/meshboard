@@ -43,6 +43,7 @@ private fun Point.offset() = Offset(x.toFloat(), y.toFloat())
 @Composable
 fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://127.0.0.1:5173", qrImage: (String) -> ImageBitmap? = { null }) {
     val state by controller.state.collectAsState()
+    val images = rememberBoardImages(state.elements)
     val currentState by rememberUpdatedState(state)
     var tool by remember { mutableStateOf(Tool.Pen) }
     var color by remember { mutableStateOf(Palette.first().second) }
@@ -187,10 +188,10 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                         scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero)
                     }) {
                         val displayed = selection.display(state.elements)
-                        displayed.forEach { drawElement(it, textMeasurer) }
+                        displayed.forEach { drawElement(it, textMeasurer, images) }
                         if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
-                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, .65f) }
-                        draft?.let { drawElement(it, textMeasurer) }
+                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, images, .65f) }
+                        draft?.let { drawElement(it, textMeasurer, images) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null && state.previews.isEmpty()) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -233,6 +234,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     TextButton(onClick = { cancel(); view = View() }) { Text("Reset view", fontSize = 11.sp) }
                 }
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).background(colors.surface, RoundedCornerShape(10.dp))) {
+                    InsertImageButton(controller, { view.world(Point(canvasSize.width / density / 2.0, canvasSize.height / density / 2.0)) }, ::cancel)
                     TextButton(onClick = { cancel(); controller.undo() }, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
                     TextButton(onClick = { cancel(); controller.redo() }, enabled = state.canRedo, modifier = Modifier.testTag("redo")) { Text("Redo") }
                 }
@@ -285,7 +287,8 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     }
 }
 
-private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
+private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f) {
+    if (element.image != null) { drawImageElement(element, images, alpha); return }
     if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = paint(element.color).copy(alpha = alpha)
     if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }

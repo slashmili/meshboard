@@ -20,6 +20,19 @@ class CanvasTest {
     }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
+    @Test fun imagePickerImportsThroughProductionController() {
+        androidx.test.espresso.intent.Intents.init()
+        try {
+            val uri = android.net.Uri.parse("android.resource://dev.meshboard.android.test/raw/image")
+            androidx.test.espresso.intent.Intents.intending(
+                androidx.test.espresso.intent.matcher.IntentMatchers.hasAction(android.content.Intent.ACTION_OPEN_DOCUMENT)
+            ).respondWith(android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_OK, android.content.Intent().setData(uri)))
+            rule.onNodeWithTag("insert-image").performClick(); count(1)
+            rule.onNodeWithTag("mobile-undo").performClick(); count(0)
+            rule.onNodeWithTag("mobile-redo").performClick(); count(1)
+        } finally { androidx.test.espresso.intent.Intents.release() }
+    }
+
     @Test fun undoRedoAndClearRestoreThroughProductionController() {
         rule.onNodeWithTag("mobile-undo").assertIsNotEnabled()
         draw(); count(1)

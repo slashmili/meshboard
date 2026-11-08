@@ -1,3 +1,4 @@
+import { imagesInterop } from './images'
 import { historyInterop } from './history'
 import { selectionInterop } from './selection'
 import { pressureInterop } from './pressure'
@@ -189,4 +190,8 @@ test('selection moves preserve remote edits and skip deleted objects', async ({ 
 
 test('undo and redo preserve remote objects across encrypted peers', async ({ page, ios }) => {
   await historyInterop(page, ios)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, ios }) => {
+  await imagesInterop(page, ios)
 })

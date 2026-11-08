@@ -330,3 +330,9 @@ changes invalidate affected object history; unrelated edits remain undoable.
 Group moves and clears undo atomically. See the Phase 4 ledger for validation
 and remaining Mac/iPad checks. Attached connectors, images, export/import,
 expanded presence and opt-in local recovery remain pending.
+
+**4g — Embedded images.** PNG/JPEG insertion, bounded validation and native/web
+rendering are implemented. Images participate in move, erase, undo/redo and
+creator-independent encrypted synchronization. Platform results and picker/device
+checks are tracked in the Phase 4 ledger. Attached connectors, export/import,
+expanded presence and opt-in recovery remain pending.

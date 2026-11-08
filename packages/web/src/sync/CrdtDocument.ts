@@ -54,6 +54,7 @@ export class CrdtDocument implements SessionDocument {
       if (id !== element.id) throw new Error('CRDT element ID mismatch.')
       return element
     }).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    if (elements.filter(e => e.type === 'image').length > 8) throw new Error('A board supports up to eight images.')
     if (Y.encodeStateAsUpdate(candidate).length > LIMIT || new TextEncoder().encode(JSON.stringify(elements)).length > LIMIT) throw new Error('Board exceeds CRDT session limits.')
     return elements
   }

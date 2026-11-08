@@ -139,3 +139,16 @@ it('invalid remote input preserves history and remote edits prune only one group
   b.put({...shape('b'),color:'#abcdef'}); sync(b,a)
   expect(a.canRedo).toBe(false)
 })
+
+import images from '../../../shared-protocol/fixtures/image-elements.json'
+it('images synchronize, move, undo and enforce the eight-image limit atomically', () => {
+  const a = new CrdtDocument(), b = new CrdtDocument()
+  const image = images.valid[0] as BoardElement
+  a.put(image); sync(a,b); expect(b.getElements()).toEqual([image])
+  a.move([image.id],{x:20,y:10}); const moved = a.getElements()
+  a.undo(); expect(a.getElements()).toEqual([image]); a.redo(); expect(a.getElements()).toEqual(moved)
+  for(let i=0;i<7;i++) expect(a.put({...image,id:`extra-${i}`})).toBe(true)
+  expect(a.put({...image,id:'too-many'})).toBe(false)
+  expect(a.getElements()).toHaveLength(8)
+  a.remove([image.id]); a.undo(); expect(a.getElements()).toHaveLength(8)
+})

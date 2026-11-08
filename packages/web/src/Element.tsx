@@ -4,6 +4,7 @@ import { bounds, outline, penWidth, type BoardElement } from './board'
 export function Element({ element }: { element: BoardElement }) {
   const style = { fill: 'none', stroke: element.color, strokeWidth: element.width, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   const [start, end = start] = element.points
+  if (element.image !== undefined) return <image {...bounds(element)} href={element.image} preserveAspectRatio="xMidYMid meet" data-element-type="image" />
   if (element.text !== undefined) {
     const box = bounds(element)
     return <g data-element-type={element.type}>

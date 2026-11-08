@@ -63,3 +63,25 @@ with round caps. Single points use a round dot. Erasing uses the same widths.
 Mouse and touch input omit pressure. Stylus release retains the last contact
 pressure rather than adding the platform's synthetic zero-pressure lift event.
 Pressure remains part of the encrypted atomic CRDT element and its previews.
+
+### Embedded images
+
+`image` elements have two rectangle corners and an `image` field containing a
+canonical `data:image/png;base64,...` or `data:image/jpeg;base64,...` value.
+The ordinary color/width fields remain present; they do not tint the raster.
+Images preserve aspect ratio inside their bounds and participate in selection,
+move, whole-object erasing and local undo/redo. Insertion centers an image in the
+visible canvas, with a maximum initial display edge of 400 board units.
+
+Each image is limited to 512 KiB of encoded file bytes and 1024 pixels per edge;
+a board permits eight image elements, subject to the existing 2 MiB CRDT budget.
+PNG must be static (APNG is rejected); JPEG supports baseline/progressive frames.
+SVG, external URLs, unknown formats, noncanonical base64 and oversized dimensions
+are rejected before pixel decoding. Local import also requires successful pixel
+decoding. A malformed pixel stream received from a peer cannot launch external
+requests; native rendering shows a placeholder if decoding fails.
+
+Bytes, including file metadata, are embedded unchanged and travel only through
+normal encrypted CRDT synchronization. There is no image upload service or image
+URL fetch. History and CRDT tombstones can retain removed bytes during the session;
+erasing an image is not a security revocation or a promise to reclaim its budget.

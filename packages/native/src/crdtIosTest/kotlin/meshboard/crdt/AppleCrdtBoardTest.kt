@@ -55,6 +55,17 @@ class AppleCrdtBoardTest {
         } finally { a.close(); b.close() }
     }
 
+    @Test fun embeddedImageSurvivesAppleBindingsAndUndo() {
+        val a = AppleCrdtBoard(); val b = AppleCrdtBoard()
+        try {
+            val element = stroke.copy(type = "image", points = listOf(Point(0.0,0.0),Point(40.0,30.0)), image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAeAQMAAABkE86eAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAADUExURdweKMIdZqsAAAAHdElNRQfqCwgWKxJUDdhZAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTExLTA4VDIyOjQzOjE4KzAwOjAwmmLvvQAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMS0wOFQyMjo0MzoxOCswMDowMOs/VwEAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTEtMDhUMjI6NDM6MTgrMDA6MDC8KnbeAAAADElEQVQI12NgGHoAAAC0AAFecZC/AAAAAElFTkSuQmCC")
+            a.put(element); b.apply(a.update())
+            assertEquals(listOf(element),b.elements())
+            a.undo(); assertTrue(a.elements().isEmpty())
+            a.redo(); assertEquals(listOf(element),a.elements())
+        } finally { a.close(); b.close() }
+    }
+
     @Test fun closeIsIdempotentAndUseAfterCloseFails() {
         val board = AppleCrdtBoard()
         board.close()

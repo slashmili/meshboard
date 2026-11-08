@@ -2,6 +2,12 @@
 
 ## Unreleased — Phase 4
 
+### Embedded images
+- Added: PNG/JPEG file insertion on web and native with bounded file/pixel sizes and an eight-image cap within the existing CRDT budget.
+- Added: embedded raster rendering, selection/movement, interior erasing, undo/redo and encrypted late-join/reload synchronization.
+- Fixed: native imports use bounded streams instead of relying on optional or untrusted file-size metadata.
+- Tested: shared schema fixtures, Rust/JNI history, decoder pixels, browser import and native picker callbacks; platform results and deferred device checks are recorded in the Phase 4 ledger.
+
 ### CRDT-aware undo and redo
 - Added: local undo/redo on web and native, web/desktop keyboard shortcuts, and atomic group-move/clear history.
 - Added: bounded per-object inverse history that preserves unrelated remote work and invalidates history for objects changed remotely, including identical-value rewrites.

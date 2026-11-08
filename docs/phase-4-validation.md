@@ -254,3 +254,40 @@ text editing); all 16 encrypted desktop interoperability scenarios, including
 TURN/reconnect regressions; Android debug/test APK builds, all nine tablet UI
 tests, and the encrypted web/Android undo/redo scenario. The Apple binding test
 and matching live scenario are included for CI but were not run locally.
+
+## Embedded images (checkpoint 4g)
+
+Insert PNG/JPEG from the web footer or the native Image button (desktop footer,
+mobile style strip). Native pickers use pinned FileKit 0.8.8; common import reads
+at most 512 KiB plus one detection byte, closes the stream and handles providers
+without file-size metadata. Images enter at the visible canvas center, preserving
+aspect ratio and capped at 400 board units for initial display. Move, marquee,
+whole-object erase, clear and undo/redo use existing CRDT operations.
+
+The shared schema accepts static PNG and baseline/progressive JPEG only, with
+512 KiB per file, 1024 pixels per edge and eight images per board. Existing 2 MiB
+CRDT limits still apply, including historical CRDT data. Header/dimension checks
+precede decoding; local import requires successful decoding. Remote invalid pixel
+streams use a native placeholder. No external image URLs, SVG, APNG, image upload
+server, resize/crop UI or automatic compression are introduced. Embedded metadata
+is retained. Erasing does not revoke bytes already shared or necessarily reclaim
+CRDT capacity. Limits and cross-language fixtures live in the shared protocol.
+
+Mac/iPad follow-up: run the new Apple binding test and image interoperability
+scenario in CI; exercise actual Files/photo-export PNG/JPEG selection, cancel,
+invalid/oversized input, touch move/erase and undo; check packaged macOS picker
+launch/cancel and rotated JPEG display. HEIC must be exported to PNG/JPEG first.
+Windows/Linux packaged native file-dialog interaction also needs a manual smoke
+check; the automated Android import test stubs the system picker result while
+exercising the real callback, stream reader, decoder and production controller.
+
+Validated locally (2026-11-08): 45 shared-protocol, 62 web and 15 signaling unit
+tests; workspace typechecks and production build; Rust format/Clippy (warnings
+denied), 17 all-feature tests and rustdoc; 66 desktop/common/JNI tests including
+PNG/JPEG pixel decoding, painted-canvas pixels and bounded file reads; three
+production-browser scenarios plus an oversized-file regression; all 17 encrypted
+web/desktop interoperability scenarios; ten Android tablet UI tests (including
+picker callback/import/undo) and the final encrypted web/Android image scenario.
+The mixed-peer image scenario includes a 240 kB JPEG metadata payload to exercise
+fragmentation, movement, undo/redo, reload and erasing without losing image bytes.
+Apple binding and interoperability tests are wired into CI but not run on Linux.
