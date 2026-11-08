@@ -63,8 +63,7 @@ checks that both drawing and the appearance override survive activity recreation
 - macOS: native system-theme changes while open, explicit override, packaged app.
 - iPad/iPhone: system-theme changes, override, safe areas, rotation, native dialogs.
 - Windows: system-theme detection and packaged app.
-- Stylus: Apple Pencil, Android pressure stylus and desktop tablet hardware once
-  pressure support is implemented; synthetic events cannot establish device feel.
+- Stylus: Apple Pencil, Android pressure stylus and desktop tablet hardware; synthetic events cannot establish device feel.
 
 These checks are pending, not implied by Linux or shared Compose tests. Session
 recovery and the other increments above are not implemented by appearance work.
@@ -139,8 +138,9 @@ Verified: shared schema fixtures, web geometry tests, Rust validation/round trip
 desktop pointer and shared mobile touch UI, seven production-browser drawing tests,
 and encrypted web/desktop arrow edit/reload/erase interoperability. Rust format,
 Clippy, tests and docs passed. The same interop scenario is wired into Android/iOS
-CI; Android pinch cancellation now includes arrows. macOS/iPad/Android device
-execution of these additions remains pending, including touch toolbar scrolling
+CI; Android pinch cancellation now includes arrows. Android emulator execution
+passed (eight UI tests and arrow/pressure interoperability). macOS/iPad execution
+and physical-device checks remain pending, including touch toolbar scrolling
 and arrowhead rendering at different zooms.
 
 ## Pressure-sensitive pen (checkpoint 4d)
@@ -155,11 +155,13 @@ Verified: 49 web unit tests, 33 shared-protocol tests, Rust validation/round tri
 format/Clippy/tests/docs, desktop/common tests including mobile rendering pixels,
 six production-browser tests including Chromium pen injection, live encrypted
 web/desktop pressure and arrow scenarios, Android app/instrumentation APK builds.
-Android and iOS pressure interoperability scenarios are wired into CI.
+Android and iOS pressure interoperability scenarios are wired into CI. The Android
+tablet emulator passed all eight UI tests and both new encrypted arrow/pressure
+interoperability scenarios after installing the rebuilt APKs.
 
 Pending hardware checks: Apple Pencil and Android stylus light/heavy strokes,
 stationary pressure changes, lift-off, palm/pinch interaction, zoom, coalesced
 input and long strokes; desktop tablet pressure on each OS/driver. Verify the
-pressure curve feels useful at each selected stroke width. Device execution of
+pressure curve feels useful at each selected stroke width. iOS runtime execution of
 these new scenarios remains pending; synthetic Chromium events and Compose
 pixel tests do not establish physical-device behavior.
