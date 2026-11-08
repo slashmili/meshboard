@@ -87,6 +87,8 @@ impl Board {
         struct Point {
             x: f64,
             y: f64,
+            #[serde(default)]
+            pressure: Option<f64>,
         }
         #[derive(serde::Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -128,7 +130,17 @@ impl Board {
             } else {
                 value.get("text").is_none()
             };
+            let valid_pressure = value["points"].as_array().is_some_and(|points| {
+                points.iter().all(|p| match p.get("pressure") {
+                    None => true,
+                    Some(pressure) => {
+                        e.r#type == "pen"
+                            && pressure.as_f64().is_some_and(|v| (0.0..=1.0).contains(&v))
+                    }
+                })
+            });
             if !valid_text
+                || !valid_pressure
                 || e.id != *id
                 || id.is_empty()
                 || id.len() > 80
@@ -150,9 +162,11 @@ impl Board {
                 || e.points.is_empty()
                 || e.points.len() > 12000
                 || (e.r#type != "pen" && e.points.len() != 2)
-                || e.points
-                    .iter()
-                    .any(|p| !(-1e7..=1e7).contains(&p.x) || !(-1e7..=1e7).contains(&p.y))
+                || e.points.iter().any(|p| {
+                    !(-1e7..=1e7).contains(&p.x)
+                        || !(-1e7..=1e7).contains(&p.y)
+                        || p.pressure.is_some_and(|v| !(0.0..=1.0).contains(&v))
+                })
             {
                 return Err("Invalid board element".into());
             }
@@ -250,6 +264,26 @@ impl Board {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn pressure_round_trips_and_invalid_samples_are_atomic() {
+        let mut a = Board::new(1);
+        let mut b = Board::new(2);
+        let pen = json!({"id":"pressure","type":"pen","color":"#293b36","width":8,
+            "points":[{"x":0,"y":0,"pressure":0},{"x":100,"y":0,"pressure":1}]});
+        a.validated_put("pressure", &pen).unwrap();
+        b.validated_apply(&a.update(&[0]).unwrap()).unwrap();
+        assert_eq!(a.elements(), b.elements());
+        for pressure in [json!(-0.1), json!(1.1), Value::Null, json!("0.5")] {
+            let mut invalid = pen.clone();
+            invalid["points"][0]["pressure"] = pressure;
+            assert!(b.validated_put("pressure", &invalid).is_err());
+            assert_eq!(a.elements(), b.elements());
+        }
+        let mut invalid = pen;
+        invalid["type"] = json!("arrow");
+        assert!(b.validated_put("pressure", &invalid).is_err());
+    }
 
     #[test]
     fn arrow_updates_round_trip_and_reject_invalid_geometry() {

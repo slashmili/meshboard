@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import { MAX_POINTS } from '@meshboard/shared-protocol'
-import { constrainEnd, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
+import { constrainEnd, penSample, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
 import type { SessionDocument } from './sync/SessionDocument'
 
 type Gesture =
@@ -112,7 +112,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       if (event.pointerType !== 'touch') erase(world, world)
       return
     }
-    const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? [world] : [world, world] }
+    const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? [penSample(world, event.pointerType, event.pressure)] : [world, world] }
     gesture.current = { type: 'draw', pointer: event.pointerId, element }
     setDraft(element)
     preview(element)
@@ -147,7 +147,12 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
     const element = active.element
     if (element.type === 'pen') {
       const samples = event.nativeEvent.getCoalescedEvents?.() ?? []
-      const newPoints = (samples.length ? samples : [event]).map(sample => toWorld(localPoint(sample), viewRef.current))
+      const newPoints = (samples.length ? samples : [event]).map(sample => {
+        const world = toWorld(localPoint(sample), viewRef.current)
+        // Pointer-up pressure is zero even when the final contact had pressure.
+        const pressure = event.type === 'pointerup' ? element.points.at(-1)?.pressure : sample.pressure
+        return penSample(world, event.pointerType, pressure ?? Number.NaN)
+      })
       // Split a very long stroke into bounded objects without interrupting input.
       if (element.points.length + newPoints.length > MAX_POINTS) {
         document.put(element)

@@ -142,3 +142,24 @@ Clippy, tests and docs passed. The same interop scenario is wired into Android/i
 CI; Android pinch cancellation now includes arrows. macOS/iPad/Android device
 execution of these additions remains pending, including touch toolbar scrolling
 and arrowhead rendering at different zooms.
+
+## Pressure-sensitive pen (checkpoint 4d)
+
+Web pointer/coalesced events and native stylus pointer events now capture bounded
+pressure samples. Rendering and erasing use the documented shared width curve;
+mouse/touch retain the chosen constant width. Lift-off preserves the last contact
+pressure. Pressure samples survive encrypted synchronization, native edits and
+browser reloads. This is input/rendering support, not a hardware-quality claim.
+
+Verified: 49 web unit tests, 33 shared-protocol tests, Rust validation/round trips,
+format/Clippy/tests/docs, desktop/common tests including mobile rendering pixels,
+six production-browser tests including Chromium pen injection, live encrypted
+web/desktop pressure and arrow scenarios, Android app/instrumentation APK builds.
+Android and iOS pressure interoperability scenarios are wired into CI.
+
+Pending hardware checks: Apple Pencil and Android stylus light/heavy strokes,
+stationary pressure changes, lift-off, palm/pinch interaction, zoom, coalesced
+input and long strokes; desktop tablet pressure on each OS/driver. Verify the
+pressure curve feels useful at each selected stroke width. Device execution of
+these new scenarios remains pending; synthetic Chromium events and Compose
+pixel tests do not establish physical-device behavior.

@@ -1,5 +1,5 @@
 import { textLines } from './textElements'
-import { bounds, outline, type BoardElement } from './board'
+import { bounds, outline, penWidth, type BoardElement } from './board'
 
 export function Element({ element }: { element: BoardElement }) {
   const style = { fill: 'none', stroke: element.color, strokeWidth: element.width, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
@@ -11,6 +11,17 @@ export function Element({ element }: { element: BoardElement }) {
       <text fill={element.color} fontFamily="monospace" fontSize={18} xmlSpace="preserve">
         {textLines(element.text).map((line, i) => <tspan key={i} x={box.x + 12} y={box.y + 30 + i * 24}>{line}</tspan>)}
       </text>
+    </g>
+  }
+  if (element.type === 'pen' && element.points.some(p => p.pressure !== undefined)) {
+    return <g data-element-type="pressure-pen">
+      {element.points.length === 1
+        ? <circle cx={start.x} cy={start.y} r={penWidth(element.width, start.pressure) / 2} fill={element.color} />
+        : element.points.slice(1).map((p, i) => {
+          const previous = element.points[i]
+          const width = (penWidth(element.width, previous.pressure) + penWidth(element.width, p.pressure)) / 2
+          return <line key={i} {...style} x1={previous.x} y1={previous.y} x2={p.x} y2={p.y} strokeWidth={width} />
+        })}
     </g>
   }
   if (element.type === 'rectangle') return <rect {...bounds(element)} {...style} />

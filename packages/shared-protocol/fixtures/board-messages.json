@@ -8,7 +8,8 @@
     {"v":1,"type":"remove","ids":["pen-1","rect-1"]},
     {"v":1,"type":"snapshot","elements":[{"id":"dot-1","type":"pen","color":"#293b36","width":3,"points":[{"x":0,"y":0}]}],"removed":["pen-1"]},
     {"v":1,"type":"snapshot","elements":[],"removed":[]},
-    {"v":1,"type":"put","element":{"id":"arrow","type":"arrow","color":"#293b36","width":3,"points":[{"x":0,"y":0},{"x":100,"y":0}]}}
+    {"v":1,"type":"put","element":{"id":"arrow","type":"arrow","color":"#293b36","width":3,"points":[{"x":0,"y":0},{"x":100,"y":0}]}},
+    {"v":1,"type":"put","element":{"id":"pressure","type":"pen","color":"#293b36","width":8,"points":[{"x":0,"y":0,"pressure":0},{"x":100,"y":0,"pressure":1}]}}
   ],
   "invalid": [
     {"v":2,"type":"preview","element":null},
@@ -25,6 +26,11 @@
     {"v":1,"type":"put","element":{"id":"a","type":"pen","color":"#293b36","width":3,"points":[{"x":"0","y":0}]}},
     {"v":1,"type":"put","element":{"id":"a","type":"pen","color":"#293b36","width":3,"points":[{"x":10000001,"y":0}]}},
     {"v":1,"type":"put","element":{"id":"a","type":"pen","color":"#293b36","width":3,"points":[]}},
-    {"v":1,"type":"put","element":{"id":"arrow","type":"arrow","color":"#293b36","width":3,"points":[{"x":0,"y":0}]}}
+    {"v":1,"type":"put","element":{"id":"arrow","type":"arrow","color":"#293b36","width":3,"points":[{"x":0,"y":0}]}},
+    {"v":1,"type":"put","element":{"id":"pressure","type":"pen","color":"#293b36","width":8,"points":[{"x":0,"y":0,"pressure":-0.1}]}},
+    {"v":1,"type":"put","element":{"id":"pressure","type":"pen","color":"#293b36","width":8,"points":[{"x":0,"y":0,"pressure":1.1}]}},
+    {"v":1,"type":"put","element":{"id":"pressure","type":"pen","color":"#293b36","width":8,"points":[{"x":0,"y":0,"pressure":null}]}},
+    {"v":1,"type":"put","element":{"id":"pressure","type":"pen","color":"#293b36","width":8,"points":[{"x":0,"y":0,"pressure":"0.5"}]}},
+    {"v":1,"type":"put","element":{"id":"pressure","type":"arrow","color":"#293b36","width":8,"points":[{"x":0,"y":0,"pressure":0},{"x":100,"y":0,"pressure":1}]}}
   ]
 }

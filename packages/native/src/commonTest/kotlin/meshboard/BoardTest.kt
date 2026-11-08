@@ -3,6 +3,19 @@ package meshboard
 import kotlin.test.*
 
 class BoardTest {
+    @Test fun pressureWidthsHitTestsAndInputFallbackAgree() {
+        assertEquals(2.0, penWidth(8.0, 0.0)); assertEquals(8.0, penWidth(8.0, 1.0))
+        assertEquals(8.0, penWidth(8.0, null))
+        val point = Point(0.0, 0.0)
+        assertEquals(0.5, penSample(point, androidx.compose.ui.input.pointer.PointerType.Stylus, .5f).pressure)
+        assertNull(penSample(point, androidx.compose.ui.input.pointer.PointerType.Mouse, .5f).pressure)
+        assertNull(penSample(point, androidx.compose.ui.input.pointer.PointerType.Touch, .5f).pressure)
+        assertNull(penSample(point, androidx.compose.ui.input.pointer.PointerType.Stylus, Float.NaN).pressure)
+        val thin = BoardElement("thin", "pen", "#293b36", 8.0, listOf(Point(0.0,0.0,0.0), Point(100.0,0.0,0.0)))
+        assertFalse(hits(thin, Point(50.0,2.0), Point(50.0,2.0), 0.0))
+        assertTrue(hits(thin, Point(50.0,1.0), Point(50.0,1.0), 0.0))
+    }
+
     @Test fun arrowGeometryIncludesErasableWingsAndHandlesShortOrZeroLengths() {
         val a = Point(0.0, 0.0); val b = Point(100.0, 0.0)
         val arrow = BoardElement("arrow", "arrow", "#293b36", 3.0, listOf(a, b))

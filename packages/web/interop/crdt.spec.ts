@@ -1,3 +1,4 @@
+import { pressureInterop } from './pressure'
 import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -265,4 +266,8 @@ test('text and sticky notes synchronize edits and late joins across web and nati
 
 test('arrows synchronize native edits, reloads and erasing', async ({ page, native }) => {
   await arrowsInterop(page, native)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, native }) => {
+  await pressureInterop(page, native)
 })

@@ -152,7 +152,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     val change = event.changes.firstOrNull { it.id == pointer }
                                         ?: event.changes.firstOrNull { it.pressed && !it.previousPressed } ?: continue
                                     val point = Point(change.position.x / density, change.position.y / density)
-                                    val world = view.world(point)
+                                    val world = if (tool == Tool.Pen) penSample(view.world(point), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(point)
                                     if (pointer == null && change.pressed) {
                                         pointer = change.id; start = world; last = point
                                         if (tool != Tool.Hand && tool != Tool.Eraser && tool != Tool.Text && tool != Tool.Sticky) {
@@ -278,6 +278,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
 private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
     if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = mobilePaint(element.color).copy(alpha = alpha)
+    if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }
     val a = element.points.first(); val b = element.points.last()
     if (element.points.size == 1) { drawCircle(color, element.width.toFloat() / 2, Offset(a.x.toFloat(), a.y.toFloat())); return }
     val style = Stroke(element.width.toFloat(), cap = StrokeCap.Round, join = StrokeJoin.Round)

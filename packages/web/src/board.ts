@@ -1,4 +1,4 @@
-export type Point = { x: number; y: number }
+export type Point = { x: number; y: number; pressure?: number }
 export type View = Point & { zoom: number }
 export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'text' | 'sticky'
 export type Tool = DrawingTool | 'eraser' | 'hand'
@@ -85,7 +85,19 @@ export function hitsElement(element: BoardElement, from: Point, to: Point, radiu
     if (inside(from) || inside(to)) return true
   }
   const points = outline(element)
-  const threshold = radius + element.width / 2
-  if (points.length === 1) return pointSegmentDistance(points[0], from, to) <= threshold
-  return points.some((point, i) => i > 0 && segmentDistance(from, to, points[i - 1], point) <= threshold)
+  if (points.length === 1) return pointSegmentDistance(points[0], from, to) <= radius + penWidth(element.width, points[0].pressure) / 2
+  return points.some((point, i) => {
+    if (i === 0) return false
+    const width = element.type === 'pen' ? (penWidth(element.width, points[i - 1].pressure) + penWidth(element.width, point.pressure)) / 2 : element.width
+    return segmentDistance(from, to, points[i - 1], point) <= radius + width / 2
+  })
+}
+
+/** Missing pressure preserves mouse/touch width; contact samples use 25–100%. */
+export function penWidth(width: number, pressure?: number) {
+  return pressure === undefined ? width : width * (0.25 + 0.75 * pressure)
+}
+export function penSample(point: Point, pointerType: string, pressure: number): Point {
+  return pointerType === 'pen' && Number.isFinite(pressure)
+    ? { ...point, pressure: Math.min(1, Math.max(0, pressure)) } : point
 }

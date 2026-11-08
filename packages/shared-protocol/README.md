@@ -52,3 +52,14 @@ them; participants should use the same current build.
 `min(endpoint distance / 2, max(12, width * 3))`, wing half-width is half that
 length. A zero-length arrow has no wings. Rendering and hit testing use this same
 outline. Endpoints are absolute board coordinates, not attachments to other objects.
+
+## Pen pressure
+
+Pen points may contain `pressure`, a finite number in `[0, 1]`. Other element
+types must omit it. Missing pressure means constant base width. Null, strings
+and out-of-range values are invalid. For recorded pressure `p`, point width is
+`baseWidth * (0.25 + 0.75 * p)`; a segment uses the mean of its endpoints' widths,
+with round caps. Single points use a round dot. Erasing uses the same widths.
+Mouse and touch input omit pressure. Stylus release retains the last contact
+pressure rather than adding the platform's synthetic zero-pressure lift event.
+Pressure remains part of the encrypted atomic CRDT element and its previews.

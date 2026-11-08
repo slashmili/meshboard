@@ -25,6 +25,11 @@
 - Tested: shared schema fixtures, native and web geometry/UI tests, Rust round trips, seven production-browser tests and live encrypted web/desktop edit/reload/erase interoperability.
 - Pending: Android/iPad execution of the new CI scenarios and physical-device checks. Object-attached connectors remain separate work.
 
+### Pressure-sensitive pen
+- Added: bounded per-point stylus pressure, matching web/native widths and hit testing, mouse/touch fallback, and lift-off pressure preservation.
+- Tested: schema rejection and CRDT round trips, geometry and native rendering pixels, production-browser synthetic pen events, encrypted native edits/reload, and Android APK compilation.
+- Pending: physical Apple Pencil/Android stylus/desktop tablet behavior and new Android/iPad interoperability scenarios; recorded in the Phase 4 ledger.
+
 ## Unreleased — Phase 3
 
 ### Added

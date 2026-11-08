@@ -117,6 +117,17 @@ class AppTest {
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
 
+    @Test fun mobilePressureStrokePaintsDifferentWidths() {
+        val controller = LocalBoardController { "pressure" }
+        controller.put(BoardElement("pressure", "pen", "#293b36", 8.0, listOf(
+            Point(100.0,100.0,0.0), Point(200.0,100.0,0.0), Point(300.0,100.0,1.0), Point(400.0,100.0,1.0))))
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
+        val scale = image.width / 1024.0
+        fun pixel(x: Int, y: Int) = java.awt.Color(image.getRGB((x * scale).toInt(), (y * scale).toInt()))
+        assertTrue(pixel(150, 103).red > 200, "Low pressure must remain narrow")
+        assertTrue(pixel(350, 103).red < 150, "High pressure must paint a wider stroke")
+    }
     @Test fun mobileArrowsDrawAndEraseWithTouch() {
         val controller = LocalBoardController { "mobile-arrow" }
         rule.setContent { Box(Modifier.requiredSize(390.dp, 844.dp)) { MobileBoardApp(controller) } }

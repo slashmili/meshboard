@@ -27,10 +27,14 @@ object Wire {
         val width = o.number("width"); require(width in 1.0..32.0)
         val data = o.getValue("points").jsonArray; require(data.size in 1..MAX_POINTS && (type == "pen" || data.size == 2))
         val points = data.map { item ->
-            val p = item.jsonObject; p.exact("x", "y")
+            val p = item.jsonObject
+            val pressure = if ("pressure" in p) {
+                require(type == "pen"); p.exact("x", "y", "pressure")
+                p.number("pressure").also { require(it in 0.0..1.0) }
+            } else { p.exact("x", "y"); null }
             val x = p.number("x"); val y = p.number("y")
             require(x in -1e7..1e7 && y in -1e7..1e7)
-            Point(x, y)
+            Point(x, y, pressure)
         }
         val text = if (type in listOf("text", "sticky")) o.text("text").also { require(validText(it)) } else null
         return BoardElement(id, type, color, width, points, text)
@@ -38,7 +42,7 @@ object Wire {
     fun elementJson(e: BoardElement) = buildJsonObject {
         e.text?.let { put("text", it) }
         put("id", e.id); put("type", e.type); put("color", e.color); put("width", e.width)
-        putJsonArray("points") { e.points.forEach { p -> add(buildJsonObject { put("x", p.x); put("y", p.y) }) } }
+        putJsonArray("points") { e.points.forEach { p -> add(buildJsonObject { put("x", p.x); put("y", p.y); p.pressure?.let { put("pressure", it) } }) } }
     }
     private fun ids(o: JsonObject, key: String): List<String> {
         val data = o.getValue(key).jsonArray; require(data.size <= MAX_REMOVED)

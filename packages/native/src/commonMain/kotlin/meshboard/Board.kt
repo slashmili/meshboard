@@ -2,7 +2,7 @@ package meshboard
 
 import kotlin.math.*
 
-data class Point(val x: Double, val y: Double)
+data class Point(val x: Double, val y: Double, val pressure: Double? = null)
 data class View(val x: Double = 0.0, val y: Double = 0.0, val zoom: Double = 1.0) {
     fun world(p: Point) = Point((p.x - x) / zoom, (p.y - y) / zoom)
     fun zoomAt(anchor: Point, requested: Double): View {
@@ -84,9 +84,11 @@ fun hits(element: BoardElement, from: Point, to: Point, radius: Double): Boolean
         fun inside(p: Point) = p.x in min(a.x,b.x)..max(a.x,b.x) && p.y in min(a.y,b.y)..max(a.y,b.y)
         if (inside(from) || inside(to)) return true
     }
-    val points = outline(element); val threshold = radius + element.width / 2
-    if (points.size == 1) return distance(points[0], from, to) <= threshold
+    val points = outline(element)
+    if (points.size == 1) return distance(points[0], from, to) <= radius + penWidth(element.width, points[0].pressure) / 2
     return points.zipWithNext().any { (a, b) ->
+        val width = if (element.type == "pen") (penWidth(element.width, a.pressure) + penWidth(element.width, b.pressure)) / 2 else element.width
+        val threshold = radius + width / 2
         val crossing = cross(from, to, a) * cross(from, to, b) < 0 && cross(a, b, from) * cross(a, b, to) < 0
         crossing || minOf(distance(a, from, to), distance(b, from, to), distance(from, a, b), distance(to, a, b)) <= threshold
     }

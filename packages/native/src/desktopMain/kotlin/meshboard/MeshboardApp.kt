@@ -112,7 +112,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull() ?: continue
                                     val p = Point(change.position.x / density.toDouble(), change.position.y / density.toDouble())
-                                    val world = view.world(p)
+                                    val world = if (tool == Tool.Pen) penSample(view.world(p), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(p)
                                     if (change.pressed && !change.previousPressed) {
                                         focus.requestFocus()
                                         active = if (space || event.buttons.isTertiaryPressed) Tool.Hand else tool
@@ -271,6 +271,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
 private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
     if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = paint(element.color).copy(alpha = alpha)
+    if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }
     val points = element.points
     if (points.size == 1) { drawCircle(color, element.width.toFloat() / 2, points.first().offset()); return }
     val path = Path().apply { val start = points.first(); moveTo(start.x.toFloat(), start.y.toFloat()); outline(element).drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) } }

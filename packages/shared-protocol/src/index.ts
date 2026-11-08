@@ -11,7 +11,7 @@ export const MAX_SIGNAL_BYTES = 32 * 1024
 
 const id = z.string().min(1).max(80).regex(/^[a-zA-Z0-9-]+$/)
 const peerId = z.uuid()
-const point = z.object({ x: z.number().min(-1e7).max(1e7), y: z.number().min(-1e7).max(1e7) }).strict()
+const point = z.object({ x: z.number().min(-1e7).max(1e7), y: z.number().min(-1e7).max(1e7), pressure: z.number().min(0).max(1).optional() }).strict()
 export const elementSchema = z.object({
   id,
   type: z.enum(['pen', 'rectangle', 'ellipse', 'line', 'arrow', 'text', 'sticky']),
@@ -19,7 +19,7 @@ export const elementSchema = z.object({
   width: z.number().min(1).max(32),
   points: z.array(point).min(1).max(MAX_POINTS),
   text: z.string().min(1).max(500).refine(value => !/[\uD800-\uDFFF]/u.test(value), 'Text must contain valid Unicode').optional(),
-}).strict().refine(value => value.type === 'pen' || value.points.length === 2, 'Shapes need two points').refine(value => (value.type === 'text' || value.type === 'sticky') === (value.text !== undefined), 'Only text boxes and notes require text')
+}).strict().refine(value => value.type === 'pen' || value.points.length === 2, 'Shapes need two points').refine(value => (value.type === 'text' || value.type === 'sticky') === (value.text !== undefined), 'Only text boxes and notes require text').refine(value => value.type === 'pen' || value.points.every(p => p.pressure === undefined), 'Only pen strokes support pressure')
 export type BoardElement = z.infer<typeof elementSchema>
 
 export const boardMessageSchema = z.discriminatedUnion('type', [

@@ -315,3 +315,7 @@ opt-in recovery are still pending.
 **4c — Straight arrows.** Shared arrow format, renderer, eraser and tool controls
 are implemented; see the validation ledger for tests and deferred device checks.
 Object-attached connectors and the remaining Phase 4 features are still pending.
+
+**4d — Pen pressure.** Shared pressure samples, stylus capture, variable-width
+rendering and hit testing are implemented. Mouse/touch remain constant-width.
+Hardware and platform checks are tracked in the Phase 4 ledger.
