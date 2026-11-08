@@ -81,6 +81,31 @@ impl Board {
         })
     }
 
+    /// Moves selected existing elements atomically, preserving their other current fields.
+    ///
+    /// # Errors
+    /// Rejects invalid deltas, too many IDs, or resulting state outside board limits.
+    pub fn validated_move(&mut self, ids: &[String], dx: f64, dy: f64) -> Result<(), BoardError> {
+        if ids.len() > 2000 || !dx.is_finite() || !dy.is_finite() {
+            return Err("Invalid move".into());
+        }
+        let selected: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
+        self.staged(|candidate| {
+            let mut elements = candidate.try_elements()?;
+            for (id, element) in elements.as_object_mut().ok_or("Invalid elements")? {
+                if !selected.contains(id.as_str()) {
+                    continue;
+                }
+                for point in element["points"].as_array_mut().ok_or("Invalid points")? {
+                    point["x"] = Value::from(point["x"].as_f64().ok_or("Invalid x")? + dx);
+                    point["y"] = Value::from(point["y"].as_f64().ok_or("Invalid y")? + dy);
+                }
+                candidate.put(id, element)?;
+            }
+            Ok(())
+        })
+    }
+
     fn validate(&self) -> Result<(), BoardError> {
         #[derive(serde::Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -264,6 +289,40 @@ impl Board {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn moves_are_atomic_skip_deleted_objects_and_preserve_pressure() {
+        let mut board = Board::new(1);
+        for id in ["a", "b"] {
+            board
+                .validated_put(
+                    id,
+                    &json!({"id":id,"type":"pen","color":"#293b36","width":3,
+                "points":[{"x":if id == "b" { 1e7 } else { 1.0 },"y":2,"pressure":0.5}]}),
+                )
+                .unwrap();
+        }
+        let before = board.elements();
+        assert!(board
+            .validated_move(&["a".into(), "b".into()], 1.0, 0.0)
+            .is_err());
+        assert_eq!(board.elements(), before);
+        board.validated_remove("b").unwrap();
+        let vector = board.state_vector();
+        let mut peer = Board::new(2);
+        peer.validated_apply(&board.update(&[0]).unwrap()).unwrap();
+        board
+            .validated_move(&["a".into(), "b".into(), "a".into()], 10.0, -3.0)
+            .unwrap();
+        peer.validated_apply(&board.update(&vector).unwrap())
+            .unwrap();
+        assert_eq!(board.elements(), peer.elements());
+        assert_eq!(
+            board.elements()["a"]["points"][0],
+            json!({"x":11,"y":-1,"pressure":0.5})
+        );
+        assert!(board.elements().get("b").is_none());
+    }
 
     #[test]
     fn pressure_round_trips_and_invalid_samples_are_atomic() {

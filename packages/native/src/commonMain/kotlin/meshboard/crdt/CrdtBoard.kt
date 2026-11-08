@@ -7,6 +7,7 @@ interface CrdtBoard {
     fun put(element: BoardElement)
     fun remove(id: String)
     fun removeAll(ids: List<String>) { ids.forEach(::remove) }
+    fun move(ids: List<String>, delta: meshboard.Point)
     fun elements(): List<BoardElement>
     fun apply(update: ByteArray)
     fun stateVector(): ByteArray

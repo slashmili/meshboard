@@ -1,3 +1,4 @@
+import { marquee, selectionBounds } from './selection'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
@@ -10,6 +11,7 @@ import { ShareDialog } from './ShareDialog'
 import { useTheme, type ThemeMode } from './useTheme'
 
 const TOOLS: { id: Tool; label: string; key: string; icon: LucideIcon }[] = [
+  { id: 'select', label: 'Select', key: 'V', icon: MousePointer2 },
   { id: 'pen', label: 'Pen', key: 'P', icon: Pencil },
   { id: 'eraser', label: 'Eraser', key: 'E', icon: Eraser },
   { id: 'rectangle', label: 'Rectangle', key: 'R', icon: Square },
@@ -29,6 +31,7 @@ const COLORS = [
   { name: 'Amber', value: '#c49226' },
 ]
 const HINTS: Record<Tool, string> = {
+  select: 'Click an object or drag a box around several, then drag to move. Shift-click toggles objects. Escape cancels.',
   pen: 'Click and drag to draw. A single click makes a dot.',
   eraser: 'Click or drag across a stroke to erase the whole object.',
   rectangle: 'Drag to draw a rectangle. Hold Shift for a square.',
@@ -119,6 +122,13 @@ export function App() {
             {board.elements.map(element => <Element key={element.id} element={element} />)}
             {board.draft && <Element element={board.draft} />}
           </g>
+          {tool === 'select' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="selection-overlay">
+            {board.elements.filter(e => board.selection.ids.includes(e.id)).map(e => {
+              const box = selectionBounds(e), padding = 4 / zoom
+              return <rect key={e.id} x={box.x-padding} y={box.y-padding} width={box.width+2*padding} height={box.height+2*padding} fill="none" stroke="#4878c8" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />
+            })}
+            {marquee(board.selection) && <rect {...marquee(board.selection)!} fill="#4878c815" stroke="#4878c8" strokeWidth={1 / zoom} />}
+          </g>}
           <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} />)}</g>
         </svg>
 

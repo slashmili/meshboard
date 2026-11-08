@@ -78,3 +78,9 @@ interop suites test y-webrtc signaling/sync/awareness, four mixed peers, creator
 departure, recovery and TURN. See [the validation ledger](../../docs/phase-2-validation.md)
 for completed tests and pending Apple/device checks. Application encryption and
 authenticated admission remain Phase 3.
+
+Atomic selection moves use local ABI operation 9: JSON containing `ids`, `dx`
+and `dy`. The operation reads the current document, skips missing IDs, preserves
+other fields, validates the entire staged result, and commits all selected
+changes together. A rejected move leaves the document unchanged. The transport
+still carries ordinary encrypted Yjs-compatible updates, without a new wire type.

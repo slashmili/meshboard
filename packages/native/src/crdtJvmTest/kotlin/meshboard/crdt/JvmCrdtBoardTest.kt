@@ -24,6 +24,19 @@ class JvmCrdtBoardTest {
         } }
     }
 
+    @Test fun groupMovesAreAtomicAndDoNotResurrectDeletedObjects() {
+        JvmCrdtBoard().use { a -> JvmCrdtBoard().use { b ->
+            a.put(stroke.copy(points = listOf(Point(1.0,2.0,0.5))))
+            a.put(stroke.copy(id = "deleted")); a.remove("deleted")
+            val before = a.elements()
+            assertFails { a.move(listOf(stroke.id), Point(1e8,0.0)) }
+            assertEquals(before, a.elements())
+            b.apply(a.update()); val vector = b.stateVector()
+            a.move(listOf(stroke.id, "deleted"), Point(10.0,-3.0)); b.apply(a.update(vector))
+            assertEquals(listOf(Point(11.0,-1.0,0.5)), a.elements().single().points)
+            assertEquals(a.elements(), b.elements())
+        } }
+    }
     @Test fun closingIsIdempotentAndUseAfterCloseFails() {
         val board = JvmCrdtBoard()
         board.close()

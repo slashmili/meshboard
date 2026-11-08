@@ -165,3 +165,35 @@ input and long strokes; desktop tablet pressure on each OS/driver. Verify the
 pressure curve feels useful at each selected stroke width. iOS runtime execution of
 these new scenarios remains pending; synthetic Chromium events and Compose
 pixel tests do not establish physical-device behavior.
+
+## Multi-select and move (checkpoint 4e)
+
+Select (V) is available on web, desktop and mobile. Click/tap an object to select
+it, or drag a box that fully encloses several objects. Drag a selected object to
+move the group. Web/desktop Shift-click toggles individual objects. Escape,
+changing tools, or adding a second touch cancels an unfinished move. Selection
+outlines and movement previews are device-local; peers receive the committed move
+on release.
+
+Moves preserve IDs, text, pressure and other fields from the current document.
+Objects deleted before the move is committed are skipped. Each move commits as
+one CRDT update; if any object would exceed coordinate/document limits, the whole
+move is rejected. Simultaneous edits to the same object retain the existing
+whole-element CRDT conflict resolution; independent movement of object fields is
+not claimed. A group move is atomic locally and sent as one update, while later
+concurrent edits can still resolve independently per object.
+
+Verified: shared geometry tests, web and Rust atomic rollback/delete/pressure
+checks, JNI bindings, desktop pointer and mobile touch group moves, Escape/pinch
+cancellation, production-browser toolbar and movement tests, and encrypted
+bidirectional web/desktop moves with a remote edit/delete during drag and reload.
+Android passed all eight tablet UI tests and the bidirectional encrypted move
+scenario. Final local totals: 54 web unit tests, 59 desktop/common/JNI tests,
+seven production-browser drawing tests plus a focused final selection rerun,
+Rust format/Clippy/tests/docs and Android APK builds. Apple C binding tests
+and the same mixed-peer scenario are wired into CI but cannot run on Linux.
+
+Mac/iPad follow-up: marquee selection in both directions, Shift-click where a
+keyboard is attached, touch group movement, pinch cancellation, pressure/text
+preservation, and remote deletion during a move. No object resize/rotation,
+attachment routing, or undo is introduced by this increment.

@@ -54,3 +54,29 @@ it('frames preview traffic but never accepts legacy drawing messages in CRDT mod
   expect(() => new FrameReceiver().accept(encodeFrames(message)[0])).toThrow()
   expect(() => new FrameReceiver(true).accept(encodeFrames({ v: 1, type: 'remove', ids: [] })[0])).toThrow()
 })
+
+it('moves a group in one update, preserves fields and skips remotely deleted objects', () => {
+  const a = new CrdtDocument(), b = new CrdtDocument()
+  a.put({ ...shape('a'), points: [{ x: 12, y: 34, pressure: 0.5 }] }); a.put(shape('b'))
+  sync(a, b); b.remove(['b']); sync(b, a)
+  let updates = 0
+  a.ydoc.on('update', () => updates++)
+  a.move(['a', 'b', 'a'], { x: 10, y: -3 })
+  expect(updates).toBe(1)
+  expect(a.getElements()).toHaveLength(1)
+  expect(a.getElements()[0].points).toEqual([{ x: 22, y: 31, pressure: 0.5 }])
+  sync(a, b); expect(b.getElements()).toEqual(a.getElements())
+  const before = a.getElements()
+  a.move(['a'], { x: 1e8, y: 0 })
+  expect(a.getElements()).toEqual(before)
+})
+
+it('rolls back the whole move when only one member exceeds the coordinate limit', () => {
+  const doc = new CrdtDocument()
+  doc.put(shape('a')); doc.put({ ...shape('b'), points: [{ x: 1e7, y: 0 }] })
+  const before = doc.getElements()
+  let updates = 0; doc.ydoc.on('update', () => updates++)
+  doc.move(['a', 'b'], { x: 1, y: 0 })
+  expect(doc.getElements()).toEqual(before)
+  expect(updates).toBe(0)
+})

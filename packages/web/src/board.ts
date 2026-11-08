@@ -1,7 +1,7 @@
 export type Point = { x: number; y: number; pressure?: number }
 export type View = Point & { zoom: number }
 export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'text' | 'sticky'
-export type Tool = DrawingTool | 'eraser' | 'hand'
+export type Tool = DrawingTool | 'eraser' | 'hand' | 'select'
 
 import type { BoardElement } from '@meshboard/shared-protocol'
 export type { BoardElement } from '@meshboard/shared-protocol'

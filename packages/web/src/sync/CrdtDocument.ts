@@ -1,3 +1,4 @@
+import { translated } from '../selection'
 import * as Y from 'yjs'
 import { elementSchema, MAX_ELEMENTS, type BoardElement, type CrdtMessage, type SessionMessage } from '@meshboard/shared-protocol'
 import type { SessionDocument } from './SessionDocument'
@@ -84,6 +85,13 @@ export class CrdtDocument implements SessionDocument {
   }
   put(element: BoardElement) { return this.local(doc => doc.getMap('elements').set(element.id, elementSchema.parse(element))) }
   remove(ids: string[]) { this.local(doc => doc.transact(() => { for (const id of ids) doc.getMap('elements').delete(id) })) }
+  move(ids: string[], delta: { x: number; y: number }) {
+    if (delta.x === 0 && delta.y === 0) return
+    this.local(doc => {
+      const next = translated(this.readElements(doc), ids, delta)
+      doc.transact(() => { for (const e of next) doc.getMap('elements').set(e.id, e) })
+    })
+  }
   clear() { this.remove(this.visible.map(e => e.id)) }
   // Used by validation tests; joining uses state vectors, including delete-only changes.
   fullState() { return message('update', Y.encodeStateAsUpdate(this.doc, EMPTY)) }

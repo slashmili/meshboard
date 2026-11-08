@@ -11,6 +11,18 @@ import meshboard.crdt.ffi.*
 class AppleCrdtBoardTest {
     private val stroke = BoardElement("stroke", "pen", "#123456", 3.0, listOf(Point(-1.25, 2.5)))
 
+    @Test fun atomicMovesPreservePressureAndIgnoreDeletedIds() {
+        val board = AppleCrdtBoard()
+        try {
+            board.put(stroke.copy(points = listOf(Point(1.0,2.0,0.5))))
+            board.put(stroke.copy(id = "deleted")); board.remove("deleted")
+            val before = board.elements()
+            assertFails { board.move(listOf(stroke.id), Point(1e8,0.0)) }
+            assertEquals(before, board.elements())
+            board.move(listOf(stroke.id,"deleted"),Point(10.0,-3.0))
+            assertEquals(listOf(Point(11.0,-1.0,0.5)),board.elements().single().points)
+        } finally { board.close() }
+    }
     @Test fun independentBoardsExchangeSnapshotsDeltasAndDeletionOnlyUpdates() {
         val a = AppleCrdtBoard()
         val b = AppleCrdtBoard()

@@ -14,6 +14,9 @@ class LocalBoardController(private val createId: () -> String) : DrawingControll
         document.apply(BoardMessage("put", element = element))
     }
     override fun remove(ids: List<String>) = update { document.apply(BoardMessage("remove", ids = ids)) }
+    override fun move(ids: List<String>, delta: Point) = update {
+        document.apply(BoardMessage("snapshot", elements = translated(document.elements, ids, delta)))
+    }
     override fun preview(element: BoardElement?) { /* Drafts live in the canvas until committed. */ }
     fun discard() { document.reset(); mutable.value = BoardState() }
     private fun update(action: () -> Unit) {

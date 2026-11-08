@@ -30,6 +30,12 @@
 - Tested: schema rejection and CRDT round trips, geometry and native rendering pixels, production-browser synthetic pen events, encrypted native edits/reload, and Android APK compilation.
 - Verified: Android emulator UI suite and live encrypted pressure edit/reload scenario. Physical Apple Pencil/Android stylus/desktop tablet behavior and iPad runtime execution remain pending; recorded in the Phase 4 ledger.
 
+### Multi-select and move
+- Added: Select (V), marquee selection, desktop/web Shift-click toggles and group dragging on web and native, with Escape/pinch cancellation and local selection outlines.
+- Added: atomic CRDT moves that preserve current fields, skip deleted objects and reject an invalid group without partial changes.
+- Tested: geometry, atomic rollback and JNI bindings, 59 desktop/common/JNI tests, eight Android UI tests, production browser flows and bidirectional encrypted web/desktop and web/Android moves during remote edits/deletes.
+- Pending: Mac/iPad runtime and physical-device checks remain in the Phase 4 ledger.
+
 ## Unreleased — Phase 3
 
 ### Added

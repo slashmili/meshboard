@@ -12,7 +12,7 @@ data class View(val x: Double = 0.0, val y: Double = 0.0, val zoom: Double = 1.0
     }
 }
 enum class Tool(val wire: String, val label: String, val shortcut: String) {
-    Pen("pen", "Pen", "P"), Eraser("eraser", "Eraser", "E"),
+    Select("select", "Select", "V"), Pen("pen", "Pen", "P"), Eraser("eraser", "Eraser", "E"),
     Rectangle("rectangle", "Rectangle", "R"), Ellipse("ellipse", "Ellipse", "O"),
     Arrow("arrow", "Arrow", "A"), Line("line", "Line", "L"), Text("text", "Text", "T"), Sticky("sticky", "Note", "N"), Hand("hand", "Pan", "H")
 }

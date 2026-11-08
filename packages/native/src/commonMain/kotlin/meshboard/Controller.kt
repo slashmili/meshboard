@@ -21,6 +21,7 @@ interface DrawingController {
     fun newId(): String
     fun put(element: BoardElement)
     fun remove(ids: List<String>)
+    fun move(ids: List<String>, delta: Point)
     fun preview(element: BoardElement?)
 }
 

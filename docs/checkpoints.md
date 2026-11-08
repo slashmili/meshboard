@@ -319,3 +319,7 @@ Object-attached connectors and the remaining Phase 4 features are still pending.
 **4d — Pen pressure.** Shared pressure samples, stylus capture, variable-width
 rendering and hit testing are implemented. Mouse/touch remain constant-width.
 Hardware and platform checks are tracked in the Phase 4 ledger.
+
+**4e — Multi-select and move.** Local selection, marquee, group movement and
+atomic CRDT commits are implemented on web and native. Cancellation, remote
+deletions and preserving received edits are covered; see the Phase 4 ledger.

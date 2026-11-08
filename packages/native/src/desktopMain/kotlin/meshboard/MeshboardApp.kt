@@ -51,6 +51,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     val textMeasurer = rememberTextMeasurer()
     var textEdit by remember { mutableStateOf<BoardElement?>(null) }
     var editingExisting by remember { mutableStateOf(false) }
+    var selection by remember { mutableStateOf(Selection()) }
     var draft by remember { mutableStateOf<BoardElement?>(null) }
     var space by remember { mutableStateOf(false) }
     var cancelled by remember { mutableIntStateOf(0) }
@@ -62,7 +63,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     val focus = remember { FocusRequester() }
     val density = LocalDensity.current.density
     val clipboard = LocalClipboardManager.current
-    fun cancel() { draft = null; cancelled++; controller.preview(null) }
+    fun cancel() { selection = Selection(); draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2.0, canvasSize.height / density / 2.0), view.zoom * factor) }
 
     var appearance by rememberAppearance()
@@ -73,7 +74,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             if (event.key == Key.Spacebar) { space = event.type == KeyEventType.KeyDown; return@onPreviewKeyEvent true }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             if (event.key == Key.Escape) { cancel(); return@onPreviewKeyEvent true }
-            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.A -> Tool.Arrow; Key.H -> Tool.Hand; Key.T -> Tool.Text; Key.N -> Tool.Sticky; else -> null }
+            val next = when (event.key) { Key.V -> Tool.Select; Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.A -> Tool.Arrow; Key.H -> Tool.Hand; Key.T -> Tool.Text; Key.N -> Tool.Sticky; else -> null }
             if (next != null) { cancel(); tool = next; true } else false
         }) {
             Row(Modifier.fillMaxWidth().height(76.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -95,7 +96,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     .focusRequester(focus).focusable()
                     .pointerHoverIcon(if (tool == Tool.Hand || space) PointerIcon.Hand else PointerIcon.Crosshair)
                     .onPointerEvent(PointerEventType.Scroll) { event ->
-                        if (draft != null) return@onPointerEvent
+                        if (draft != null || selection.start != null) return@onPointerEvent
                         val change = event.changes.first()
                         val p = Point(change.position.x / density.toDouble(), change.position.y / density.toDouble())
                         if (event.keyboardModifiers.isCtrlPressed || event.keyboardModifiers.isMetaPressed) view = view.zoomAt(p, view.zoom * exp(-change.scrollDelta.y * .12))
@@ -117,13 +118,15 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         focus.requestFocus()
                                         active = if (space || event.buttons.isTertiaryPressed) Tool.Hand else tool
                                         last = p; start = world
-                                        if (active != Tool.Hand && active != Tool.Eraser && active != Tool.Text && active != Tool.Sticky) {
+                                        if (active == Tool.Select) selection = selection.begin(currentState.elements, world, 6 / view.zoom, event.keyboardModifiers.isShiftPressed)
+                                        if (active != Tool.Select && active != Tool.Hand && active != Tool.Eraser && active != Tool.Text && active != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), active!!.wire, color, width, if (active == Tool.Pen) listOf(world) else listOf(world, world))
                                             controller.preview(draft)
                                         }
                                     }
                                     if (active != null) {
                                         when (active) {
+                                        Tool.Select -> selection = selection.copy(end = world)
                                             Tool.Hand -> if (change.previousPressed) { val previous = last!!; view = view.copy(x = view.x + p.x - previous.x, y = view.y + p.y - previous.y) }
                                             Tool.Eraser -> {
                                                 val from = last?.let(view::world) ?: world
@@ -147,6 +150,10 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         }
                                         last = p
                                         if (!change.pressed) {
+                                        if (active == Tool.Select) {
+                                            if (selection.moving) controller.move(selection.ids, selection.delta())
+                                            selection = selection.finish(currentState.elements)
+                                        }
                                             if ((active == Tool.Text || active == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
                                                 val existing = currentState.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
                                                 editingExisting = existing != null
@@ -162,7 +169,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                     }
                                 }
                             }
-                        } finally { draft = null; controller.preview(null) }
+                        } finally { selection = Selection(); draft = null; controller.preview(null) }
                     }) {
                     val spacing = (24 * view.zoom * density).toFloat()
                     val ox = ((view.x * density % spacing + spacing) % spacing).toFloat()
@@ -174,7 +181,9 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                         translate(view.x.toFloat(), view.y.toFloat())
                         scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero)
                     }) {
-                        state.elements.forEach { drawElement(it, textMeasurer) }
+                        val displayed = selection.display(state.elements)
+                        displayed.forEach { drawElement(it, textMeasurer) }
+                        if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
                         state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, .65f) }
                         draft?.let { drawElement(it, textMeasurer) }
                     }
@@ -227,7 +236,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             HorizontalDivider(color = Border)
             Row(Modifier.fillMaxWidth().height(34.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (space) "Pan" else tool.label, color = colors.primary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.width(16.dp)); Text("P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan · Shift constrains shapes", color = colors.onSurfaceVariant, fontSize = 10.sp)
+                Spacer(Modifier.width(16.dp)); Text("V select · P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan · Shift constrains shapes", color = colors.onSurfaceVariant, fontSize = 10.sp)
                 Spacer(Modifier.weight(1f)); Text(if (state.connected == 0) "WEB ↔ DESKTOP / 03" else if (state.relayed > 0) "VIA RELAY / 03" else "DIRECT CONNECTION / 03", fontSize = 9.sp, color = colors.onSurfaceVariant, modifier = Modifier.testTag("connection-route"))
             }
         }
@@ -263,7 +272,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             "appearance" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
                 AppearanceOptions(appearance) { appearance = it }
             }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
-            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
+            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("V select · P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan\n\nSelect: click an object or drag a box around several, then drag to move. Shift-click toggles objects.\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
         }
     }
 }

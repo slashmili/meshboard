@@ -25,6 +25,7 @@ class AppTest {
         override fun newId() = "test-${++next}"
         override fun put(element: BoardElement) { doc.apply(BoardMessage("put", element = element)); state.value = state.value.copy(elements = doc.elements) }
         override fun remove(ids: List<String>) { doc.apply(BoardMessage("remove", ids = ids)); state.value = state.value.copy(elements = doc.elements) }
+        override fun move(ids: List<String>, delta: Point) { doc.apply(BoardMessage("snapshot", elements = translated(doc.elements, ids, delta))); state.value = state.value.copy(elements = doc.elements) }
         override fun preview(element: BoardElement?) {}
         override fun share(origin: String) { state.value = state.value.copy(invite = "$origin/#room=123e4567-e89b-42d3-a456-426614174000", signaling = true) }
         override fun join(invite: String) { state.value = BoardState(invite = invite, signaling = true) }
@@ -117,6 +118,35 @@ class AppTest {
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
 
+    @Test fun desktopSelectionMovesGroupsAndEscapeCancelsDraftMove() {
+        val controller = LocalController()
+        for ((id,x) in listOf("one" to 450.0, "two" to 650.0)) controller.put(BoardElement(id,"rectangle","#293b36",3.0,listOf(Point(x,200.0),Point(x+60,260.0))))
+        render(controller, 650)
+        rule.onNodeWithTag("tool-select").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { moveTo(Offset(400f,150f)); press(); moveTo(Offset(750f,300f)); release() }
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { moveTo(Offset(480f,230f)); press(); moveTo(Offset(580f,330f)); release() }
+        rule.runOnIdle { assertEquals(listOf(550.0,750.0), controller.state.value.elements.map { it.points.first().x }) }
+        val before = controller.state.value.elements
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { moveTo(Offset(580f,330f)); press(); moveTo(Offset(680f,430f)) }
+        rule.onNodeWithTag("drawing-canvas").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { release() }
+        rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
+    }
+    @Test fun mobileSelectionMovesGroupsAndPinchCancelsMovement() {
+        val controller = LocalBoardController { "unused" }
+        for ((id,x) in listOf("one" to 100.0, "two" to 240.0)) controller.put(BoardElement(id,"rectangle","#293b36",3.0,listOf(Point(x,100.0),Point(x+40,140.0))))
+        rule.setContent { Box(Modifier.requiredSize(390.dp,844.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-tool-select").performScrollTo().performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(80f,80f)); moveTo(Offset(300f,160f)); up() }
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(120f,120f)); moveTo(Offset(140f,150f)); up() }
+        rule.runOnIdle { assertEquals(listOf(120.0,260.0), controller.state.value.elements.map { it.points.first().x }) }
+        val before = controller.state.value.elements
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(0,Offset(140f,150f)); moveBy(0,Offset(10f,10f))
+            down(1,Offset(250f,250f)); moveBy(1,Offset(20f,20f)); up(1); up(0)
+        }
+        rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
+    }
     @Test fun mobilePressureStrokePaintsDifferentWidths() {
         val controller = LocalBoardController { "pressure" }
         controller.put(BoardElement("pressure", "pen", "#293b36", 8.0, listOf(

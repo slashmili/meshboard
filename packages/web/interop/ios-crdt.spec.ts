@@ -1,3 +1,4 @@
+import { selectionInterop } from './selection'
 import { pressureInterop } from './pressure'
 import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
@@ -178,4 +179,8 @@ test('arrows synchronize native edits, reloads and erasing', async ({ page, ios 
 
 test('pressure samples synchronize native edits and reloads', async ({ page, ios }) => {
   await pressureInterop(page, ios)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, ios }) => {
+  await selectionInterop(page, ios)
 })

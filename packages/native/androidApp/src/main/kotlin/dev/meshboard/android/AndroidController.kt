@@ -80,6 +80,13 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     override fun newId() = "${System.currentTimeMillis().toString(36)}-${UUID.randomUUID()}"
     override fun put(element: BoardElement) = post { Wire.element(Wire.elementJson(element)); local(BoardMessage("put", element = element)) }
     override fun remove(ids: List<String>) = post { if (ids.isNotEmpty()) local(BoardMessage("remove", ids = ids)) }
+    override fun move(ids: List<String>, delta: Point) = post {
+        if (delta.x != 0.0 || delta.y != 0.0) {
+            val before = crdt.stateVector()
+            crdt.move(ids, delta)
+            report(); broadcastY(YWire.sync(2, crdt.update(before)))
+        }
+    }
     private fun local(message: BoardMessage) {
         val board = crdt
         val before = board.stateVector()

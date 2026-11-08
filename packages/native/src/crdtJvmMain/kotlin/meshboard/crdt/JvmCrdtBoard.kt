@@ -53,6 +53,14 @@ class JvmCrdtBoard internal constructor(clientId: Long) : CrdtBoard, AutoCloseab
         require(ids.size <= Wire.MAX_REMOVED && ids.all { Regex("^[a-zA-Z0-9-]{1,80}$").matches(it) })
         call(8, JsonArray(ids.map(::JsonPrimitive)).toString().encodeToByteArray())
     }
+    override fun move(ids: List<String>, delta: meshboard.Point) {
+        require(ids.size <= Wire.MAX_ELEMENTS && delta.x.isFinite() && delta.y.isFinite())
+        val request = kotlinx.serialization.json.buildJsonObject {
+            put("ids", JsonArray(ids.map(::JsonPrimitive)))
+            put("dx", JsonPrimitive(delta.x)); put("dy", JsonPrimitive(delta.y))
+        }
+        call(9, request.toString().encodeToByteArray())
+    }
     override fun elements(): List<BoardElement> {
         val values = Json.parseToJsonElement(call(6).decodeToString()).jsonObject
         require(values.size <= Wire.MAX_ELEMENTS)
