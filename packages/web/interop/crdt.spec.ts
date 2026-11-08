@@ -1,3 +1,4 @@
+import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { nativePeer } from './peers'
@@ -260,4 +261,8 @@ test('wrong-key browser and native peers cannot read or modify a board', async (
 
 test('text and sticky notes synchronize edits and late joins across web and native', async ({ page, native, browser }) => {
   await textElementsInterop(page, native, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, native }) => {
+  await arrowsInterop(page, native)
 })

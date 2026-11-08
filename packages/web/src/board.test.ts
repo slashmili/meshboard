@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { constrainEnd, hitsElement, toWorld, zoomAt, type BoardElement } from './board'
+import { constrainEnd, hitsElement, outline, toWorld, zoomAt, type BoardElement } from './board'
 
 describe('viewport', () => {
   it('keeps the world point under the pointer fixed while zooming', () => {
@@ -57,5 +57,21 @@ describe('constrained shapes', () => {
     const end = constrainEnd({ x: 0, y: 0 }, { x: 100, y: 90 }, 'line')
     expect(end.x).toBeCloseTo(end.y)
     expect(Math.hypot(end.x, end.y)).toBeCloseTo(Math.hypot(100, 90))
+  })
+})
+
+describe('arrows', () => {
+  const arrow: BoardElement = { id: 'arrow', type: 'arrow', color: '#293b36', width: 3, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] }
+  it('renders the shaft and both wings, including reverse and zero-length arrows', () => {
+    expect(outline(arrow)).toEqual([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 88, y: 6 }, { x: 100, y: 0 }, { x: 88, y: -6 }])
+    expect(outline({ ...arrow, points: [...arrow.points].reverse() })[2]).toEqual({ x: 12, y: -6 })
+    expect(outline({ ...arrow, points: [arrow.points[0], arrow.points[0]] })).toEqual([arrow.points[0], arrow.points[0]])
+    expect(outline({ ...arrow, points: [{ x: 0, y: 0 }, { x: 4, y: 0 }] })[2]).toEqual({ x: 2, y: 1 })
+  })
+  it('erases arrowheads and snaps arrows to 45 degrees', () => {
+    expect(hitsElement(arrow, { x: 88, y: 6 }, { x: 88, y: 6 }, 0)).toBe(true)
+    expect(hitsElement(arrow, { x: 88, y: 10 }, { x: 88, y: 10 }, 0)).toBe(false)
+    const end = constrainEnd({ x: 0, y: 0 }, { x: 100, y: 90 }, 'arrow')
+    expect(end.x).toBeCloseTo(end.y)
   })
 })

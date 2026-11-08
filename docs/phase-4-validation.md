@@ -122,7 +122,23 @@ and preserve error states. The original count and equality requirements and
 30-second assertion timeout remain intact. No production workaround was added
 without a reproduced cause.
 
-The failed iPad job was rerun with `gh` on the same commit (attempt 2). Its result
-is pending; this does not validate the later text/note commit or the new local
-diagnostics. Follow up on that rerun and run the updated iPad suite on macOS/CI.
+The failed iPad job was rerun with `gh` on the same commit (attempt 2). The user confirmed that the rerun passed; this does not validate the later text/note commit or the new local
+diagnostics. Run the updated iPad suite on macOS/CI.
 Do not mark this issue resolved solely because the Linux repetitions pass.
+
+## Straight arrows (checkpoint 4c)
+
+Arrow (A) is available on web, desktop and the shared mobile toolbar. Drag from
+tail to head; desktop/web Shift snaps to 45-degree increments. The arrowhead is
+part of the erasable outline, scales with stroke width, and shrinks for short
+arrows. Zero-length arrows never produce non-finite coordinates. Wire data stores
+two endpoints; both implementations derive matching geometry. These are free-standing
+arrows, without object-attached endpoints or automatic routing.
+
+Verified: shared schema fixtures, web geometry tests, Rust validation/round trips,
+desktop pointer and shared mobile touch UI, seven production-browser drawing tests,
+and encrypted web/desktop arrow edit/reload/erase interoperability. Rust format,
+Clippy, tests and docs passed. The same interop scenario is wired into Android/iOS
+CI; Android pinch cancellation now includes arrows. macOS/iPad/Android device
+execution of these additions remains pending, including touch toolbar scrolling
+and arrowhead rendering at different zooms.

@@ -286,7 +286,7 @@ private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMea
         val size = Size(abs(b.x - a.x).toFloat(), abs(b.y - a.y).toFloat())
         if (element.type == "rectangle") drawRect(color, top, size, style = style) else drawOval(color, top, size, style = style)
     } else {
-        val path = Path().apply { moveTo(a.x.toFloat(), a.y.toFloat()); element.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) } }
+        val path = Path().apply { moveTo(a.x.toFloat(), a.y.toFloat()); outline(element).drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) } }
         drawPath(path, color, style = style)
     }
 }

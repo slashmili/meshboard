@@ -311,3 +311,7 @@ concurrent replacements, remote deletion and encrypted mixed-peer late joins
 are covered. See [the Phase 4 ledger](phase-4-validation.md) for results and Mac/iPad
 checks. Remaining expanded tools, undo/redo, exports, presence, pressure and
 opt-in recovery are still pending.
+
+**4c — Straight arrows.** Shared arrow format, renderer, eraser and tool controls
+are implemented; see the validation ledger for tests and deferred device checks.
+Object-attached connectors and the remaining Phase 4 features are still pending.

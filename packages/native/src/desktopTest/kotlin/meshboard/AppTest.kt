@@ -56,6 +56,14 @@ class AppTest {
         val screenshot = rule.onRoot().captureToImage().toAwtImage()
         val file = File("build/test-artifacts/desktop-board.png"); file.parentFile.mkdirs(); ImageIO.write(screenshot, "png", file)
     }
+    @Test fun arrowsCanBeDrawnAndErasedAtMinimumWindowHeight() {
+        val controller = LocalController(); render(controller, 650)
+        rule.onNodeWithTag("tool-arrow").assertIsDisplayed().performClick(); drag()
+        rule.runOnIdle { assertEquals("arrow", controller.state.value.elements.single().type) }
+        rule.onNodeWithTag("tool-eraser").performClick()
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { click(Offset(460f, 330f)) }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+    }
     @Test fun nativeCanCreateAndJoinInvites() {
         val controller = LocalController(); render(controller)
         rule.onNodeWithText("Share", useUnmergedTree = true).performClick()
@@ -109,6 +117,22 @@ class AppTest {
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
 
+    @Test fun mobileArrowsDrawAndEraseWithTouch() {
+        val controller = LocalBoardController { "mobile-arrow" }
+        rule.setContent { Box(Modifier.requiredSize(390.dp, 844.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-tool-arrow").performScrollTo().performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(250f, 100f)); up()
+        }
+        rule.runOnIdle { assertEquals("arrow", controller.state.value.elements.single().type) }
+        val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
+        val scale = image.width / 390.0
+        val wing = java.awt.Color(image.getRGB((238 * scale).toInt(), (106 * scale).toInt()))
+        assertTrue(wing.red < 150 && wing.green < 150, "The mobile canvas must render the arrowhead, not just the shaft")
+        rule.onNodeWithTag("mobile-tool-eraser").performScrollTo().performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { click(Offset(250f, 100f)) }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+    }
     @Test fun mobileAppearanceIsAvailableInOverflow() {
         val controller = LocalBoardController { "theme-stroke" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }

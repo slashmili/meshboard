@@ -1,3 +1,4 @@
+import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { iosPeer, nativePeer } from './peers'
@@ -168,4 +169,8 @@ test('iOS app refuses legacy invites and insecure origins without clearing the b
 
 test('text and sticky notes synchronize edits and late joins across web and iOS', async ({ page, ios, browser }) => {
   await textElementsInterop(page, ios, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, ios }) => {
+  await arrowsInterop(page, ios)
 })

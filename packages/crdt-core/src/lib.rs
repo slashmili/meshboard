@@ -133,8 +133,16 @@ impl Board {
                 || id.is_empty()
                 || id.len() > 80
                 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
-                || !["pen", "rectangle", "ellipse", "line", "text", "sticky"]
-                    .contains(&e.r#type.as_str())
+                || ![
+                    "pen",
+                    "rectangle",
+                    "ellipse",
+                    "line",
+                    "arrow",
+                    "text",
+                    "sticky",
+                ]
+                .contains(&e.r#type.as_str())
                 || e.color.len() != 7
                 || !e.color.starts_with('#')
                 || !e.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
@@ -242,6 +250,21 @@ impl Board {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn arrow_updates_round_trip_and_reject_invalid_geometry() {
+        let mut a = Board::new(1);
+        let mut b = Board::new(2);
+        let arrow = json!({"id":"arrow","type":"arrow","color":"#293b36","width":3,
+            "points":[{"x":0,"y":0},{"x":100,"y":0}]});
+        a.validated_put("arrow", &arrow).unwrap();
+        b.validated_apply(&a.update(&[0]).unwrap()).unwrap();
+        assert_eq!(a.elements(), b.elements());
+        let mut invalid = arrow;
+        invalid["points"] = json!([{"x":0,"y":0}]);
+        assert!(b.validated_put("arrow", &invalid).is_err());
+        assert_eq!(a.elements(), b.elements());
+    }
 
     #[test]
     fn text_fixtures_validate_and_invalid_updates_leave_state_intact() {

@@ -73,7 +73,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             if (event.key == Key.Spacebar) { space = event.type == KeyEventType.KeyDown; return@onPreviewKeyEvent true }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             if (event.key == Key.Escape) { cancel(); return@onPreviewKeyEvent true }
-            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.H -> Tool.Hand; Key.T -> Tool.Text; Key.N -> Tool.Sticky; else -> null }
+            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.A -> Tool.Arrow; Key.H -> Tool.Hand; Key.T -> Tool.Text; Key.N -> Tool.Sticky; else -> null }
             if (next != null) { cancel(); tool = next; true } else false
         }) {
             Row(Modifier.fillMaxWidth().height(76.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -227,7 +227,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             HorizontalDivider(color = Border)
             Row(Modifier.fillMaxWidth().height(34.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (space) "Pan" else tool.label, color = colors.primary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.width(16.dp)); Text("P pen · E eraser · R rectangle · O ellipse · L line · H pan · Shift constrains shapes", color = colors.onSurfaceVariant, fontSize = 10.sp)
+                Spacer(Modifier.width(16.dp)); Text("P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan · Shift constrains shapes", color = colors.onSurfaceVariant, fontSize = 10.sp)
                 Spacer(Modifier.weight(1f)); Text(if (state.connected == 0) "WEB ↔ DESKTOP / 03" else if (state.relayed > 0) "VIA RELAY / 03" else "DIRECT CONNECTION / 03", fontSize = 9.sp, color = colors.onSurfaceVariant, modifier = Modifier.testTag("connection-route"))
             }
         }
@@ -263,7 +263,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             "appearance" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
                 AppearanceOptions(appearance) { appearance = it }
             }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
-            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("P pen · E eraser · R rectangle · O ellipse · L line · H pan\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
+            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
         }
     }
 }

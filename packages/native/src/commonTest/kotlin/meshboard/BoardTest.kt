@@ -3,6 +3,19 @@ package meshboard
 import kotlin.test.*
 
 class BoardTest {
+    @Test fun arrowGeometryIncludesErasableWingsAndHandlesShortOrZeroLengths() {
+        val a = Point(0.0, 0.0); val b = Point(100.0, 0.0)
+        val arrow = BoardElement("arrow", "arrow", "#293b36", 3.0, listOf(a, b))
+        assertEquals(listOf(a, b, Point(88.0, 6.0), b, Point(88.0, -6.0)), outline(arrow))
+        assertEquals(Point(12.0, -6.0), outline(arrow.copy(points = listOf(b, a)))[2])
+        assertEquals(listOf(a, a), outline(arrow.copy(points = listOf(a, a))))
+        assertEquals(Point(2.0, 1.0), outline(arrow.copy(points = listOf(a, Point(4.0, 0.0))))[2])
+        assertTrue(hits(arrow, Point(88.0, 6.0), Point(88.0, 6.0), 0.0))
+        assertFalse(hits(arrow, Point(88.0, 10.0), Point(88.0, 10.0), 0.0))
+        val snapped = constrained(a, Point(100.0, 90.0), "arrow")
+        assertEquals(snapped.x, snapped.y, 0.000001)
+    }
+
     private val stroke = BoardElement("stroke-1", "pen", "#293b36", 3.0, listOf(Point(0.0, 0.0), Point(100.0, 100.0)))
     @Test fun deletionsSurviveLateSnapshots() {
         val a = BoardDocument(); val b = BoardDocument()

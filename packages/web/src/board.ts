@@ -1,6 +1,6 @@
 export type Point = { x: number; y: number }
 export type View = Point & { zoom: number }
-export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'sticky'
+export type DrawingTool = 'pen' | 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'text' | 'sticky'
 export type Tool = DrawingTool | 'eraser' | 'hand'
 
 import type { BoardElement } from '@meshboard/shared-protocol'
@@ -23,7 +23,7 @@ export function zoomAt(view: View, anchor: Point, zoom: number): View {
 export function constrainEnd(start: Point, end: Point, type: DrawingTool): Point {
   const dx = end.x - start.x
   const dy = end.y - start.y
-  if (type === 'line') {
+  if (type === 'line' || type === 'arrow') {
     const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4)
     const length = Math.hypot(dx, dy)
     return { x: start.x + Math.cos(angle) * length, y: start.y + Math.sin(angle) * length }
@@ -39,6 +39,17 @@ export function bounds(element: BoardElement) {
 
 export function outline(element: BoardElement): Point[] {
   if (element.type === 'pen' || element.type === 'line') return element.points
+  if (element.type === 'arrow') {
+    const [start, end] = element.points
+    const dx = end.x - start.x, dy = end.y - start.y
+    const distance = Math.hypot(dx, dy)
+    if (distance === 0) return [start, end]
+    const head = Math.min(distance / 2, Math.max(12, element.width * 3))
+    const ux = dx / distance, uy = dy / distance
+    return [start, end,
+      { x: end.x - ux * head - uy * head / 2, y: end.y - uy * head + ux * head / 2 }, end,
+      { x: end.x - ux * head + uy * head / 2, y: end.y - uy * head - ux * head / 2 }]
+  }
   const { x, y, width, height } = bounds(element)
   if (['rectangle', 'text', 'sticky'].includes(element.type)) {
     return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }, { x, y }]

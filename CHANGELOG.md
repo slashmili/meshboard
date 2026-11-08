@@ -20,6 +20,11 @@
 - Added: element IDs in the iPad convergence assertion and browser-state capture before cleanup. Native failure capture retains errors and omits the invite secret.
 - Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in `docs/phase-4-validation.md`.
 
+### Straight arrows
+- Added: Arrow (A) on web and native with matching arrowheads, whole-object erasing, bounded short-arrow geometry and desktop/web Shift angle snapping.
+- Tested: shared schema fixtures, native and web geometry/UI tests, Rust round trips, seven production-browser tests and live encrypted web/desktop edit/reload/erase interoperability.
+- Pending: Android/iPad execution of the new CI scenarios and physical-device checks. Object-attached connectors remain separate work.
+
 ## Unreleased — Phase 3
 
 ### Added

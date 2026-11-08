@@ -14,7 +14,7 @@ const peerId = z.uuid()
 const point = z.object({ x: z.number().min(-1e7).max(1e7), y: z.number().min(-1e7).max(1e7) }).strict()
 export const elementSchema = z.object({
   id,
-  type: z.enum(['pen', 'rectangle', 'ellipse', 'line', 'text', 'sticky']),
+  type: z.enum(['pen', 'rectangle', 'ellipse', 'line', 'arrow', 'text', 'sticky']),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   width: z.number().min(1).max(32),
   points: z.array(point).min(1).max(MAX_POINTS),

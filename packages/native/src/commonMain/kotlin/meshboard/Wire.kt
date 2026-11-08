@@ -22,7 +22,7 @@ object Wire {
         if (o["type"]?.jsonPrimitive?.content in listOf("text", "sticky")) o.exact("id", "type", "color", "width", "points", "text")
         else o.exact("id", "type", "color", "width", "points")
         val id = o.text("id"); require(idPattern.matches(id))
-        val type = o.text("type"); require(type in listOf("pen", "rectangle", "ellipse", "line", "text", "sticky"))
+        val type = o.text("type"); require(type in listOf("pen", "rectangle", "ellipse", "line", "arrow", "text", "sticky"))
         val color = o.text("color"); require(Regex("^#[0-9a-fA-F]{6}$").matches(color))
         val width = o.number("width"); require(width in 1.0..32.0)
         val data = o.getValue("points").jsonArray; require(data.size in 1..MAX_POINTS && (type == "pen" || data.size == 2))

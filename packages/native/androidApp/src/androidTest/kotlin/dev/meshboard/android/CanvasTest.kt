@@ -35,7 +35,7 @@ class CanvasTest {
     }
 
     @Test fun pinchCancelsDraftAndDoesNotDrawWhenOneFingerRemains() {
-        for (tool in listOf("pen", "text", "sticky")) {
+        for (tool in listOf("pen", "text", "sticky", "arrow")) {
             rule.onNodeWithTag("mobile-tool-$tool").performClick()
             canvas().performTouchInput {
                 down(0, Offset(width * .4f, height * .4f))

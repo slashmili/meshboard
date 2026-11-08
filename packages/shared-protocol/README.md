@@ -44,3 +44,11 @@ level collaborative editing. An editor whose object has been deleted cannot save
 and resurrect it. Text and notes use the existing encrypted update path, validation
 staging and document size limits. Older builds that lack these element types reject
 them; participants should use the same current build.
+
+## Arrow elements
+
+`arrow` uses the standard color/width and exactly two points (tail, tip), without
+`text`. Render a shaft plus two open wings: head length is
+`min(endpoint distance / 2, max(12, width * 3))`, wing half-width is half that
+length. A zero-length arrow has no wings. Rendering and hit testing use this same
+outline. Endpoints are absolute board coordinates, not attachments to other objects.

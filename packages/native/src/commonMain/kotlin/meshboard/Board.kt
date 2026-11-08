@@ -14,7 +14,7 @@ data class View(val x: Double = 0.0, val y: Double = 0.0, val zoom: Double = 1.0
 enum class Tool(val wire: String, val label: String, val shortcut: String) {
     Pen("pen", "Pen", "P"), Eraser("eraser", "Eraser", "E"),
     Rectangle("rectangle", "Rectangle", "R"), Ellipse("ellipse", "Ellipse", "O"),
-    Line("line", "Line", "L"), Text("text", "Text", "T"), Sticky("sticky", "Note", "N"), Hand("hand", "Pan", "H")
+    Arrow("arrow", "Arrow", "A"), Line("line", "Line", "L"), Text("text", "Text", "T"), Sticky("sticky", "Note", "N"), Hand("hand", "Pan", "H")
 }
 data class BoardElement(val id: String, val type: String, val color: String, val width: Double, val points: List<Point>, val text: String? = null)
 data class BoardMessage(
@@ -46,7 +46,7 @@ class BoardDocument {
 
 fun constrained(start: Point, end: Point, type: String): Point {
     val dx = end.x - start.x; val dy = end.y - start.y
-    if (type == "line") {
+    if (type == "line" || type == "arrow") {
         val angle = round(atan2(dy, dx) / (PI / 4)) * (PI / 4)
         return Point(start.x + cos(angle) * hypot(dx, dy), start.y + sin(angle) * hypot(dx, dy))
     }
@@ -57,6 +57,16 @@ fun constrained(start: Point, end: Point, type: String): Point {
 fun outline(element: BoardElement): List<Point> {
     if (element.type == "pen" || element.type == "line") return element.points
     val a = element.points.first(); val b = element.points.last()
+    if (element.type == "arrow") {
+        val dx = b.x - a.x; val dy = b.y - a.y
+        val distance = hypot(dx, dy)
+        if (distance == 0.0) return listOf(a, b)
+        val head = min(distance / 2, max(12.0, element.width * 3))
+        val ux = dx / distance; val uy = dy / distance
+        return listOf(a, b,
+            Point(b.x - ux * head - uy * head / 2, b.y - uy * head + ux * head / 2), b,
+            Point(b.x - ux * head + uy * head / 2, b.y - uy * head - ux * head / 2))
+    }
     val x = min(a.x, b.x); val y = min(a.y, b.y); val w = abs(b.x - a.x); val h = abs(b.y - a.y)
     if (element.type in listOf("rectangle", "text", "sticky")) return listOf(Point(x, y), Point(x + w, y), Point(x + w, y + h), Point(x, y + h), Point(x, y))
     return (0..96).map { i -> val angle = i / 96.0 * PI * 2; Point(x + w / 2 + cos(angle) * w / 2, y + h / 2 + sin(angle) * h / 2) }
