@@ -36,6 +36,12 @@
 - Tested: geometry, atomic rollback and JNI bindings, 59 desktop/common/JNI tests, eight Android UI tests, production browser flows and bidirectional encrypted web/desktop and web/Android moves during remote edits/deletes.
 - Pending: Mac/iPad runtime and physical-device checks remain in the Phase 4 ledger.
 
+### CI interoperability isolation
+- Fixed: test scenarios no longer share a signaling server's credential budget. Each scenario owns and closes its own local server; production limits remain unchanged.
+- Reproduced: the second budget regression failed with the old shared server. The CI pressure scenario trace showed HTTP 429 before joining.
+- Added: regressions proving each scenario receives its own 30-request budget and still rejects request 31.
+- Verified: all 15 desktop interoperability scenarios, 15 signaling tests and workspace typechecks.
+
 ## Unreleased — Phase 3
 
 ### Added

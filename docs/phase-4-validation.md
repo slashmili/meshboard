@@ -197,3 +197,26 @@ Mac/iPad follow-up: marquee selection in both directions, Shift-click where a
 keyboard is attached, touch group movement, pinch cancellation, pressure/text
 preservation, and remote deletion during a move. No object resize/rotation,
 attachment routing, or undo is introduced by this increment.
+
+## CI test-server isolation (2026-11-08)
+
+The Linux web/desktop job in run
+[42522240765](https://github.com/slashmili/meshboard/actions/runs/42522240765)
+failed at commit `cfb72d4`, before the pressure scenario could join. Its Playwright
+network trace records HTTP 429 for `/api/rtc-config`. Earlier scenarios consumed
+the shared server's 30-requests-per-minute credential budget. Faster runners could
+hit the limit, while slower runs crossed the expiry window. Both macOS jobs and
+the Android job passed at that commit; this failure was not a pressure assertion.
+
+Interop scenarios now own a fresh Vite/signaling server, started before peer
+fixtures and closed after their cleanup. They use port 5174 and fail if it is
+already occupied instead of reusing an unrelated development server. Desktop,
+Android and iOS suites use the same fixture. Production rate limits are unchanged.
+Two regression scenarios each use all 30 allowed requests, check that request 31
+returns 429 and verify health stays available. With the former shared server,
+the second scenario fails on its first request; with isolation both pass.
+
+Validated locally: the regression fails before the fixture change and passes
+after it; all 15 desktop interoperability scenarios, all 15 signaling tests and
+workspace typechecks pass. The new fixture still needs the next remote CI run
+for macOS/Android/iPad validation. No application code or rate limit was changed.
