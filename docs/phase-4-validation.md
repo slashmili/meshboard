@@ -220,3 +220,37 @@ Validated locally: the regression fails before the fixture change and passes
 after it; all 15 desktop interoperability scenarios, all 15 signaling tests and
 workspace typechecks pass. The new fixture still needs the next remote CI run
 for macOS/Android/iPad validation. No application code or rate limit was changed.
+
+## CRDT-aware undo/redo (checkpoint 4f)
+
+Web and native keep local, in-memory per-object inverse history (up to 100
+operations and an 8 MiB serialized-value budget). Undo/redo emits normal CRDT
+updates through the authenticated encrypted session. Remote map changes remove
+only the affected objects from both history stacks, including same-value writes.
+A group move or clear is one action; eraser batches are separate actions. New
+local changes clear redo; rejected changes preserve history and board state.
+Reload/leave starts fresh history; temporary transport reconnect keeps the live
+replica's history. Joining does not make received drawings locally undoable.
+
+This uses conditional inverse writes rather than Yjs/yrs UndoManager. Existing
+whole-element concurrent conflict resolution still applies. A redundant remote
+delete of an already absent object may produce no map event and does not itself
+invalidate redo. History is not a shared chronological timeline or character-level
+text editing. See the CRDT core README for the precise model.
+
+Controls are available on web, desktop and mobile. Web/desktop support Ctrl/⌘ Z,
+Ctrl/⌘ Shift Z and Ctrl/⌘ Y; text editors retain their own keyboard handling.
+
+Mac/iPad follow-up: run the new Apple C binding history test and encrypted iPad
+history scenario in CI; manually check Cmd-Z/Shift-Cmd-Z on macOS, iPad touch
+undo/redo, and real stylus stroke undo. These cannot be executed on this Linux
+machine. No physical-device results are claimed.
+
+Validated on Linux (2026-11-08): 61 web unit tests, workspace typechecks and
+production build, 33 shared-protocol and 15 signaling tests; Rust format,
+Clippy with warnings denied, 16 all-feature tests and rustdoc; 62 desktop/common/
+JNI tests; four focused production-browser tests (history, group movement and
+text editing); all 16 encrypted desktop interoperability scenarios, including
+TURN/reconnect regressions; Android debug/test APK builds, all nine tablet UI
+tests, and the encrypted web/Android undo/redo scenario. The Apple binding test
+and matching live scenario are included for CI but were not run locally.

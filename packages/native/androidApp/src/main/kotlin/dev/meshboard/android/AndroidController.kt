@@ -74,7 +74,8 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
     private fun later(delay: Long, action: () -> Unit) = executor.schedule({ post(action) }, delay, TimeUnit.MILLISECONDS)
     private fun report(error: String? = mutable.value.error) {
         val open = peers.values.filter { it.open }
-        mutable.value = mutable.value.copy(elements = elements, previews = previews.values.toList(), connected = open.size,
+        val history = crdt.history()
+        mutable.value = mutable.value.copy(canUndo = history.first, canRedo = history.second, elements = elements, previews = previews.values.toList(), connected = open.size,
         connecting = peers.size - open.size, relayed = open.count { it.relayed }, error = error)
     }
     override fun newId() = "${System.currentTimeMillis().toString(36)}-${UUID.randomUUID()}"
@@ -86,6 +87,14 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             crdt.move(ids, delta)
             report(); broadcastY(YWire.sync(2, crdt.update(before)))
         }
+    }
+    override fun undo() = post {
+        val before = crdt.stateVector(); crdt.undo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
+    }
+    override fun redo() = post {
+        val before = crdt.stateVector(); crdt.redo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
     }
     private fun local(message: BoardMessage) {
         val board = crdt
@@ -128,7 +137,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             awarenessTask = later(10_000) { tick() }
         }
         awarenessTask = later(10_000) { tick() }
-        mutable.value = BoardState(elements = elements, invite = "$origin/#crdt=$room&key=$sessionKey")
+        mutable.value = BoardState(elements = elements, canUndo = crdt.history().first, canRedo = crdt.history().second, invite = "$origin/#crdt=$room&key=$sessionKey")
         val current = generation
         http.newCall(Request.Builder().url(destination("$base/api/rtc-config")).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) = post { if (current == generation) report("Could not load connection settings. Check the app address and retry.") }

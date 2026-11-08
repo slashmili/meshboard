@@ -20,6 +20,19 @@ class CanvasTest {
     }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
+    @Test fun undoRedoAndClearRestoreThroughProductionController() {
+        rule.onNodeWithTag("mobile-undo").assertIsNotEnabled()
+        draw(); count(1)
+        rule.onNodeWithTag("mobile-undo").performClick(); count(0)
+        rule.onNodeWithTag("mobile-redo").performClick(); count(1)
+        rule.onNodeWithTag("mobile-tool-rectangle").performClick(); draw(); count(2)
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithTag("mobile-clear").performClick()
+        rule.onNodeWithTag("mobile-confirm-clear").performClick(); count(0)
+        rule.onNodeWithTag("mobile-undo").performClick(); count(2)
+        rule.onNodeWithTag("mobile-redo").performClick(); count(0)
+    }
+
     @Test fun drawShapesEraseAndConfirmClear() {
         draw(); count(1)
         rule.onNodeWithTag("mobile-tool-rectangle").performClick(); draw(); count(2)

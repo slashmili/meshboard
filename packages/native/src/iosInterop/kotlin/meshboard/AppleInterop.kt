@@ -12,6 +12,8 @@ class AppleInterop(network: AppleNetwork) {
             "share" -> controller.share(value.text("origin"))
             "join" -> controller.join(value.text("invite"))
             "put" -> controller.put(Wire.element(value.getValue("element")))
+            "undo" -> controller.undo()
+            "redo" -> controller.redo()
             "move" -> controller.move(value.getValue("ids").jsonArray.map { it.jsonPrimitive.content }, meshboard.Point(value.getValue("dx").jsonPrimitive.double, value.getValue("dy").jsonPrimitive.double))
             "remove" -> controller.remove(value.getValue("ids").jsonArray.map { it.jsonPrimitive.content })
             "preview" -> controller.preview(value["element"]?.takeUnless { it == JsonNull }?.let(Wire::element))

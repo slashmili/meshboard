@@ -102,6 +102,8 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                 }
             }
             Row(Modifier.fillMaxWidth().background(colors.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { cancel(); controller.undo() }, enabled = state.canUndo, modifier = Modifier.testTag("mobile-undo")) { Text("Undo") }
+                TextButton(onClick = { cancel(); controller.redo() }, enabled = state.canRedo, modifier = Modifier.testTag("mobile-redo")) { Text("Redo") }
                 MobilePalette.forEach { (name, hex) ->
                     Box(Modifier.size(48.dp).semantics { contentDescription = "$name stroke"; selected = color == hex }.clickable { cancel(); color = hex }.padding(9.dp)
                         .border(1.dp, if (color == hex) mobilePaint(hex) else Color.Transparent, CircleShape).padding(4.dp).background(mobilePaint(hex), CircleShape))

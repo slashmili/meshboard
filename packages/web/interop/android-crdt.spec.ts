@@ -1,3 +1,4 @@
+import { historyInterop } from './history'
 import { selectionInterop } from './selection'
 import { pressureInterop } from './pressure'
 import { arrowsInterop } from './arrows'
@@ -177,4 +178,8 @@ test('pressure samples synchronize native edits and reloads', async ({ page, and
 
 test('selection moves preserve remote edits and skip deleted objects', async ({ page, android }) => {
   await selectionInterop(page, android)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, android }) => {
+  await historyInterop(page, android)
 })

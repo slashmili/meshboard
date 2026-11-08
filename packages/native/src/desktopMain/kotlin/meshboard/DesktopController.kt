@@ -74,7 +74,8 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
     private fun later(delay: Long, action: () -> Unit) = executor.schedule({ if (!disposed) post(action) }, delay, TimeUnit.MILLISECONDS)
     private fun report(error: String? = mutable.value.error) {
         val open = peers.values.filter { it.open }
-        mutable.value = mutable.value.copy(elements = elements, previews = previews.values.toList(),
+        val history = crdt.history()
+        mutable.value = mutable.value.copy(canUndo = history.first, canRedo = history.second, elements = elements, previews = previews.values.toList(),
         connected = open.size, connecting = peers.size - open.size, relayed = open.count { it.relayed }, error = error)
     }
     override fun newId() = "${System.currentTimeMillis().toString(36)}-${UUID.randomUUID()}"
@@ -89,6 +90,14 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
             crdt.move(ids, delta)
             report(); broadcastY(YWire.sync(2, crdt.update(before)))
         }
+    }
+    override fun undo() = post {
+        val before = crdt.stateVector(); crdt.undo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
+    }
+    override fun redo() = post {
+        val before = crdt.stateVector(); crdt.redo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
     }
     private fun local(message: BoardMessage) {
         val board = crdt
@@ -138,7 +147,7 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
             awarenessTask = later(10_000) { tick() }
         }
         awarenessTask = later(10_000) { tick() }
-        mutable.value = BoardState(elements = elements, invite = "$origin/#crdt=$room&key=$sessionKey")
+        mutable.value = BoardState(elements = elements, canUndo = crdt.history().first, canRedo = crdt.history().second, invite = "$origin/#crdt=$room&key=$sessionKey")
         val current = generation
         val request = HttpRequest.newBuilder(URI("$origin/api/rtc-config")).timeout(Duration.ofSeconds(8)).GET().build()
         http.sendAsync(request, HttpResponse.BodyHandlers.ofString()).whenComplete { response, error -> post {

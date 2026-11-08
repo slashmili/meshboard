@@ -323,3 +323,10 @@ Hardware and platform checks are tracked in the Phase 4 ledger.
 **4e — Multi-select and move.** Local selection, marquee, group movement and
 atomic CRDT commits are implemented on web and native. Cancellation, remote
 deletions and preserving received edits are covered; see the Phase 4 ledger.
+
+**4f — CRDT-aware undo/redo.** Bounded local inverse history and controls are
+implemented on web and native, with web/desktop keyboard shortcuts. Remote
+changes invalidate affected object history; unrelated edits remain undoable.
+Group moves and clears undo atomically. See the Phase 4 ledger for validation
+and remaining Mac/iPad checks. Attached connectors, images, export/import,
+expanded presence and opt-in local recovery remain pending.

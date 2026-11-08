@@ -1,6 +1,6 @@
 import { marquee, selectionBounds } from './selection'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
+import { Undo2, Redo2, ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
 import { MAX_ZOOM, MIN_ZOOM, hitsElement, type Point, type BoardElement, type Tool } from './board'
 import { textElement } from './textElements'
@@ -78,8 +78,13 @@ export function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return
       if (event.target instanceof HTMLElement && (event.target.closest('input, textarea, select, dialog') || event.target.isContentEditable)) return
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && ['z', 'y'].includes(event.key.toLowerCase())) {
+        event.preventDefault(); board.cancelGesture()
+        if (event.shiftKey || event.key.toLowerCase() === 'y') document.redo(); else document.undo()
+        return
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return
       const next = TOOLS.find(item => item.key.toLowerCase() === event.key.toLowerCase())
       if (next) {
         board.cancelGesture()
@@ -88,7 +93,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [board.cancelGesture])
+  }, [board.cancelGesture, document])
 
   const { x, y, zoom } = board.view
   const currentTool = TOOLS.find(item => item.id === tool)!
@@ -168,7 +173,10 @@ export function App() {
             <span className="zoom-divider" />
             <button aria-label="Reset view" title="Reset view to 100% and original position" onClick={board.resetView}><RotateCcw size={15} /></button>
           </div>
-          <span className="navigation-hint"><MousePointer2 size={13} /> Scroll to pan <span>·</span> Ctrl/⌘ + scroll to zoom</span>
+          <div className="zoom-panel" role="group" aria-label="Edit history">
+            <button className="quiet-button history-button" aria-label="Undo" title="Undo (Ctrl/⌘ Z)" disabled={!document.canUndo} onClick={() => { board.cancelGesture(); document.undo() }}><Undo2 size={17} /></button>
+            <button className="quiet-button history-button" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" disabled={!document.canRedo} onClick={() => { board.cancelGesture(); document.redo() }}><Redo2 size={17} /></button>
+          </div>
           <button className="help-button" aria-label="Help and keyboard shortcuts" title="Help and keyboard shortcuts" onClick={() => helpDialog.current?.showModal()}><CircleHelp size={20} /></button>
         </div>
       </section>
@@ -191,7 +199,7 @@ export function App() {
         <span className="eyebrow">MAKE YOURSELF AT HOME</span>
         <h2 id="help-title">A few handy shortcuts</h2>
         <label className="theme-control">Appearance <select aria-label="Appearance" value={theme.mode} onChange={event => theme.setMode(event.target.value as ThemeMode)}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-        <div className="shortcuts">{TOOLS.map(item => <div key={item.id}><span>{item.label}</span><kbd>{item.key}</kbd></div>)}<div><span>Temporary pan</span><kbd>Space + drag</kbd></div><div><span>Square, circle, snapped line</span><kbd>Shift + drag</kbd></div></div>
+        <div className="shortcuts">{TOOLS.map(item => <div key={item.id}><span>{item.label}</span><kbd>{item.key}</kbd></div>)}<div><span>Undo / redo</span><kbd>Ctrl/⌘ Z / Shift Z</kbd></div><div><span>Temporary pan</span><kbd>Space + drag</kbd></div><div><span>Square, circle, snapped line</span><kbd>Shift + drag</kbd></div></div>
         <p>Scroll to pan. Use Ctrl/⌘ + scroll to zoom, or pinch with two fingers on a touch screen. The eraser removes whole strokes and shapes.</p>
         <div className="local-notice"><strong>A board that lives in the moment</strong><p>Use Share to invite another browser. Strokes and erasing sync live. Refreshing a shared board restores it from a connected participant; once everyone leaves, it is gone. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.</p></div>
         <button className="primary-button" onClick={() => helpDialog.current?.close()}>Back to the board <ArrowUpRight size={17} /></button>

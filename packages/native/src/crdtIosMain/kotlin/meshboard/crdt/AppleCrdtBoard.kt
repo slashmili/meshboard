@@ -51,6 +51,12 @@ class AppleCrdtBoard internal constructor(clientId: Long) : CrdtBoard {
         }
         call(9, request.toString().encodeToByteArray())
     }
+    override fun undo() { call(10) }
+    override fun redo() { call(11) }
+    override fun history(): Pair<Boolean, Boolean> {
+        val value = Json.parseToJsonElement(call(12).decodeToString()).jsonObject
+        return value.getValue("undo").jsonPrimitive.content.toBooleanStrict() to value.getValue("redo").jsonPrimitive.content.toBooleanStrict()
+    }
     override fun elements(): List<BoardElement> {
         val values = Json.parseToJsonElement(call(6).decodeToString()).jsonObject
         require(values.size <= Wire.MAX_ELEMENTS)

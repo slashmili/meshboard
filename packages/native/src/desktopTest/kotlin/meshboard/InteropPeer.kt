@@ -26,6 +26,8 @@ fun main(args: Array<String>) = runBlocking {
                 "share" -> controller.share(command.text("origin"))
                 "join" -> controller.join(command.text("invite"))
                 "put" -> controller.put(Wire.element(command.getValue("element")))
+                "undo" -> controller.undo()
+                "redo" -> controller.redo()
                 "move" -> controller.move(command.getValue("ids").jsonArray.map { it.jsonPrimitive.content }, meshboard.Point(command.getValue("dx").jsonPrimitive.double, command.getValue("dy").jsonPrimitive.double))
                 "remove" -> controller.remove(command.getValue("ids").jsonArray.map { it.jsonPrimitive.content })
                 "preview" -> controller.preview(command["element"]?.takeUnless { it == JsonNull }?.let(Wire::element))

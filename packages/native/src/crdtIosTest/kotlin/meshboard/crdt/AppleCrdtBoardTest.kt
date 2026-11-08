@@ -41,6 +41,20 @@ class AppleCrdtBoardTest {
         } finally { a.close(); b.close() }
     }
 
+    @Test fun undoRedoBindingsPreserveRemoteObjects() {
+        val a = AppleCrdtBoard(); val b = AppleCrdtBoard()
+        try {
+            a.put(stroke); b.apply(a.update())
+            assertEquals(false to false, b.history())
+            b.put(stroke.copy(id = "remote")); a.apply(b.update(a.stateVector()))
+            a.undo(); b.apply(a.update(b.stateVector()))
+            assertEquals(listOf("remote"), b.elements().map { it.id })
+            assertEquals(false to true, a.history())
+            a.redo(); b.apply(a.update(b.stateVector()))
+            assertEquals(a.elements(), b.elements())
+        } finally { a.close(); b.close() }
+    }
+
     @Test fun closeIsIdempotentAndUseAfterCloseFails() {
         val board = AppleCrdtBoard()
         board.close()

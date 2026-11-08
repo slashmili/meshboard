@@ -2,6 +2,11 @@
 
 ## Unreleased — Phase 4
 
+### CRDT-aware undo and redo
+- Added: local undo/redo on web and native, web/desktop keyboard shortcuts, and atomic group-move/clear history.
+- Added: bounded per-object inverse history that preserves unrelated remote work and invalidates history for objects changed remotely, including identical-value rewrites.
+- Tested: validation rollback, local history isolation, remote conflicts, action/byte limits, UI controls and encrypted peer synchronization. Platform results and deferred Mac/iPad checks are recorded in the Phase 4 ledger.
+
 ### Appearance and delivery decisions
 - Added: System, Light and Dark appearance on web and shared native UI. Controls and dialogs follow the selected theme; the shared paper and stroke colors stay consistent across peers.
 - Added: web appearance preference storage with a fallback when storage is blocked; native appearance survives Android activity recreation.

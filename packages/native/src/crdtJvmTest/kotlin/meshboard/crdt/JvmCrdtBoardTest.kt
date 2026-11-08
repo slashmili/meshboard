@@ -37,6 +37,24 @@ class JvmCrdtBoardTest {
             assertEquals(a.elements(), b.elements())
         } }
     }
+    @Test fun historyIsLocalAndRemoteChangesInvalidateOnlyAffectedObjects() {
+        JvmCrdtBoard().use { a -> JvmCrdtBoard().use { b ->
+            assertEquals(false to false, a.history())
+            a.put(stroke); b.apply(a.update())
+            assertEquals(false to false, b.history())
+            b.put(stroke.copy(id = "remote")); a.apply(b.update(a.stateVector()))
+            a.undo(); b.apply(a.update(b.stateVector()))
+            assertEquals(listOf("remote"), b.elements().map { it.id })
+            assertEquals(false to true, a.history())
+            a.redo(); b.apply(a.update(b.stateVector()))
+            assertEquals(a.elements(), b.elements())
+            b.put(stroke); a.apply(b.update(a.stateVector()))
+            assertEquals(false to false, a.history())
+            a.undo()
+            assertEquals(2, a.elements().size)
+        } }
+    }
+
     @Test fun closingIsIdempotentAndUseAfterCloseFails() {
         val board = JvmCrdtBoard()
         board.close()

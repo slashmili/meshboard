@@ -45,7 +45,8 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
     init { network.listen(this) }
     override fun newId() = NSUUID().UUIDString.lowercase()
     private fun report(error: String? = mutable.value.error) {
-        mutable.value = mutable.value.copy(elements = elements, previews = previews.values.toList(),
+        val history = crdt.history()
+        mutable.value = mutable.value.copy(canUndo = history.first, canRedo = history.second, elements = elements, previews = previews.values.toList(),
         connected = yReceivers.size, relayed = relayed.size, error = error)
     }
     private fun attempt(block: () -> Unit) {
@@ -61,6 +62,14 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
             crdt.move(ids, delta)
             report(); broadcastY(YWire.sync(2, crdt.update(before)))
         }
+    }
+    override fun undo() = attempt {
+        val before = crdt.stateVector(); crdt.undo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
+    }
+    override fun redo() = attempt {
+        val before = crdt.stateVector(); crdt.redo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
     }
     private fun local(message: BoardMessage) {
         val board = crdt
@@ -105,7 +114,7 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
     private fun begin(base: String, id: String, keep: Boolean) {
         disconnect(); if (!keep) resetDocument()
         origin = base; room = id
-        mutable.value = BoardState(elements = elements, invite = "$base/#crdt=$id&key=$sessionKey")
+        mutable.value = BoardState(elements = elements, canUndo = crdt.history().first, canRedo = crdt.history().second, invite = "$base/#crdt=$id&key=$sessionKey")
         network.start(base, id, sessionKey)
         awareness = YAwareness(); awareness.local(network.peerId(), null)
         awarenessJob = scope.launch {

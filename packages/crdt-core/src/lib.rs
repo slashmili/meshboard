@@ -2,7 +2,7 @@
 use serde_json::Value;
 use yrs::types::ToJson;
 use yrs::updates::{decoder::Decode, encoder::Encode};
-use yrs::{Any, Doc, Map, MapRef, ReadTxn, StateVector, Transact, Update};
+use yrs::{Any, Doc, Map, MapRef, Observable, ReadTxn, StateVector, Transact, Update};
 
 #[cfg(feature = "jvm")]
 mod jvm;
@@ -12,6 +12,21 @@ mod bridge;
 #[cfg(feature = "c-api")]
 mod c_api;
 
+mod history;
+use history::History;
+
+#[derive(Clone, Copy)]
+enum ChangeKind {
+    Local,
+    Remote,
+    History,
+}
+#[derive(Clone, Copy)]
+enum Direction {
+    Undo,
+    Redo,
+}
+
 mod error;
 pub use error::BoardError;
 
@@ -20,18 +35,41 @@ pub use error::BoardError;
 pub struct Board {
     doc: Doc,
     elements: MapRef,
+    history: History,
 }
 
 impl Board {
     fn staged(
         &mut self,
+        kind: ChangeKind,
         change: impl FnOnce(&Board) -> Result<(), BoardError>,
     ) -> Result<(), BoardError> {
+        let before = self.try_elements()?;
         let candidate = Board::new(self.doc.client_id().get());
         candidate.apply(&self.update(&[0])?)?;
+        let changed = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashSet::new()));
+        let captured = changed.clone();
+        let _subscription = candidate.elements.observe(move |txn, event| {
+            captured
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .extend(event.keys(txn).keys().map(|id| id.to_string()));
+        });
         change(&candidate)?;
         candidate.validate()?;
+        let after = candidate.try_elements()?;
+        let mut history = std::mem::take(&mut self.history);
+        match kind {
+            ChangeKind::Local => history.record(&before, &after),
+            ChangeKind::Remote => history.invalidate(
+                &changed
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            ),
+            ChangeKind::History => {}
+        }
         *self = candidate;
+        self.history = history;
         Ok(())
     }
 
@@ -43,7 +81,7 @@ impl Board {
         if update.len() > 2 * 1024 * 1024 {
             return Err("CRDT update exceeds preview limits".into());
         }
-        self.staged(|candidate| candidate.apply(update))
+        self.staged(ChangeKind::Remote, |candidate| candidate.apply(update))
     }
 
     /// Inserts an element only if the resulting board passes validation.
@@ -51,7 +89,7 @@ impl Board {
     /// # Errors
     /// Rejects invalid elements or a board exceeding its size limits.
     pub fn validated_put(&mut self, id: &str, value: &Value) -> Result<(), BoardError> {
-        self.staged(|candidate| candidate.put(id, value))
+        self.staged(ChangeKind::Local, |candidate| candidate.put(id, value))
     }
 
     /// Removes an element atomically, retaining the board on validation failure.
@@ -59,7 +97,7 @@ impl Board {
     /// # Errors
     /// Returns an error if the resulting board fails validation.
     pub fn validated_remove(&mut self, id: &str) -> Result<(), BoardError> {
-        self.staged(|candidate| {
+        self.staged(ChangeKind::Local, |candidate| {
             candidate.remove(id);
             Ok(())
         })
@@ -73,7 +111,7 @@ impl Board {
         if ids.len() > 10000 {
             return Err("Too many removed IDs".into());
         }
-        self.staged(|candidate| {
+        self.staged(ChangeKind::Local, |candidate| {
             for id in ids {
                 candidate.remove(id);
             }
@@ -90,7 +128,7 @@ impl Board {
             return Err("Invalid move".into());
         }
         let selected: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
-        self.staged(|candidate| {
+        self.staged(ChangeKind::Local, |candidate| {
             let mut elements = candidate.try_elements()?;
             for (id, element) in elements.as_object_mut().ok_or("Invalid elements")? {
                 if !selected.contains(id.as_str()) {
@@ -104,6 +142,79 @@ impl Board {
             }
             Ok(())
         })
+    }
+
+    /// Whether a local action can currently be undone.
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        !self.history.undo.is_empty()
+    }
+    /// Whether an undone local action can currently be reapplied.
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        !self.history.redo.is_empty()
+    }
+    /// Reverts the latest local action without restoring remotely changed objects.
+    ///
+    /// # Errors
+    /// Leaves state and history intact if the inverse exceeds document limits.
+    pub fn undo(&mut self) -> Result<(), BoardError> {
+        self.apply_history(Direction::Undo)
+    }
+    /// Reapplies the latest undone local action.
+    ///
+    /// # Errors
+    /// Leaves state and history intact if the change exceeds document limits.
+    pub fn redo(&mut self) -> Result<(), BoardError> {
+        self.apply_history(Direction::Redo)
+    }
+    fn apply_history(&mut self, direction: Direction) -> Result<(), BoardError> {
+        loop {
+            let source = match direction {
+                Direction::Undo => &self.history.undo,
+                Direction::Redo => &self.history.redo,
+            };
+            let Some(action) = source.last() else {
+                return Ok(());
+            };
+            let current = self.try_elements()?;
+            let action: Vec<_> = action
+                .iter()
+                .filter(|c| {
+                    current.get(&c.id)
+                        == match direction {
+                            Direction::Undo => c.after.as_ref(),
+                            Direction::Redo => c.before.as_ref(),
+                        }
+                })
+                .cloned()
+                .collect();
+            if !action.is_empty() {
+                self.staged(ChangeKind::History, |candidate| {
+                    for change in &action {
+                        let value = match direction {
+                            Direction::Undo => &change.before,
+                            Direction::Redo => &change.after,
+                        };
+                        if let Some(value) = value {
+                            candidate.put(&change.id, value)?;
+                        } else {
+                            candidate.remove(&change.id);
+                        }
+                    }
+                    Ok(())
+                })?;
+            }
+            let (source, target) = match direction {
+                Direction::Undo => (&mut self.history.undo, &mut self.history.redo),
+                Direction::Redo => (&mut self.history.redo, &mut self.history.undo),
+            };
+            source.pop();
+            if !action.is_empty() {
+                target.push(action);
+                return Ok(());
+            }
+        }
     }
 
     fn validate(&self) -> Result<(), BoardError> {
@@ -204,7 +315,11 @@ impl Board {
     pub fn random() -> Self {
         let doc = Doc::new();
         let elements = doc.get_or_insert_map("elements");
-        Self { doc, elements }
+        Self {
+            doc,
+            elements,
+            history: History::default(),
+        }
     }
 
     /// The harness supplies unique client IDs for deterministic test replicas.
@@ -213,7 +328,11 @@ impl Board {
     pub fn new(client_id: u64) -> Self {
         let doc = Doc::with_client_id(client_id);
         let elements = doc.get_or_insert_map("elements");
-        Self { doc, elements }
+        Self {
+            doc,
+            elements,
+            history: History::default(),
+        }
     }
 
     /// Applies a binary update without board-schema validation.
@@ -289,6 +408,82 @@ impl Board {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn stroke(id: &str, x: i32) -> Value {
+        json!({"id":id,"type":"pen","color":"#293b36","width":3,"points":[{"x":x,"y":0}]})
+    }
+    #[test]
+    fn history_preserves_remote_objects_and_invalidates_identical_remote_writes() {
+        let mut a = Board::new(1);
+        let mut b = Board::new(2);
+        a.validated_put("a", &stroke("a", 0)).unwrap();
+        b.validated_apply(&a.update(&[0]).unwrap()).unwrap();
+        assert!(!b.can_undo());
+        b.validated_put("b", &stroke("b", 0)).unwrap();
+        a.validated_apply(&b.update(&a.state_vector()).unwrap())
+            .unwrap();
+        a.undo().unwrap();
+        assert!(a.elements().get("a").is_none());
+        assert!(a.elements().get("b").is_some());
+        a.redo().unwrap();
+        assert!(a.elements().get("a").is_some());
+        b.validated_apply(&a.update(&b.state_vector()).unwrap())
+            .unwrap();
+        b.validated_put("a", &stroke("a", 0)).unwrap();
+        a.validated_apply(&b.update(&a.state_vector()).unwrap())
+            .unwrap();
+        assert!(!a.can_undo());
+    }
+    #[test]
+    fn group_moves_and_clears_are_single_history_actions() {
+        let mut a = Board::new(1);
+        a.validated_put("a", &stroke("a", 0)).unwrap();
+        a.validated_put("b", &stroke("b", 10)).unwrap();
+        let before = a.elements();
+        a.validated_move(&["a".into(), "b".into()], 20.0, 30.0)
+            .unwrap();
+        let moved = a.elements();
+        a.undo().unwrap();
+        assert_eq!(a.elements(), before);
+        a.redo().unwrap();
+        assert_eq!(a.elements(), moved);
+        a.validated_remove_all(&["a".into(), "b".into()]).unwrap();
+        a.undo().unwrap();
+        assert_eq!(a.elements(), moved);
+        a.validated_put("c", &stroke("c", 0)).unwrap();
+        assert!(!a.can_redo());
+    }
+    #[test]
+    fn rejected_undo_retains_document_and_history() {
+        let mut a = Board::new(1);
+        let mut b = Board::new(2);
+        for i in 0..2000 {
+            let id = format!("e-{i}");
+            a.put(&id, &stroke(&id, 0)).unwrap();
+        }
+        a.validated_remove("e-0").unwrap();
+        b.validated_apply(&a.update(&[0]).unwrap()).unwrap();
+        b.validated_put("new", &stroke("new", 0)).unwrap();
+        a.validated_apply(&b.update(&a.state_vector()).unwrap())
+            .unwrap();
+        let before = a.elements();
+        assert!(a.undo().is_err());
+        assert_eq!(a.elements(), before);
+        assert!(a.can_undo());
+        assert!(!a.can_redo());
+    }
+    #[test]
+    fn history_retains_only_one_hundred_actions() {
+        let mut a = Board::new(1);
+        for i in 0..101 {
+            a.validated_put("a", &stroke("a", i)).unwrap();
+        }
+        for _ in 0..100 {
+            a.undo().unwrap();
+        }
+        assert_eq!(a.elements()["a"], stroke("a", 0));
+        assert!(!a.can_undo());
+    }
 
     #[test]
     fn moves_are_atomic_skip_deleted_objects_and_preserve_pressure() {

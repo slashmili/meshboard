@@ -20,16 +20,19 @@ class AppTest {
     @get:Rule val rule = createComposeRule()
     private class LocalController : BoardController {
         override val state = MutableStateFlow(BoardState())
-        private val doc = BoardDocument()
+        private val local = LocalBoardController { "unused" }
         private var next = 0
         override fun newId() = "test-${++next}"
-        override fun put(element: BoardElement) { doc.apply(BoardMessage("put", element = element)); state.value = state.value.copy(elements = doc.elements) }
-        override fun remove(ids: List<String>) { doc.apply(BoardMessage("remove", ids = ids)); state.value = state.value.copy(elements = doc.elements) }
-        override fun move(ids: List<String>, delta: Point) { doc.apply(BoardMessage("snapshot", elements = translated(doc.elements, ids, delta))); state.value = state.value.copy(elements = doc.elements) }
+        private fun sync() { val next = local.state.value; state.value = state.value.copy(elements = next.elements, canUndo = next.canUndo, canRedo = next.canRedo) }
+        override fun put(element: BoardElement) { local.put(element); sync() }
+        override fun remove(ids: List<String>) { local.remove(ids); sync() }
+        override fun move(ids: List<String>, delta: Point) { local.move(ids, delta); sync() }
+        override fun undo() { local.undo(); sync() }
+        override fun redo() { local.redo(); sync() }
         override fun preview(element: BoardElement?) {}
         override fun share(origin: String) { state.value = state.value.copy(invite = "$origin/#room=123e4567-e89b-42d3-a456-426614174000", signaling = true) }
         override fun join(invite: String) { state.value = BoardState(invite = invite, signaling = true) }
-        override fun leave() { doc.reset(); state.value = BoardState() }
+        override fun leave() { local.discard(); state.value = BoardState() }
         override fun retry() {}
     }
     private fun render(controller: BoardController, height: Int = 768) {
@@ -37,6 +40,31 @@ class AppTest {
     }
     private fun drag() = rule.onNodeWithTag("drawing-canvas").performMouseInput {
         moveTo(Offset(350f, 250f)); press(); moveTo(Offset(460f, 330f)); release()
+    }
+    @Test fun desktopHistoryControlsRestoreDrawingAndClearRedoOnNewEdit() {
+        val controller = LocalController(); render(controller)
+        rule.onNodeWithTag("undo").assertIsNotEnabled()
+        rule.onNodeWithTag("redo").assertIsNotEnabled()
+        drag()
+        rule.onNodeWithTag("undo").performClick()
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        rule.onNodeWithTag("redo").performClick()
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
+        rule.onNodeWithTag("undo").performClick(); drag()
+        rule.onNodeWithTag("redo").assertIsNotEnabled()
+    }
+    @Test fun mobileHistoryControlsUndoAndRedoTouchDrawing() {
+        var next = 0
+        val controller = LocalBoardController { "history-${++next}" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-undo").assertIsNotEnabled()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(200f, 200f)); moveTo(Offset(300f, 280f)); up()
+        }
+        rule.onNodeWithTag("mobile-undo").performClick()
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        rule.onNodeWithTag("mobile-redo").performClick()
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
     }
     @Test fun drawingToolsAndEraserWorkThroughPointerInput() {
         val controller = LocalController(); render(controller)

@@ -70,7 +70,12 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     val colors = appearanceColors(appearance)
     BoardTheme(colors) {
         Column(Modifier.fillMaxSize().background(Paper).onPreviewKeyEvent { event ->
-            if (dialog != null || textEdit != null || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return@onPreviewKeyEvent false
+            if (dialog != null || textEdit != null || event.isAltPressed) return@onPreviewKeyEvent false
+            if ((event.isCtrlPressed || event.isMetaPressed) && event.type == KeyEventType.KeyDown && event.key in listOf(Key.Z, Key.Y)) {
+                cancel(); if (event.isShiftPressed || event.key == Key.Y) controller.redo() else controller.undo()
+                return@onPreviewKeyEvent true
+            }
+            if (event.isCtrlPressed || event.isMetaPressed) return@onPreviewKeyEvent false
             if (event.key == Key.Spacebar) { space = event.type == KeyEventType.KeyDown; return@onPreviewKeyEvent true }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             if (event.key == Key.Escape) { cancel(); return@onPreviewKeyEvent true }
@@ -227,7 +232,10 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     TextButton(onClick = { zoom(1.2) }, enabled = view.zoom < 4, modifier = Modifier.width(40.dp)) { Text("+") }
                     TextButton(onClick = { cancel(); view = View() }) { Text("Reset view", fontSize = 11.sp) }
                 }
-                Text("Scroll to pan · Ctrl/⌘ + scroll to zoom", Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp), color = Muted, fontSize = 10.sp)
+                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).background(colors.surface, RoundedCornerShape(10.dp))) {
+                    TextButton(onClick = { cancel(); controller.undo() }, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
+                    TextButton(onClick = { cancel(); controller.redo() }, enabled = state.canRedo, modifier = Modifier.testTag("redo")) { Text("Redo") }
+                }
                 TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp), colors = ButtonDefaults.textButtonColors(contentColor = Green)) { Text("Help") }
                 state.error?.let { error -> Surface(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).widthIn(max = 480.dp), color = Color(0xfffff9ee), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xffe0c89e))) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(error, Modifier.weight(1f), fontSize = 12.sp, color = Ink); if (state.invite.isNotEmpty()) TextButton(onClick = controller::retry) { Text("Retry") } }
