@@ -35,8 +35,9 @@ links it statically. Native test adapters remain separate from production APIs.
 - Deletes remove map entries. Rendering order stays deterministic by element ID;
   shared-map iteration order must not be used as drawing order.
 - Concurrent replacement of one element resolves through the CRDT's map rules.
-  Fields do not merge independently yet. Collaborative text and per-field edits
-  will need shared nested types and an explicit schema/migration decision.
+  Fields do not merge independently. Text boxes and notes use atomic whole-box
+  replacement; character-level collaborative text would need nested shared types
+  and an explicit schema decision.
 - Updates and state vectors use Yjs's **v1 binary encoding** on both sides.
   This is distinct from Meshboard's existing JSON protocol's `v: 1` field.
 - Previews/presence are ephemeral and are not part of the persistent CRDT state.

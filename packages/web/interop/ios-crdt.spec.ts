@@ -1,3 +1,4 @@
+import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { iosPeer, nativePeer } from './peers'
 import type { UpstreamFixture } from './y-webrtc-peer'
@@ -75,7 +76,13 @@ test('iOS creates; four peers converge on large state, survive creator departure
     await Promise.all([draw(page), draw(fourth)])
     ios.send({ type: 'put', element: stroke('ios') })
     desktop.send({ type: 'put', element: stroke('desktop') })
-    await expect.poll(() => [ios.state().elements.length, desktop.state().elements.length]).toEqual([5, 5])
+    await expect.poll(() => [ios, desktop].map(peer => ({
+      ids: peer.state().elements.map(e => e.id).sort(),
+      count: peer.state().elements.length,
+    })), { message: 'Both native replicas must receive both native edits and both browser strokes' }).toEqual([
+      { ids: expect.arrayContaining(['desktop', 'ios', 'large']), count: 5 },
+      { ids: expect.arrayContaining(['desktop', 'ios', 'large']), count: 5 },
+    ])
     await expect.poll(() => ios.state().elements).toEqual(desktop.state().elements)
     await expect(elements(page)).toHaveCount(5); await expect(elements(fourth)).toHaveCount(5)
     await expect.poll(() => elements(page).evaluateAll(nodes => nodes.map(node => node.outerHTML))).toEqual(await elements(fourth).evaluateAll(nodes => nodes.map(node => node.outerHTML)))
@@ -91,9 +98,15 @@ test('iOS creates; four peers converge on large state, survive creator departure
     await expect(elements(page)).toHaveCount(0); await expect(elements(fourth)).toHaveCount(0)
   } catch (error) {
     const states = [ios, desktop].map(peer => {
-      try { const { elements, previews, ...state } = peer.state(); return { ...state, ids: elements.map(e => e.id), previews: previews.length } }
+      try { const { elements, previews, invite: _invite, ...state } = peer.state(true); return { ...state, ids: elements.map(e => e.id), previews: previews.length } }
       catch (stateError) { return { error: String(stateError) } }
     })
+    const browsers = await Promise.allSettled([page, fourth].filter((peer): peer is Page => !!peer).map(peer => peer.evaluate(() => ({
+      status: document.querySelector('[data-testid="connection-status"]')?.textContent,
+      elements: document.querySelector('[data-testid="drawing-elements"]')?.childElementCount,
+      error: document.querySelector('[role="alert"]')?.textContent,
+    }))))
+    await testInfo.attach('browser-states-before-cleanup', { body: JSON.stringify(browsers, null, 2), contentType: 'application/json' })
     await testInfo.attach('native-peer-states-before-cleanup', { body: JSON.stringify(states, null, 2), contentType: 'application/json' })
     await testInfo.attach('ios-connection-events', { body: JSON.stringify(ios.diagnostics(), null, 2), contentType: 'application/json' })
     throw error
@@ -151,4 +164,8 @@ test('iOS app refuses legacy invites and insecure origins without clearing the b
   await expect.poll(() => ios.state(true).error).toContain('HTTPS')
   expect(ios.state(true).invite).toBe('')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
+})
+
+test('text and sticky notes synchronize edits and late joins across web and iOS', async ({ page, ios, browser }) => {
+  await textElementsInterop(page, ios, browser)
 })

@@ -1,0 +1,128 @@
+# Phase 4 implementation and validation
+
+Phase 3 CI is green, as confirmed by the user. Phase 4 is in progress; the
+checkpoints below are independent tested increments, not a completion claim.
+
+## Scope and decisions
+
+- Appearance: follow the OS by default with System, Light and Dark overrides.
+  Theme changes affect local controls/dialogs, not the shared canvas's colors.
+  Keep paper light so every existing stroke stays visible and exports can match
+  what peers see. Web stores its appearance preference; native retains the override
+  for the current app instance, including Android activity recreation.
+- Recovery: user approved **opt-in** “Remember this board on this device”, default
+  off, with an explicit delete action. Retain the board and invite secret only on
+  the opting-in device. Never persist a live cipher's keys/counters/challenges.
+  Fresh authenticated channels are established on reconnection. This supersedes
+  the earlier unconditional claim that all state disappears when everyone leaves.
+- Snapshots/import: a documented versioned format shared by web and native;
+  imported boards start new sessions with new secrets. Exported files must not
+  include the live session's invite secret or transport authentication state.
+- Preserve encrypted CRDT and awareness transport for every new feature.
+
+## Increments
+
+1. Appearance and accurate sharing/help text.
+2. Shared element model and tools: text, sticky notes, arrows/connectors, images,
+   multi-select and move, with cross-language fixtures and mixed-peer tests.
+3. CRDT-aware undo/redo that does not undo someone else's unrelated edits.
+4. Snapshot import/export and PNG/PDF export on each platform.
+5. Connected-peer names and live cursors using encrypted awareness.
+6. Pressure-sensitive pen input/rendering and graceful mouse/touch fallback.
+7. Opt-in local recovery, resume/delete UX, and reconnect/security tests.
+
+## Appearance verification
+
+Implemented as checkpoint 4a. Passed on Linux: 44 web unit tests, TypeScript
+checks and production build, six production-browser drawing/appearance tests,
+44 native desktop tests, Android debug APK build and seven Android tablet UI
+tests. Reviewed desktop/web-phone dark screenshots; corrected selected-tool
+contrast and reran the affected desktop UI suite. Apple/Windows execution remains
+pending below.
+
+Find Appearance in web Help, the desktop header, or mobile Board options.
+
+Commands:
+
+```sh
+pnpm --filter @meshboard/web check
+pnpm --filter @meshboard/web test
+pnpm --filter @meshboard/web build
+MESHBOARD_TEST_BUILD=1 pnpm --filter @meshboard/web exec playwright test e2e/appearance.spec.ts e2e/board.spec.ts
+./packages/native/gradlew -p packages/native desktopTest
+ANDROID_HOME="$PWD/.android-sdk" ./packages/native/gradlew -p packages/native -Pmeshboard.android=true :androidApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.meshboard.android.CanvasTest
+```
+
+Web tests cover live OS changes, explicit override, reload, blocked storage and
+unchanged stroke data. Compose tests cover mode resolution, desktop/mobile
+controls, actual dark header pixels and drawing preservation. Android's new test
+checks that both drawing and the appearance override survive activity recreation.
+
+## Deferred platform checks
+
+- macOS: native system-theme changes while open, explicit override, packaged app.
+- iPad/iPhone: system-theme changes, override, safe areas, rotation, native dialogs.
+- Windows: system-theme detection and packaged app.
+- Stylus: Apple Pencil, Android pressure stylus and desktop tablet hardware once
+  pressure support is implemented; synthetic events cannot establish device feel.
+
+These checks are pending, not implied by Linux or shared Compose tests. Session
+recovery and the other increments above are not implemented by appearance work.
+
+## Text and sticky notes (checkpoint 4b)
+
+Text (T) and Note (N) tools are implemented on web, desktop and the shared mobile
+UI. Click/tap to create a box, or click an existing text/note with either tool to
+edit it. Save commits one element; Cancel discards the draft. Notes expand
+vertically to fit up to 500 UTF-16 code units. Erasing through a box's interior
+removes the whole object. A second touch cancels placement and starts navigation.
+
+The cross-platform format and atomic-edit semantics are documented in
+[shared schemas](../packages/shared-protocol/README.md#text-and-sticky-note-elements).
+There is no character-level collaborative text editing. Image insertion,
+connectors, selection/moving, undo/redo, export/import, presence, pressure and
+local recovery remain separate increments.
+
+Coverage includes strict shared validation and invalid-update rollback; identical
+Unicode wrapping; native and web create/edit/cancel/erase flows; Android activity
+UI; encrypted mixed-peer edits/late join/deletion while editing; Yjs/yrs Unicode
+round trips and concurrent replacements. The new live scenario is wired into
+Linux desktop, Android and iOS CI. iOS execution remains pending CI/Mac.
+
+Mac/iPad follow-up: create and edit both tools with keyboard/touch, compare
+Unicode text with web, pan/zoom, cancel a placement with a pinch, and confirm
+keyboard dismissal and text-field focus. Physical devices remain unverified here.
+
+Verified on Linux for 4b: 46 web unit tests (plus shared-protocol/signaling suites),
+eight production-browser tests, 20 repeated new text/note runs after fixing the
+queued dialog-close race, 48 desktop tests, eight Android UI tests and expanded
+pinch coverage. Eight Yjs/yrs scenarios passed through Kotlin/JNI, including
+Unicode and concurrent text replacements. Live web/desktop and web/Android text
+scenarios passed; Android requires the local TURN relay (`pnpm turn`). Rust format,
+all-target/all-feature Clippy with warnings denied, six Rust tests and docs pass.
+Desktop UI tests also exercise text creation at the minimum 650-pixel window
+height. No iOS runtime pass is claimed for this increment.
+
+## iPad CI convergence investigation (2026-11-08)
+
+Run [41929821839](https://github.com/slashmili/meshboard/actions/runs/41929821839)
+at appearance commit `43dabd0` compiled iOS successfully, then failed the four-peer
+large-state interoperability test. Five other iPad scenarios passed. Before
+cleanup, both native replicas reported three connected peers, no error, the large
+seed and both browser strokes. Each had its own native stroke but lacked the
+other native stroke (four elements instead of five). This is an unresolved
+convergence failure; neither compilation nor a missing browser gesture explains it.
+
+The Linux four-peer regression now makes both native replicas edit concurrently,
+matching the iPad scenario. Ten repeated runs passed, followed by three more with all test processes pinned
+to one CPU. Workspace typechecks passed with the repository Node 22 toolchain.
+The iPad assertion now includes element IDs in failure output and captures both
+browser states before cleanup; native failure attachments omit the invite secret
+and preserve error states. The original count and equality requirements and
+30-second assertion timeout remain intact. No production workaround was added
+without a reproduced cause.
+
+The failed iPad job was rerun with `gh` on the same commit (attempt 2). Its result
+is pending; this does not validate the later text/note commit or the new local
+diagnostics. Follow up on that rerun and run the updated iPad suite on macOS/CI.
+Do not mark this issue resolved solely because the Linux repetitions pass.

@@ -18,6 +18,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.*
 
 private val MobileInk = Color(0xff293b36)
-private val MobileGreen = Color(0xff254d3c)
 private val MobilePaper = Color(0xfff8f9f6)
 private val MobileMuted = Color(0xff78866e)
 private val MobileBorder = Color(0xffe0e5dc)
@@ -45,6 +46,9 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     var color by rememberSaveable { mutableStateOf("#293b36") }
     var width by rememberSaveable { mutableStateOf(3.0) }
     var view by remember { mutableStateOf(View()) }
+    val textMeasurer = rememberTextMeasurer()
+    var textEdit by remember { mutableStateOf<BoardElement?>(null) }
+    var editingExisting by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf<BoardElement?>(null) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var widthMenu by remember { mutableStateOf(false) }
@@ -59,14 +63,16 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     fun cancel() { draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2, canvasSize.height / density / 2), view.zoom * factor) }
 
-    MaterialTheme(colorScheme = lightColorScheme(primary = MobileGreen, onPrimary = Color.White, surface = Color.White, onSurface = MobileInk, background = MobilePaper, outline = MobileBorder)) {
+    var appearance by rememberAppearance()
+    val colors = appearanceColors(appearance)
+    BoardTheme(colors) {
         Column(Modifier.fillMaxSize().background(MobilePaper)) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).background(Color.White).padding(start = 16.dp, end = 4.dp).testTag("mobile-header"), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).background(colors.surface).padding(start = 16.dp, end = 4.dp).testTag("mobile-header"), verticalAlignment = Alignment.CenterVertically) {
                 MeshboardLogo(Modifier.size(28.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
-                    Text(boardTitle, color = MobileGreen, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(state.connectionLabel, Modifier.testTag("mobile-connection-status"), fontSize = 10.sp, lineHeight = 14.sp, color = MobileMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(boardTitle, color = colors.primary, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(state.connectionLabel, Modifier.testTag("mobile-connection-status"), fontSize = 10.sp, lineHeight = 14.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (sharing != null && qrImage != null) {
                     TextButton(onClick = { cancel(); dialog = "join" }, modifier = Modifier.heightIn(min = 48.dp).testTag("mobile-join"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Join", fontSize = 13.sp) }
@@ -75,25 +81,26 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                 Box {
                     IconButton(onClick = { cancel(); boardMenu = true }, modifier = Modifier.size(48.dp).testTag("mobile-more").semantics { contentDescription = "Board options" }) {
                         Canvas(Modifier.size(20.dp)) {
-                            listOf(.25f, .5f, .75f).forEach { y -> drawCircle(MobileGreen, 1.6.dp.toPx(), Offset(size.width / 2, size.height * y)) }
+                            listOf(.25f, .5f, .75f).forEach { y -> drawCircle(colors.primary, 1.6.dp.toPx(), Offset(size.width / 2, size.height * y)) }
                         }
                     }
                     DropdownMenu(expanded = boardMenu, onDismissRequest = { boardMenu = false }) {
                         DropdownMenuItem(text = { Text("Clear board") }, enabled = state.elements.isNotEmpty(), onClick = { boardMenu = false; dialog = "clear" }, modifier = Modifier.testTag("mobile-clear"))
+                        DropdownMenuItem(text = { Text("Appearance") }, onClick = { boardMenu = false; dialog = "appearance" })
                         DropdownMenuItem(text = { Text("Help") }, onClick = { boardMenu = false; dialog = "help" }, modifier = Modifier.testTag("mobile-help"))
                     }
                 }
             }
             HorizontalDivider(color = MobileBorder)
-            Row(Modifier.fillMaxWidth().background(Color.White).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(Modifier.fillMaxWidth().background(colors.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 Tool.entries.forEach { item ->
                     val label = when (item) { Tool.Rectangle -> "Rect"; Tool.Ellipse -> "Oval"; else -> item.label }
                     TextButton(onClick = { cancel(); toolName = item.name }, modifier = Modifier.width(56.dp).height(48.dp).testTag("mobile-tool-${item.wire}").semantics { contentDescription = item.label; selected = tool == item },
                         contentPadding = PaddingValues(0.dp), shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.textButtonColors(containerColor = if (tool == item) Color(0xffe5efd8) else Color.Transparent)) { Text(label, fontSize = 12.sp) }
+                        colors = ButtonDefaults.textButtonColors(containerColor = if (tool == item) colors.primaryContainer else Color.Transparent)) { Text(label, fontSize = 12.sp) }
                 }
             }
-            Row(Modifier.fillMaxWidth().background(Color.White).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().background(colors.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 MobilePalette.forEach { (name, hex) ->
                     Box(Modifier.size(48.dp).semantics { contentDescription = "$name stroke"; selected = color == hex }.clickable { cancel(); color = hex }.padding(9.dp)
                         .border(1.dp, if (color == hex) mobilePaint(hex) else Color.Transparent, CircleShape).padding(4.dp).background(mobilePaint(hex), CircleShape))
@@ -148,7 +155,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     val world = view.world(point)
                                     if (pointer == null && change.pressed) {
                                         pointer = change.id; start = world; last = point
-                                        if (tool != Tool.Hand && tool != Tool.Eraser) {
+                                        if (tool != Tool.Hand && tool != Tool.Eraser && tool != Tool.Text && tool != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), tool.wire, color, width, if (tool == Tool.Pen) listOf(world) else listOf(world, world))
                                         }
                                     }
@@ -172,6 +179,11 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     }
                                     last = point
                                     if (!change.pressed) {
+                                        if ((tool == Tool.Text || tool == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
+                                            val existing = latest.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
+                                            editingExisting = existing != null
+                                            textEdit = existing ?: textElement(controller.newId(), tool.wire, world, color, "")
+                                        }
                                         draft?.let { element ->
                                             val a = element.points.first(); val b = element.points.last()
                                             if (element.type == "pen" || hypot(b.x - a.x, b.y - a.y) > 1 / view.zoom) controller.put(element)
@@ -192,9 +204,9 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                         x += spacing
                     }
                     withTransform({ scale(d, d, Offset.Zero); translate(view.x.toFloat(), view.y.toFloat()); scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero) }) {
-                        state.elements.forEach { mobileElement(it) }
-                        state.previews.forEach { mobileElement(it, .65f) }
-                        draft?.let { mobileElement(it) }
+                        state.elements.forEach { mobileElement(it, textMeasurer) }
+                        state.previews.forEach { mobileElement(it, textMeasurer, .65f) }
+                        draft?.let { mobileElement(it, textMeasurer) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null) Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -204,25 +216,29 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                     Spacer(Modifier.height(10.dp))
                     Text("Draw with one finger. Pan and pinch with two.", fontSize = 12.sp, color = MobileMuted)
                 }
-                state.error?.let { Text(it, Modifier.align(Alignment.TopCenter).background(Color(0xfffff2d9)).padding(12.dp), fontSize = 12.sp) }
+                state.error?.let { Text(it, Modifier.align(Alignment.TopCenter).background(Color(0xfffff2d9)).padding(12.dp), fontSize = 12.sp, color = MobileInk) }
             }
             HorizontalDivider(color = MobileBorder)
-            Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().background(colors.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { zoom(1 / 1.2) }, enabled = view.zoom > .25, modifier = Modifier.testTag("mobile-zoom-out")) { Text("−") }
                 Text("${(view.zoom * 100).roundToInt()}%", fontSize = 12.sp, modifier = Modifier.testTag("mobile-zoom"))
                 TextButton(onClick = { zoom(1.2) }, enabled = view.zoom < 4, modifier = Modifier.testTag("mobile-zoom-in")) { Text("+") }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { cancel(); view = View() }) { Text("Reset view", fontSize = 12.sp) }
             }
-            Text(if (state.invite.isEmpty()) "Session-only canvas · not saved" else if (state.relayed > 0) "VIA RELAY · prototype / unverified peers" else "WebRTC · prototype / unverified peers",
-                Modifier.fillMaxWidth().background(Color.White).padding(start = 16.dp, bottom = 8.dp).testTag("mobile-connection-route"), color = MobileMuted, fontSize = 10.sp)
+            Text(if (state.invite.isEmpty()) "Session-only canvas · not saved" else if (state.relayed > 0) "VIA RELAY · encrypted" else "WebRTC · encrypted",
+                Modifier.fillMaxWidth().background(colors.surface).padding(start = 16.dp, bottom = 8.dp).testTag("mobile-connection-route"), color = colors.onSurfaceVariant, fontSize = 10.sp)
         }
+        textEdit?.let { editing -> TextEditor(editing, deleted = editingExisting && state.elements.none { it.id == editing.id }, onSave = { controller.put(it); textEdit = null }, onDismiss = { textEdit = null }) }
         if (dialog == "clear") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Clear this board?") }, text = { Text("Remove every object${if (state.invite.isNotEmpty()) " for everyone" else ""}? There’s no undo in this version.") },
             confirmButton = { Button(onClick = { controller.remove(state.elements.map { it.id }); dialog = null }, modifier = Modifier.testTag("mobile-confirm-clear")) { Text("Clear board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
         if (dialog == "help") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A little space for ideas") }, text = {
-            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nConnection prototype: WebRTC transport encryption only. Invites and peers are not authenticated; application encryption comes later. Don’t use for sensitive content.")
+            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nInvites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.")
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
+        if (dialog == "appearance") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
+            AppearanceOptions(appearance) { appearance = it }
+        }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
         if (dialog == "join" && sharing != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Join a board") }, text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Joining replaces your current canvas. Paste the full invite, including #room=…")
@@ -250,7 +266,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                     }
                 }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Text("Prototype: transport encryption only; peers are not authenticated. Don’t share sensitive content.", fontSize = 12.sp)
+                Text("Board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.", fontSize = 12.sp)
             }
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
         if (dialog == "leave" && sharing != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Leave this board?") }, text = { Text("Your local copy will be discarded. Other connected participants can keep drawing.") },
@@ -259,7 +275,8 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     }
 }
 
-private fun DrawScope.mobileElement(element: BoardElement, alpha: Float = 1f) {
+private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
+    if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = mobilePaint(element.color).copy(alpha = alpha)
     val a = element.points.first(); val b = element.points.last()
     if (element.points.size == 1) { drawCircle(color, element.width.toFloat() / 2, Offset(a.x.toFloat(), a.y.toFloat())); return }

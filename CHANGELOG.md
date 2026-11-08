@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — Phase 4
+
+### Appearance and delivery decisions
+- Added: System, Light and Dark appearance on web and shared native UI. Controls and dialogs follow the selected theme; the shared paper and stroke colors stay consistent across peers.
+- Added: web appearance preference storage with a fallback when storage is blocked; native appearance survives Android activity recreation.
+- Fixed: Share/Help and mobile connection labels now describe the implemented authenticated end-to-end encryption instead of the old Phase 1 prototype.
+- Verified: 44 web unit tests, six production-browser drawing/appearance tests, 44 desktop tests and seven Android tablet UI tests; Android APK build and dark-layout screenshot review. Apple/Windows appearance checks remain tracked.
+- Spec: local board recovery will be opt-in, default off, with a delete action. Record scope, implementation order and deferred Mac/iPad checks in `docs/phase-4-validation.md`.
+
+### Text boxes and sticky notes
+- Added: text (T) and note (N) tools on web, desktop and shared mobile UI, with click/tap creation and editing, cancel, multiline Unicode content, content-sized boxes and whole-area erasing.
+- Added: matching TypeScript/Kotlin/Rust validation, bounded plain-text content, shared fixtures, and encrypted cross-platform edit/late-join scenarios. Edits replace one CRDT element; character-level collaborative editing is not claimed.
+- Fixed: an editor cannot save an object already deleted by another peer; delayed browser dialog-close events cannot clear a newly opened edit. Desktop stroke controls sit beside the expanded toolbar to fit the minimum window height.
+- Verified: workspace unit checks, Rust format/Clippy/tests/docs, 48 desktop tests, eight Android tablet UI tests, eight production-browser tests and 20 repeated text/note runs; eight Yjs/yrs scenarios through Kotlin/JNI and live web↔desktop/web↔Android text scenarios. Expanded pinch checks pass on web and Android. iOS scenario is wired into CI; Mac/iPad execution remains pending.
+
+### iPad convergence investigation
+- Tested: the Linux four-peer regression now includes concurrent edits from both native replicas; ten repeated runs, three single-CPU runs and workspace typechecks pass.
+- Added: element IDs in the iPad convergence assertion and browser-state capture before cleanup. Native failure capture retains errors and omits the invite secret.
+- Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in `docs/phase-4-validation.md`.
+
 ## Unreleased — Phase 3
 
 ### Added

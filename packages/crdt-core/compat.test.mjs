@@ -133,3 +133,20 @@ test('a remaining peer can seed a newcomer after the original creator disappears
   deepStrictEqual(merged.elements, newcomer.getMap('elements').toJSON())
   strictEqual(Object.keys(merged.elements).length, 3)
 })
+
+test('text and sticky notes round-trip Unicode and concurrent whole-element replacements', async t => {
+  const textFixtures = JSON.parse(readFileSync(new URL('../shared-protocol/fixtures/text-elements.json', import.meta.url), 'utf8'))
+  const doc = web(t, 301)
+  for (const element of textFixtures.valid) doc.getMap('elements').set(element.id, element)
+  const initial = await native({ clientId: 302, updates: [snapshot(doc)] })
+  deepStrictEqual(initial.elements, doc.getMap('elements').toJSON())
+  const edited = { ...textFixtures.valid[0], text: 'Native edit 世界 👋' }
+  const changed = await native({ clientId: 302, updates: [initial.update], operations: [put(edited)], targetStateVector: vector(doc) })
+  apply(doc, changed.update)
+  deepStrictEqual(doc.getMap('elements').get(edited.id), edited)
+  doc.getMap('elements').set(edited.id, { ...edited, text: 'Web edit' })
+  const concurrent = await native({ clientId: 302, updates: [initial.update], operations: [put({ ...edited, text: 'Concurrent native edit' })] })
+  apply(doc, concurrent.update)
+  const converged = await native({ clientId: 302, updates: [concurrent.update, snapshot(doc)] })
+  deepStrictEqual(converged.elements, doc.getMap('elements').toJSON())
+})

@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +48,9 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     var color by remember { mutableStateOf(Palette.first().second) }
     var width by remember { mutableStateOf(3.0) }
     var view by remember { mutableStateOf(View()) }
+    val textMeasurer = rememberTextMeasurer()
+    var textEdit by remember { mutableStateOf<BoardElement?>(null) }
+    var editingExisting by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf<BoardElement?>(null) }
     var space by remember { mutableStateOf(false) }
     var cancelled by remember { mutableIntStateOf(0) }
@@ -60,24 +65,27 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     fun cancel() { draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2.0, canvasSize.height / density / 2.0), view.zoom * factor) }
 
-    MaterialTheme(colorScheme = lightColorScheme(primary = Green, onPrimary = Color.White, background = Paper, surface = Color.White, onSurface = Ink, outline = Border)) {
+    var appearance by rememberAppearance()
+    val colors = appearanceColors(appearance)
+    BoardTheme(colors) {
         Column(Modifier.fillMaxSize().background(Paper).onPreviewKeyEvent { event ->
-            if (dialog != null || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return@onPreviewKeyEvent false
+            if (dialog != null || textEdit != null || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return@onPreviewKeyEvent false
             if (event.key == Key.Spacebar) { space = event.type == KeyEventType.KeyDown; return@onPreviewKeyEvent true }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             if (event.key == Key.Escape) { cancel(); return@onPreviewKeyEvent true }
-            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.H -> Tool.Hand; else -> null }
+            val next = when (event.key) { Key.P -> Tool.Pen; Key.E -> Tool.Eraser; Key.R -> Tool.Rectangle; Key.O -> Tool.Ellipse; Key.L -> Tool.Line; Key.H -> Tool.Hand; Key.T -> Tool.Text; Key.N -> Tool.Sticky; else -> null }
             if (next != null) { cancel(); tool = next; true } else false
         }) {
-            Row(Modifier.fillMaxWidth().height(76.dp).background(Color.White).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth().height(76.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 MeshboardLogo(Modifier.size(36.dp))
-                Text("Meshboard", color = Green, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Meshboard", color = colors.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 VerticalDivider(Modifier.height(28.dp))
-                Column { Text("Untitled board", fontSize = 13.sp, fontWeight = FontWeight.Medium); Text("Desktop · a space for ideas", color = Muted, fontSize = 10.sp) }
+                Column { Text("Untitled board", fontSize = 13.sp, fontWeight = FontWeight.Medium); Text("Desktop · a space for ideas", color = colors.onSurfaceVariant, fontSize = 10.sp) }
                 Spacer(Modifier.weight(1f))
-                Surface(shape = RoundedCornerShape(30.dp), color = Color(0xfff0f4e9), border = BorderStroke(1.dp, Border)) { Text(state.connectionLabel, Modifier.padding(10.dp, 7.dp).testTag("connection-status"), fontSize = 11.sp, color = Green) }
+                Surface(shape = RoundedCornerShape(30.dp), color = colors.primaryContainer, border = BorderStroke(1.dp, Border)) { Text(state.connectionLabel, Modifier.padding(10.dp, 7.dp).testTag("connection-status"), fontSize = 11.sp, color = colors.primary) }
                 TextButton(onClick = { cancel(); dialog = "join" }) { Text("Join", fontSize = 12.sp) }
                 Button(onClick = { cancel(); copied = false; dialog = "share" }, shape = RoundedCornerShape(8.dp)) { Text("Share", fontSize = 12.sp) }
+                TextButton(onClick = { cancel(); dialog = "appearance" }) { Text("Appearance", fontSize = 12.sp) }
                 TextButton(onClick = { cancel(); dialog = "clear" }, enabled = state.elements.isNotEmpty()) { Text("Clear", fontSize = 12.sp) }
             }
             HorizontalDivider(color = Border)
@@ -109,7 +117,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         focus.requestFocus()
                                         active = if (space || event.buttons.isTertiaryPressed) Tool.Hand else tool
                                         last = p; start = world
-                                        if (active != Tool.Hand && active != Tool.Eraser) {
+                                        if (active != Tool.Hand && active != Tool.Eraser && active != Tool.Text && active != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), active!!.wire, color, width, if (active == Tool.Pen) listOf(world) else listOf(world, world))
                                             controller.preview(draft)
                                         }
@@ -139,6 +147,11 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         }
                                         last = p
                                         if (!change.pressed) {
+                                            if ((active == Tool.Text || active == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
+                                                val existing = currentState.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
+                                                editingExisting = existing != null
+                                                textEdit = existing ?: textElement(controller.newId(), active!!.wire, world, color, "")
+                                            }
                                             draft?.let { element ->
                                                 val first = element.points.first(); val end = element.points.last()
                                                 if (element.type == "pen" || hypot(end.x - first.x, end.y - first.y) > 1 / view.zoom) controller.put(element)
@@ -161,9 +174,9 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                         translate(view.x.toFloat(), view.y.toFloat())
                         scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero)
                     }) {
-                        state.elements.forEach { drawElement(it) }
-                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, .65f) }
-                        draft?.let { drawElement(it) }
+                        state.elements.forEach { drawElement(it, textMeasurer) }
+                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, .65f) }
+                        draft?.let { drawElement(it, textMeasurer) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null && state.previews.isEmpty()) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -172,11 +185,11 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     Spacer(Modifier.height(12.dp)); Text("A rough sketch. A big idea. A place to start.", fontSize = 13.sp, color = Muted)
                     Spacer(Modifier.height(6.dp)); Text("Pick a tool and make it yours.", fontSize = 13.sp, color = Muted)
                 }
-                Column(Modifier.align(Alignment.TopStart).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.align(Alignment.TopStart).padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(shape = RoundedCornerShape(14.dp), shadowElevation = 3.dp, border = BorderStroke(1.dp, Border)) {
                         Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Tool.entries.forEach { item ->
-                                TextButton(onClick = { cancel(); tool = item }, modifier = Modifier.width(125.dp).height(42.dp).testTag("tool-${item.wire}"), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.textButtonColors(containerColor = if (tool == item) Color(0xffe5efd8) else Color.Transparent, contentColor = if (tool == item) Green else Muted)) {
+                                TextButton(onClick = { cancel(); tool = item }, modifier = Modifier.width(125.dp).height(42.dp).testTag("tool-${item.wire}"), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.textButtonColors(containerColor = if (tool == item) colors.primaryContainer else Color.Transparent, contentColor = if (tool == item) colors.onPrimaryContainer else colors.onSurfaceVariant)) {
                                     Text(item.shortcut, fontSize = 11.sp, modifier = Modifier.width(24.dp)); Text(item.label, fontSize = 12.sp, modifier = Modifier.weight(1f))
                                 }
                             }
@@ -184,13 +197,13 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     }
                     Surface(shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Border)) {
                         Column(Modifier.width(137.dp).padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Text("STROKE", fontSize = 9.sp, letterSpacing = 1.sp, color = Muted)
+                            Text("STROKE", fontSize = 9.sp, letterSpacing = 1.sp, color = colors.onSurfaceVariant)
                             Palette.chunked(3).forEach { row -> Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) { row.forEach { (label, hex) ->
                                 Box(Modifier.size(29.dp).border(1.dp, if (color == hex) paint(hex) else Color.Transparent, CircleShape).padding(4.dp).background(paint(hex), CircleShape).clickable { color = hex }.semantics { contentDescription = label })
                             } } }
                             HorizontalDivider(color = Border)
                             Row { listOf(2.0, 3.0, 6.0).forEach { value ->
-                                Box(Modifier.size(34.dp, 29.dp).background(if (width == value) Color(0xffeef3e7) else Color.Transparent, RoundedCornerShape(5.dp)).clickable { width = value }.semantics { contentDescription = "Stroke width ${value.toInt()}" }, contentAlignment = Alignment.Center) { Box(Modifier.size(17.dp, value.dp).background(Muted, CircleShape)) }
+                                Box(Modifier.size(34.dp, 29.dp).background(if (width == value) colors.primaryContainer else Color.Transparent, RoundedCornerShape(5.dp)).clickable { width = value }.semantics { contentDescription = "Stroke width ${value.toInt()}" }, contentAlignment = Alignment.Center) { Box(Modifier.size(17.dp, value.dp).background(colors.onSurfaceVariant, CircleShape)) }
                             } }
                         }
                     }
@@ -199,46 +212,47 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     Text(if (state.invite.isEmpty()) "Just this window, just for now." else "Shared live. Never saved.", color = Muted, fontSize = 11.sp)
                     Text(if (state.invite.isEmpty()) "Closing discards your board." else "Gone when everyone leaves.", color = Muted, fontSize = 11.sp)
                 }
-                Row(Modifier.align(Alignment.BottomStart).padding(24.dp).background(Color.White, RoundedCornerShape(10.dp)).border(1.dp, Border, RoundedCornerShape(10.dp)).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.align(Alignment.BottomStart).padding(24.dp).background(colors.surface, RoundedCornerShape(10.dp)).border(1.dp, Border, RoundedCornerShape(10.dp)).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { zoom(1 / 1.2) }, enabled = view.zoom > .25, modifier = Modifier.width(40.dp)) { Text("−") }
                     Text("${(view.zoom * 100).roundToInt()}%", fontSize = 11.sp, modifier = Modifier.testTag("zoom"))
                     TextButton(onClick = { zoom(1.2) }, enabled = view.zoom < 4, modifier = Modifier.width(40.dp)) { Text("+") }
                     TextButton(onClick = { cancel(); view = View() }) { Text("Reset view", fontSize = 11.sp) }
                 }
                 Text("Scroll to pan · Ctrl/⌘ + scroll to zoom", Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp), color = Muted, fontSize = 10.sp)
-                TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp)) { Text("Help") }
+                TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp), colors = ButtonDefaults.textButtonColors(contentColor = Green)) { Text("Help") }
                 state.error?.let { error -> Surface(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).widthIn(max = 480.dp), color = Color(0xfffff9ee), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xffe0c89e))) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(error, Modifier.weight(1f), fontSize = 12.sp); if (state.invite.isNotEmpty()) TextButton(onClick = controller::retry) { Text("Retry") } }
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(error, Modifier.weight(1f), fontSize = 12.sp, color = Ink); if (state.invite.isNotEmpty()) TextButton(onClick = controller::retry) { Text("Retry") } }
                 } }
             }
             HorizontalDivider(color = Border)
-            Row(Modifier.fillMaxWidth().height(34.dp).background(Color.White).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (space) "Pan" else tool.label, color = Green, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.width(16.dp)); Text("P pen · E eraser · R rectangle · O ellipse · L line · H pan · Shift constrains shapes", color = Muted, fontSize = 10.sp)
-                Spacer(Modifier.weight(1f)); Text(if (state.connected == 0) "WEB ↔ DESKTOP / 03" else if (state.relayed > 0) "VIA RELAY / 03" else "DIRECT CONNECTION / 03", fontSize = 9.sp, color = Muted, modifier = Modifier.testTag("connection-route"))
+            Row(Modifier.fillMaxWidth().height(34.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (space) "Pan" else tool.label, color = colors.primary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.width(16.dp)); Text("P pen · E eraser · R rectangle · O ellipse · L line · H pan · Shift constrains shapes", color = colors.onSurfaceVariant, fontSize = 10.sp)
+                Spacer(Modifier.weight(1f)); Text(if (state.connected == 0) "WEB ↔ DESKTOP / 03" else if (state.relayed > 0) "VIA RELAY / 03" else "DIRECT CONNECTION / 03", fontSize = 9.sp, color = colors.onSurfaceVariant, modifier = Modifier.testTag("connection-route"))
             }
         }
+        textEdit?.let { editing -> TextEditor(editing, deleted = editingExisting && state.elements.none { it.id == editing.id }, onSave = { controller.put(it); textEdit = null }, onDismiss = { textEdit = null }) }
         when (dialog) {
             "share" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Make room for a friend.") }, text = {
                 Column(Modifier.width(370.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (state.invite.isEmpty()) {
                         Text("Create a shared board from this window. Your existing drawing will be included.", fontSize = 13.sp)
                         OutlinedTextField(origin, { origin = it }, label = { Text("App address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        Text("Use the address where the web app and signaling service run.", fontSize = 11.sp, color = Muted)
+                        Text("Use the address where the web app and signaling service run.", fontSize = 11.sp, color = colors.onSurfaceVariant)
                     } else {
                         Text("Open this invite in the web app or another desktop window.", fontSize = 13.sp)
                         val image = remember(state.invite) { qrImage(state.invite) }
                         if (image != null) Image(image, "QR code for this board", Modifier.size(192.dp).align(Alignment.CenterHorizontally))
                         OutlinedTextField(state.invite, {}, readOnly = true, label = { Text("Board invite") }, modifier = Modifier.fillMaxWidth().testTag("invite"))
-                        Text(if (copied) "Link copied." else "The localhost address works on this computer only.", fontSize = 11.sp, color = Muted)
+                        Text(if (copied) "Link copied." else "The localhost address works on this computer only.", fontSize = 11.sp, color = colors.onSurfaceVariant)
                     }
-                    Text("Connection prototype: invites are not authenticated and application-layer encryption is not implemented. Use test drawings.", fontSize = 11.sp, color = Muted)
+                    Text("Board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.", fontSize = 11.sp, color = colors.onSurfaceVariant)
                 }
             }, confirmButton = { Button(onClick = { if (state.invite.isEmpty()) controller.share(origin) else { clipboard.setText(AnnotatedString(state.invite)); copied = true } }) { Text(if (state.invite.isEmpty()) "Create invite" else "Copy invite") } }, dismissButton = { Row { if (state.invite.isNotEmpty()) TextButton(onClick = { dialog = "leave" }) { Text("Leave board") }; TextButton(onClick = { dialog = null }) { Text("Done") } } })
             "join" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Join a board") }, text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Paste the full invite link from the web or desktop app.", fontSize = 13.sp)
                 OutlinedTextField(joinLink, { joinLink = it }, label = { Text("Invite link") }, modifier = Modifier.width(380.dp).testTag("join-link"))
-                if (state.elements.isNotEmpty() || state.invite.isNotEmpty()) Text("Joining discards this window’s current copy. Other connected peers keep theirs.", fontSize = 12.sp, color = Muted)
+                if (state.elements.isNotEmpty() || state.invite.isNotEmpty()) Text("Joining discards this window’s current copy. Other connected peers keep theirs.", fontSize = 12.sp, color = colors.onSurfaceVariant)
             } }, confirmButton = { Button(onClick = { controller.join(joinLink); view = View(); dialog = null }, enabled = joinLink.isNotBlank()) { Text("Join board") } }, dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
             "clear", "leave" -> {
                 val leaving = dialog == "leave"
@@ -246,12 +260,16 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     Text(if (leaving) "Your copy will be discarded. Others can keep drawing; if you’re the last participant, the board is gone." else "Remove the objects you currently see for everyone on the board? There’s no undo in this version.")
                 }, confirmButton = { Button(onClick = { cancel(); if (leaving) { controller.leave(); view = View() } else controller.remove(state.elements.map { it.id }); dialog = null }) { Text(if (leaving) "Leave" else "Clear board") } }, dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
             }
-            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("P pen · E eraser · R rectangle · O ellipse · L line · H pan\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. No export, undo, or application-layer encryption yet.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
+            "appearance" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
+                AppearanceOptions(appearance) { appearance = it }
+            }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
+            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("P pen · E eraser · R rectangle · O ellipse · L line · H pan\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
         }
     }
 }
 
-private fun DrawScope.drawElement(element: BoardElement, alpha: Float = 1f) {
+private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
+    if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = paint(element.color).copy(alpha = alpha)
     val points = element.points
     if (points.size == 1) { drawCircle(color, element.width.toFloat() / 2, points.first().offset()); return }

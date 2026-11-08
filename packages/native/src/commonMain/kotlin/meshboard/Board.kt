@@ -14,9 +14,9 @@ data class View(val x: Double = 0.0, val y: Double = 0.0, val zoom: Double = 1.0
 enum class Tool(val wire: String, val label: String, val shortcut: String) {
     Pen("pen", "Pen", "P"), Eraser("eraser", "Eraser", "E"),
     Rectangle("rectangle", "Rectangle", "R"), Ellipse("ellipse", "Ellipse", "O"),
-    Line("line", "Line", "L"), Hand("hand", "Pan", "H")
+    Line("line", "Line", "L"), Text("text", "Text", "T"), Sticky("sticky", "Note", "N"), Hand("hand", "Pan", "H")
 }
-data class BoardElement(val id: String, val type: String, val color: String, val width: Double, val points: List<Point>)
+data class BoardElement(val id: String, val type: String, val color: String, val width: Double, val points: List<Point>, val text: String? = null)
 data class BoardMessage(
     val type: String, val element: BoardElement? = null, val ids: List<String> = emptyList(),
     val elements: List<BoardElement> = emptyList(), val removed: List<String> = emptyList(),
@@ -35,7 +35,7 @@ class BoardDocument {
         val deletes = when (message.type) { "remove" -> message.ids; "snapshot" -> message.removed; else -> emptyList() }
         deletes.forEach { nextRemoved.add(it); nextObjects.remove(it) }
         val adds = when (message.type) { "put" -> listOf(requireNotNull(message.element)); "snapshot" -> message.elements; else -> emptyList() }
-        adds.forEach { if (it.id !in nextRemoved && it.id !in nextObjects) nextObjects[it.id] = it }
+        adds.forEach { if (it.id !in nextRemoved) nextObjects[it.id] = it }
         require(nextObjects.size <= Wire.MAX_ELEMENTS && nextRemoved.size <= Wire.MAX_REMOVED) { "This prototype board is full. Start a new board." }
         val snapshot = BoardMessage("snapshot", elements = nextObjects.values.toList(), removed = nextRemoved.toList())
         require(Wire.encode(snapshot).encodeToByteArray().size <= Wire.MAX_MESSAGE) { "This prototype board is full. Start a new board." }
@@ -58,7 +58,7 @@ fun outline(element: BoardElement): List<Point> {
     if (element.type == "pen" || element.type == "line") return element.points
     val a = element.points.first(); val b = element.points.last()
     val x = min(a.x, b.x); val y = min(a.y, b.y); val w = abs(b.x - a.x); val h = abs(b.y - a.y)
-    if (element.type == "rectangle") return listOf(Point(x, y), Point(x + w, y), Point(x + w, y + h), Point(x, y + h), Point(x, y))
+    if (element.type in listOf("rectangle", "text", "sticky")) return listOf(Point(x, y), Point(x + w, y), Point(x + w, y + h), Point(x, y + h), Point(x, y))
     return (0..96).map { i -> val angle = i / 96.0 * PI * 2; Point(x + w / 2 + cos(angle) * w / 2, y + h / 2 + sin(angle) * h / 2) }
 }
 
@@ -69,6 +69,11 @@ private fun distance(p: Point, a: Point, b: Point): Double {
 }
 private fun cross(a: Point, b: Point, c: Point) = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
 fun hits(element: BoardElement, from: Point, to: Point, radius: Double): Boolean {
+    if (element.text != null) {
+        val a = element.points.first(); val b = element.points.last()
+        fun inside(p: Point) = p.x in min(a.x,b.x)..max(a.x,b.x) && p.y in min(a.y,b.y)..max(a.y,b.y)
+        if (inside(from) || inside(to)) return true
+    }
     val points = outline(element); val threshold = radius + element.width / 2
     if (points.size == 1) return distance(points[0], from, to) <= threshold
     return points.zipWithNext().any { (a, b) ->

@@ -96,6 +96,8 @@ impl Board {
             color: String,
             width: f64,
             points: Vec<Point>,
+            #[serde(default)]
+            text: Option<String>,
         }
         let txn = self.doc.transact();
         if txn.root_refs().any(|(name, _)| name != "elements") || self.elements.len(&txn) > 2000 {
@@ -117,11 +119,22 @@ impl Board {
         }
         for (id, value) in json.as_object().ok_or("Invalid elements map")? {
             let e: Element = serde_json::from_value(value.clone())?;
-            if e.id != *id
+            let is_text = matches!(e.r#type.as_str(), "text" | "sticky");
+            // Presence matters: null must not bypass the same strict schema as web/Kotlin.
+            let valid_text = if is_text {
+                e.text
+                    .as_ref()
+                    .is_some_and(|text| (1..=500).contains(&text.encode_utf16().count()))
+            } else {
+                value.get("text").is_none()
+            };
+            if !valid_text
+                || e.id != *id
                 || id.is_empty()
                 || id.len() > 80
                 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
-                || !["pen", "rectangle", "ellipse", "line"].contains(&e.r#type.as_str())
+                || !["pen", "rectangle", "ellipse", "line", "text", "sticky"]
+                    .contains(&e.r#type.as_str())
                 || e.color.len() != 7
                 || !e.color.starts_with('#')
                 || !e.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
@@ -229,6 +242,35 @@ impl Board {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn text_fixtures_validate_and_invalid_updates_leave_state_intact() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../shared-protocol/fixtures/text-elements.json"
+        ))
+        .expect("valid fixture JSON");
+        let mut board = Board::new(1);
+        for element in fixtures["valid"].as_array().expect("valid fixtures") {
+            let id = element["id"].as_str().expect("fixture id");
+            board
+                .validated_put(id, element)
+                .expect("valid text element");
+        }
+        let before = board.try_elements().expect("valid board");
+        for element in fixtures["invalid"].as_array().expect("invalid fixtures") {
+            let id = element["id"].as_str().expect("fixture id");
+            assert!(
+                board.validated_put(id, element).is_err(),
+                "accepted invalid text: {element}"
+            );
+            let remote = Board::new(2);
+            remote.put(id, element).expect("raw fixture insertion");
+            assert!(board
+                .validated_apply(&remote.update(&[0]).expect("fixture update"))
+                .is_err());
+            assert_eq!(board.try_elements().expect("unchanged board"), before);
+        }
+    }
 
     #[test]
     fn deeply_nested_remote_values_are_rejected_without_mutation() {

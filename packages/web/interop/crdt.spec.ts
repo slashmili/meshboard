@@ -1,3 +1,4 @@
+import { textElementsInterop } from './text-elements'
 import { test as base, expect, type Page } from '@playwright/test'
 import { nativePeer } from './peers'
 import { networkFault } from './network-fault'
@@ -75,20 +76,21 @@ test('four mixed peers converge, continue after creator departure, and restore a
       await meshExpect(elements(peer)).toHaveCount(1)
     }
     await Promise.all([draw(page), draw(fourth)])
+    native.send({ type: 'put', element: stroke('creator-native') })
     secondNative.send({ type: 'put', element: stroke('second-native') })
-    await meshExpect.poll(() => [native.state().elements.length, secondNative.state().elements.length]).toEqual([4, 4])
+    await meshExpect.poll(() => [native.state().elements.length, secondNative.state().elements.length]).toEqual([5, 5])
     await meshExpect.poll(() => secondNative.state().elements).toEqual(native.state().elements)
-    await meshExpect(elements(page)).toHaveCount(4)
-    await meshExpect(elements(fourth)).toHaveCount(4)
+    await meshExpect(elements(page)).toHaveCount(5)
+    await meshExpect(elements(fourth)).toHaveCount(5)
     await meshExpect.poll(() => elements(page).evaluateAll(nodes => nodes.map(node => node.outerHTML))).toEqual(await elements(fourth).evaluateAll(nodes => nodes.map(node => node.outerHTML)))
     native.send({ type: 'leave' })
     await meshExpect.poll(() => secondNative.state().connected).toBe(2)
     secondNative.send({ type: 'remove', ids: ['large'] })
-    await meshExpect(elements(fourth)).toHaveCount(3)
+    await meshExpect(elements(fourth)).toHaveCount(4)
     await page.reload()
-    await expect(elements(page)).toHaveCount(3, { timeout: 30_000 })
+    await expect(elements(page)).toHaveCount(4, { timeout: 30_000 })
     native.send({ type: 'join', invite: link })
-    await expect.poll(() => native.state().elements.length, { timeout: 30_000 }).toBe(3)
+    await expect.poll(() => native.state().elements.length, { timeout: 30_000 }).toBe(4)
     await meshExpect.poll(() => native.state().elements).toEqual(secondNative.state().elements)
     secondNative.send({ type: 'remove', ids: secondNative.state().elements.map(element => element.id) })
     await meshExpect(elements(page)).toHaveCount(0)
@@ -254,4 +256,8 @@ test('wrong-key browser and native peers cannot read or modify a board', async (
     expect(native.state(true).elements).toHaveLength(0)
     expect(native.state(true).connected).toBe(0)
   } finally { await context.close() }
+})
+
+test('text and sticky notes synchronize edits and late joins across web and native', async ({ page, native, browser }) => {
+  await textElementsInterop(page, native, browser)
 })

@@ -19,9 +19,10 @@ object Wire {
 
     fun element(value: JsonElement): BoardElement {
         val o = value.jsonObject
-        o.exact("id", "type", "color", "width", "points")
+        if (o["type"]?.jsonPrimitive?.content in listOf("text", "sticky")) o.exact("id", "type", "color", "width", "points", "text")
+        else o.exact("id", "type", "color", "width", "points")
         val id = o.text("id"); require(idPattern.matches(id))
-        val type = o.text("type"); require(type in listOf("pen", "rectangle", "ellipse", "line"))
+        val type = o.text("type"); require(type in listOf("pen", "rectangle", "ellipse", "line", "text", "sticky"))
         val color = o.text("color"); require(Regex("^#[0-9a-fA-F]{6}$").matches(color))
         val width = o.number("width"); require(width in 1.0..32.0)
         val data = o.getValue("points").jsonArray; require(data.size in 1..MAX_POINTS && (type == "pen" || data.size == 2))
@@ -31,9 +32,11 @@ object Wire {
             require(x in -1e7..1e7 && y in -1e7..1e7)
             Point(x, y)
         }
-        return BoardElement(id, type, color, width, points)
+        val text = if (type in listOf("text", "sticky")) o.text("text").also { require(validText(it)) } else null
+        return BoardElement(id, type, color, width, points, text)
     }
     fun elementJson(e: BoardElement) = buildJsonObject {
+        e.text?.let { put("text", it) }
         put("id", e.id); put("type", e.type); put("color", e.color); put("width", e.width)
         putJsonArray("points") { e.points.forEach { p -> add(buildJsonObject { put("x", p.x); put("y", p.y) }) } }
     }

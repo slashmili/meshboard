@@ -31,8 +31,8 @@ class AppTest {
         override fun leave() { doc.reset(); state.value = BoardState() }
         override fun retry() {}
     }
-    private fun render(controller: BoardController) {
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MeshboardApp(controller, qrImage = ::qrImage) } }
+    private fun render(controller: BoardController, height: Int = 768) {
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, height.dp)) { MeshboardApp(controller, qrImage = ::qrImage) } }
     }
     private fun drag() = rule.onNodeWithTag("drawing-canvas").performMouseInput {
         moveTo(Offset(350f, 250f)); press(); moveTo(Offset(460f, 330f)); release()
@@ -90,4 +90,73 @@ class AppTest {
         rule.onNodeWithTag("mobile-confirm-clear").performClick()
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
     }
+    @Test fun desktopAppearanceChangesWithoutDiscardingDrawing() {
+        val controller = LocalController(); render(controller); drag()
+        val before = controller.state.value.elements
+        rule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("Dark").performClick()
+        rule.onNodeWithText("Dark").assertIsSelected()
+        rule.onNodeWithText("Done").performClick()
+        val dark = rule.onRoot().captureToImage().toAwtImage()
+        assertEquals(0x202922, dark.getRGB(5, 5) and 0xffffff)
+        val file = File("build/test-artifacts/desktop-dark.png"); file.parentFile.mkdirs(); ImageIO.write(dark, "png", file)
+        rule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("Light").performClick()
+        rule.onNodeWithText("Light").assertIsSelected()
+        rule.onNodeWithText("System").performClick()
+        rule.onNodeWithText("System").assertIsSelected()
+        rule.onNodeWithText("Done").performClick()
+        rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
+    }
+
+    @Test fun mobileAppearanceIsAvailableInOverflow() {
+        val controller = LocalBoardController { "theme-stroke" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithText("Appearance").performClick()
+        rule.onNodeWithText("Dark").performClick()
+        rule.onNodeWithText("Dark").assertIsSelected()
+        rule.onNodeWithText("Done").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(200f, 200f)); moveTo(Offset(300f, 280f)); up()
+        }
+        rule.runOnIdle { assertEquals("#293b36", controller.state.value.elements.single().color) }
+    }
+
+    @Test fun nativeTextAndNotesCanBeEditedAndErased() {
+        val controller = LocalController(); render(controller, height = 650)
+        rule.onNodeWithTag("tool-text").performClick()
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { click(Offset(350f, 250f)) }
+        rule.onNodeWithTag("text-editor").performTextInput("Hello <team>\n世界 👋")
+        rule.onNodeWithText("Save text").performClick()
+        rule.runOnIdle { assertEquals("Hello <team>\n世界 👋", controller.state.value.elements.single().text) }
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { click(Offset(380f, 280f)) }
+        rule.onNodeWithTag("text-editor").performTextReplacement("Edited box")
+        rule.onNodeWithText("Save text").performClick()
+        rule.runOnIdle { assertEquals("Edited box", controller.state.value.elements.single().text) }
+        rule.onNodeWithTag("tool-sticky").performClick()
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { click(Offset(680f, 250f)) }
+        rule.onNodeWithTag("text-editor").performTextInput("A sticky note")
+        rule.onNodeWithText("Save text").performClick()
+        val file = File("build/test-artifacts/desktop-text.png"); file.parentFile.mkdirs()
+        ImageIO.write(rule.onRoot().captureToImage().toAwtImage(), "png", file)
+        rule.runOnIdle { assertEquals(2, controller.state.value.elements.size) }
+        rule.onNodeWithTag("tool-eraser").performClick()
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { click(Offset(700f, 280f)) }
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
+    }
+
+    @Test fun deletingAnOpenTextObjectDisablesSave() {
+        val controller = LocalController()
+        controller.put(textElement("remote-text", "text", Point(350.0, 250.0), "#293b36", "Delete while editing"))
+        render(controller)
+        rule.onNodeWithTag("tool-text").performClick()
+        rule.onNodeWithTag("drawing-canvas").performMouseInput { click(Offset(380f, 280f)) }
+        rule.onNodeWithTag("text-editor").assertTextContains("Delete while editing")
+        rule.runOnIdle { controller.remove(listOf("remote-text")) }
+        rule.onNodeWithText("Save text").assertIsNotEnabled()
+        rule.onNodeWithText("Cancel").performClick()
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+    }
+
 }
