@@ -1,3 +1,4 @@
+import { reconciliationInterop } from './reconciliation'
 import { imagesInterop } from './images'
 import { historyInterop } from './history'
 import { selectionInterop } from './selection'
@@ -187,4 +188,8 @@ test('undo and redo preserve remote objects across encrypted peers', async ({ pa
 
 test('embedded images survive encrypted sync, movement, history and reload', async ({ page, android }) => {
   await imagesInterop(page, android)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, android }) => {
+  await reconciliationInterop(page, android)
 })

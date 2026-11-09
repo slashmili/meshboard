@@ -141,6 +141,7 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
         origin = base; room = id
         self = UUID.randomUUID().toString(); awareness = YAwareness(); awareness.local(self, null)
         fun tick() {
+            broadcastY(YWire.sync(0, crdt.stateVector()))
             awareness.expire()?.let(::broadcastY)
             previews.clear(); previews.putAll(awareness.previews()); report()
             broadcastY(awareness.local(self, pendingPreview))

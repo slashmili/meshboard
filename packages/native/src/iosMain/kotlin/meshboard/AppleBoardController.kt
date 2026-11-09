@@ -120,12 +120,15 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
         awarenessJob = scope.launch {
             while (isActive) {
                 delay(10_000)
+                reconcile()
                 awareness.expire()?.let(::broadcastY)
                 previews.clear(); previews.putAll(awareness.previews()); report()
                 broadcastY(awareness.local(network.peerId(), pending))
             }
         }
     }
+    // Re-request missing state even when an authenticated channel stays open.
+    internal fun reconcile() { broadcastY(YWire.sync(0, crdt.stateVector())) }
     override fun leave() { disconnect(); room = ""; sessionKey = ""; resetDocument(); mutable.value = BoardState() }
     private fun disconnect() {
         previewJob?.cancel(); previewJob = null; pending = null

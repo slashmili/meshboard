@@ -53,6 +53,10 @@
 - Added: regressions proving each scenario receives its own 30-request budget and still rejects request 31.
 - Verified: all 15 desktop interoperability scenarios, 15 signaling tests and workspace typechecks.
 
+### Native convergence recovery
+- Fixed: native sessions periodically request CRDT state over authenticated channels so a missed update does not leave a connected replica permanently stale.
+- Tested: recovery of deliberately missed inserts and delete-only changes; the regression fails without reconciliation. Apple coverage and CI evidence are recorded in `docs/ci-reconciliation-validation.md`.
+
 ## Unreleased — Phase 3
 
 ### Added
