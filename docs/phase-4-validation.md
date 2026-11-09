@@ -349,3 +349,37 @@ and the production-browser undo/redo scenario pass. A focused run took 193 ms
 for the original large-history regression and 104 ms for the new regression.
 These timings are local evidence, not macOS measurements. macOS x86_64 CI must
 be rerun after the fix is pushed by the maintainer; no remote push was performed.
+
+
+### iPad stale snapshot investigation (2026-11-09)
+
+[Run 42588612989](https://github.com/slashmili/meshboard/actions/runs/42588612989)
+passes Android and all three web/desktop jobs, including macOS x86_64. The iPad
+four-peer large-board test fails at the five-element convergence assertion; the
+other 13 iOS CRDT interoperability scenarios pass.
+
+The attached native state reports only `large` and two previews on iPad, while
+the desktop has all five elements, including the iPad's newly issued `ios`
+stroke. Both browsers also show five elements. The iPad controller reports its
+local mutation before broadcasting it, so the adapter's observed state is stale
+relative to at least that local edit. The artifacts do not establish exactly
+where reporting stalled or prove the iPad received every remote edit.
+
+The debug adapter previously queued changed full snapshots every 50 ms without
+consumer backpressure. It now permits one outstanding snapshot. The Node reader
+acknowledges only after parsing the complete JSON line; until then the snapshot
+helper skips serialization, and the next poll publishes the latest state. This
+bounds queued board snapshots even when many previews change on a large board.
+The change affects only test reporting, not WebRTC, CRDT or production builds;
+the original convergence assertions and timeouts remain intact.
+
+Validation: all 68 web tests, 69 desktop/common native tests and workspace
+typechecks pass. Native snapshot tests
+cover 1,000 intervening preview changes while blocked, latest local/remote edits,
+and session reset after receipt. Node coverage fragments a 12,000-point snapshot
+and verifies no acknowledgment before the full line has been parsed.
+
+Pending on macOS: rerun the unchanged iPad four-peer scenario and the full iOS
+job. Linux cannot confirm the simulator-specific failure is resolved. If it
+persists, investigate simulator main-thread progress and snapshot delivery; do
+not treat this mitigation as proof of a transport/CRDT defect or its resolution.

@@ -2,6 +2,10 @@
 
 ## Unreleased — Phase 4
 
+### iPad test snapshot delivery
+- Fixed: bound the simulator debug adapter to one unacknowledged full-board snapshot and coalesce intermediate states, preventing an unbounded queue during large-board drawing.
+- Tested: stalled-consumer coalescing and fragmented large-snapshot acknowledgments; iPad four-peer CI confirmation remains pending.
+
 ### Undo history performance
 - Fixed: cache serialized action sizes instead of repeatedly encoding the entire undo stack, preserving the exact 8 MiB budget and 100-action limit.
 - Tested: large histories, partial remote invalidation, undo/redo stack movement and production-browser undo controls; fixes the web unit-test timeout in the macOS x86_64 CI job.

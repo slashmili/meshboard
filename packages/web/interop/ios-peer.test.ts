@@ -51,6 +51,25 @@ it('starts asynchronously with bounded simulator commands and preserves relay mo
   expect(socket.destroyed).toBe(true)
 })
 
+it('acknowledges only complete parsed snapshots, including fragmented large boards', async () => {
+  const write = vi.spyOn(socket, 'write')
+  const peer = await start()
+  const receipt = JSON.stringify({ type: 'snapshot-received' }) + '\n'
+  expect(write.mock.calls.filter(([data]) => data === receipt)).toHaveLength(1)
+  const updated = { ...state, elements: [{ id: 'large', type: 'pen', color: '#387c59', width: 3,
+    points: Array.from({ length: 12_000 }, (_, x) => ({ x, y: x })) }] }
+  const line = `MESHBOARD ${JSON.stringify(updated)}\n`
+  for (let offset = 0; offset < line.length - 1; offset += 4096) {
+    socket.write(line.slice(offset, Math.min(offset + 4096, line.length - 1)))
+  }
+  expect(write.mock.calls.filter(([data]) => data === receipt)).toHaveLength(1)
+  expect(peer.state()).toEqual(state)
+  socket.write('\n')
+  expect(peer.state()).toEqual(updated)
+  expect(write.mock.calls.filter(([data]) => data === receipt)).toHaveLength(2)
+  await peer.close()
+})
+
 it('awaits slow shutdown without blocking the event loop', async () => {
   const peer = await start()
   let complete!: Callback

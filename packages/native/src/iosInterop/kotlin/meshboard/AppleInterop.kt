@@ -5,10 +5,11 @@ import kotlinx.serialization.json.*
 /** Debug simulator harness; this source directory is excluded from Release builds. */
 class AppleInterop(network: AppleNetwork) {
     private val controller = AppleBoardController(network)
-    private val snapshots = InteropSnapshot()
+    private val snapshots = InteropSnapshot(awaitReceipt = true)
     fun command(raw: String) {
         val value = Json.parseToJsonElement(raw).jsonObject
         when (value.text("type")) {
+            "snapshot-received" -> snapshots.received()
             "share" -> controller.share(value.text("origin"))
             "join" -> controller.join(value.text("invite"))
             "put" -> controller.put(Wire.element(value.getValue("element")))
