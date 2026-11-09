@@ -383,3 +383,36 @@ Pending on macOS: rerun the unchanged iPad four-peer scenario and the full iOS
 job. Linux cannot confirm the simulator-specific failure is resolved. If it
 persists, investigate simulator main-thread progress and snapshot delivery; do
 not treat this mitigation as proof of a transport/CRDT defect or its resolution.
+
+
+### iPad rejoin authentication race (2026-11-09)
+
+[Run 42599879800](https://github.com/slashmili/meshboard/actions/runs/42599879800)
+passes all web/desktop and Android jobs. The iPad large-board scenario now passes
+five-element convergence, creator departure and browser reload, then fails at
+the iPad rejoin assertion with an authentication error. Its diagnostics show an
+incoming desktop connection closed after 39 ms with the data channel open,
+before authenticated admission; the two browser connections subsequently open.
+The prior stale-snapshot failure is not reproduced in this run.
+
+Code inspection found a main-queue ordering race: the incoming-channel callback
+enqueues `attach`; `attach` installs the message delegate and then enqueues
+channel initialization again. An immediate hello can therefore be queued ahead
+of initialization and encounter a nil secure channel. Initialize synchronously
+inside `attach`, which already runs on main, while keeping off-thread state
+callbacks dispatched to main. Duplicate state callbacks remain idempotent.
+Authentication validation and frame limits are unchanged. Static diagnostic
+events distinguish initialization failure, an uninitialized receive and secure
+frame rejection without exposing payloads or keys.
+
+A new integration regression performs six leave/rejoin cycles as the incoming
+channel recipient, checking existing state transfer and a new authenticated
+write on every cycle. Every failed iOS scenario now attaches connection events.
+Local validation: all 68 web unit tests and workspace typechecks pass; Playwright
+discovers all 15 iOS CRDT scenarios including the new regression.
+
+Pending: compile Swift and execute the new regression and existing four-peer
+scenario on macOS/iPad CI. This Linux host has no Apple compiler or simulator;
+the race is established by code ordering, but the old log's generic rejection
+does not prove this was the specific rejection path. The added diagnostics make
+a continuing failure distinguishable instead of relying on the generic error.

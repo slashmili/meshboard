@@ -17,7 +17,14 @@ const test = base.extend<{ ios: Awaited<ReturnType<typeof iosPeer>>; relay: bool
   relay: [false, { option: true }],
   ios: [async ({ relay }, use) => {
     const peer = await iosPeer(relay)
-    try { await use(peer) } finally { await peer.close() }
+    try { await use(peer) } finally {
+      if (test.info().status !== test.info().expectedStatus) {
+        await test.info().attach('ios-fixture-connection-events', {
+          body: JSON.stringify(peer.diagnostics(), null, 2), contentType: 'application/json',
+        })
+      }
+      await peer.close()
+    }
   }, { timeout: 120_000 }],
 })
 const elements = (page: Page) => page.getByTestId('drawing-elements').locator(':scope > *')
@@ -60,6 +67,21 @@ test('web creates; iOS exchanges CRDT drawings and awareness, erases and retries
   await page.keyboard.press('e'); await page.mouse.click(350, 300)
   // Both overlapping strokes are erased; the separate awareness-test stroke remains.
   await expect.poll(() => ios.state().elements.length).toBe(1)
+})
+
+test('iOS repeatedly rejoins as the incoming channel recipient and authenticates immediate traffic', async ({ page, ios }) => {
+  const link = await invite(page)
+  await draw(page)
+  for (let attempt = 0; attempt < 6; attempt++) {
+    ios.send({ type: 'join', invite: link })
+    await expect.poll(() => ios.state().connected).toBe(1)
+    await expect.poll(() => ios.state().elements.length).toBe(attempt + 1)
+    ios.send({ type: 'put', element: stroke(`rejoin-${attempt}`) })
+    await expect(elements(page)).toHaveCount(attempt + 2)
+    ios.send({ type: 'leave' })
+    await expect.poll(() => ios.state().connected).toBe(0)
+    await expect(page.getByTestId('connection-status')).toHaveText('Waiting for a peer')
+  }
 })
 
 test('iOS creates; four peers converge on large state, survive creator departure and recover reloads', async ({ page, browser, ios }, testInfo) => {

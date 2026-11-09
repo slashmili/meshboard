@@ -2,6 +2,10 @@
 
 ## Unreleased — Phase 4
 
+### iPad incoming-channel initialization
+- Fixed: initialize already-open incoming WebRTC channels synchronously when attaching their delegates, so an immediate authentication frame cannot overtake setup on the main queue.
+- Added: six-cycle iPad rejoin regression and failure-stage diagnostics without keys or payloads. Apple runtime verification remains pending CI.
+
 ### iPad test snapshot delivery
 - Fixed: bound the simulator debug adapter to one unacknowledged full-board snapshot and coalesce intermediate states, preventing an unbounded queue during large-board drawing.
 - Tested: stalled-consumer coalescing and fragmented large-snapshot acknowledgments; iPad four-peer CI confirmation remains pending.

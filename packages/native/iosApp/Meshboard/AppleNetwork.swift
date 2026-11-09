@@ -354,7 +354,10 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     func attach(_ channel: RTCDataChannel) {
         guard self.channel == nil, owner != nil, channel.label == fragmentChannel else { channel.close(); return }
         guard (channel.isOrdered && channel.isReliable) else { channel.close(); return }
-        self.channel = channel; channel.delegate = self; dataChannelDidChangeState(channel)
+        self.channel = channel; channel.delegate = self
+        // attach already runs on main. Initialize an incoming open channel here,
+        // before messages queued by its newly installed delegate can be handled.
+        updateChannelState(channel)
     }
     func send(_ data: Data) -> Bool {
         guard secure?.authenticated == true else { return false }
@@ -384,19 +387,26 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
             }
         } }
     }
-    func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) { main { peer, owner in
+    private func updateChannelState(_ dataChannel: RTCDataChannel) {
+        guard let owner, owner.valid(self), channel === dataChannel else { return }
         switch dataChannel.readyState {
-        case .open: if !peer.open {
+        case .open: if !open {
             do {
-                guard dataChannel.label == fragmentChannel, let local = peer.pc.localDescription, let remote = peer.pc.remoteDescription else { throw NetworkError.invalid }
-                peer.open = true
-                peer.secure = try SecureChannels.shared.open(crypto: AppleSessionCrypto(), key: owner.sessionKey, room: owner.room, localId: owner.selfID, remoteId: peer.id, localSdp: local.sdp, remoteSdp: remote.sdp)
-                guard peer.sendWire(cryptoData(peer.secure!.hello)) else { throw NetworkError.invalid }
-            } catch { owner.reject(peer: peer.id) }
+                guard dataChannel.label == fragmentChannel, let local = pc.localDescription, let remote = pc.remoteDescription else { throw NetworkError.invalid }
+                open = true
+                secure = try SecureChannels.shared.open(crypto: AppleSessionCrypto(), key: owner.sessionKey, room: owner.room, localId: owner.selfID, remoteId: id, localSdp: local.sdp, remoteSdp: remote.sdp)
+                guard sendWire(cryptoData(secure!.hello)) else { throw NetworkError.invalid }
+            } catch {
+                owner.diagnose("secure-channel-initialization-failed", self)
+                owner.reject(peer: id)
+            }
         }
-        case .closed: owner.failed(peer, reason: "data-channel-closed")
+        case .closed: owner.failed(self, reason: "data-channel-closed")
         default: break
         }
+    }
+    func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) { main { peer, _ in
+        peer.updateChannelState(dataChannel)
     } }
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         let data = buffer.data; let binary = buffer.isBinary
@@ -409,12 +419,18 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
         main { peer, owner in
             peer.incomingLock.lock(); peer.incomingBytes -= data.count; peer.incomingFrames -= 1; peer.incomingLock.unlock()
             do {
-                guard let secure = peer.secure else { throw NetworkError.invalid }
+                guard let secure = peer.secure else {
+                    owner.diagnose("secure-channel-uninitialized", peer)
+                    throw NetworkError.invalid
+                }
                 let result = try secure.receive(bytes: cryptoBytes(data))
                 if let response = result.response, !peer.sendWire(cryptoData(response)) { throw NetworkError.invalid }
                 if result.admitted { owner.opened(peer) }
                 if let clear = result.data { owner.receivedBinary(peer, cryptoData(clear)) }
-            } catch { owner.reject(peer: peer.id) }
+            } catch {
+                owner.diagnose("secure-frame-rejected", peer)
+                owner.reject(peer: peer.id)
+            }
         }
     }
     func dataChannel(_ dataChannel: RTCDataChannel, didChangeBufferedAmount amount: UInt64) { main { peer, _ in peer.flush() } }
