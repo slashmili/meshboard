@@ -1,5 +1,13 @@
+import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
+import { imagesInterop } from './images'
+import { historyInterop } from './history'
+import { selectionInterop } from './selection'
+import { pressureInterop } from './pressure'
+import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
-import { test as base, expect, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test as base } from './server-fixtures'
 import { nativePeer } from './peers'
 import { networkFault } from './network-fault'
 import { nativeReconnect } from './native-reconnect'
@@ -260,4 +268,32 @@ test('wrong-key browser and native peers cannot read or modify a board', async (
 
 test('text and sticky notes synchronize edits and late joins across web and native', async ({ page, native, browser }) => {
   await textElementsInterop(page, native, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, native }) => {
+  await arrowsInterop(page, native)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, native }) => {
+  await pressureInterop(page, native)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, native }) => {
+  await selectionInterop(page, native)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, native }) => {
+  await historyInterop(page, native)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, native }) => {
+  await imagesInterop(page, native)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, native }) => {
+  await reconciliationInterop(page, native)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, native }) => {
+  await connectorsInterop(page, native)
 })

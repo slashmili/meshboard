@@ -20,6 +20,42 @@ class CanvasTest {
     }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
+    @Test fun connectorEndpointsCanBeMovedWithoutDuplicateArrows() {
+        rule.onNodeWithTag("mobile-tool-rectangle").performClick()
+        canvas().performTouchInput { down(Offset(100f,100f)); moveTo(Offset(200f,200f)); up() }; count(1)
+        rule.onNodeWithTag("mobile-tool-arrow").performClick()
+        canvas().performTouchInput { down(Offset(200f,150f)); moveTo(Offset(400f,150f)); up() }; count(2)
+        canvas().performTouchInput { down(Offset(200f,150f)); moveTo(Offset(300f,300f)); up() }; count(2)
+        rule.onNodeWithTag("mobile-undo").performClick(); count(2)
+        rule.onNodeWithTag("mobile-redo").performClick(); count(2)
+    }
+
+    @Test fun imagePickerImportsThroughProductionController() {
+        androidx.test.espresso.intent.Intents.init()
+        try {
+            val uri = android.net.Uri.parse("android.resource://dev.meshboard.android.test/raw/image")
+            androidx.test.espresso.intent.Intents.intending(
+                androidx.test.espresso.intent.matcher.IntentMatchers.hasAction(android.content.Intent.ACTION_OPEN_DOCUMENT)
+            ).respondWith(android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_OK, android.content.Intent().setData(uri)))
+            rule.onNodeWithTag("insert-image").performClick(); count(1)
+            rule.onNodeWithTag("mobile-undo").performClick(); count(0)
+            rule.onNodeWithTag("mobile-redo").performClick(); count(1)
+        } finally { androidx.test.espresso.intent.Intents.release() }
+    }
+
+    @Test fun undoRedoAndClearRestoreThroughProductionController() {
+        rule.onNodeWithTag("mobile-undo").assertIsNotEnabled()
+        draw(); count(1)
+        rule.onNodeWithTag("mobile-undo").performClick(); count(0)
+        rule.onNodeWithTag("mobile-redo").performClick(); count(1)
+        rule.onNodeWithTag("mobile-tool-rectangle").performClick(); draw(); count(2)
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithTag("mobile-clear").performClick()
+        rule.onNodeWithTag("mobile-confirm-clear").performClick(); count(0)
+        rule.onNodeWithTag("mobile-undo").performClick(); count(2)
+        rule.onNodeWithTag("mobile-redo").performClick(); count(0)
+    }
+
     @Test fun drawShapesEraseAndConfirmClear() {
         draw(); count(1)
         rule.onNodeWithTag("mobile-tool-rectangle").performClick(); draw(); count(2)
@@ -35,7 +71,7 @@ class CanvasTest {
     }
 
     @Test fun pinchCancelsDraftAndDoesNotDrawWhenOneFingerRemains() {
-        for (tool in listOf("pen", "text", "sticky")) {
+        for (tool in listOf("pen", "text", "sticky", "arrow")) {
             rule.onNodeWithTag("mobile-tool-$tool").performClick()
             canvas().performTouchInput {
                 down(0, Offset(width * .4f, height * .4f))

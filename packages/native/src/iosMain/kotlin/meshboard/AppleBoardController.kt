@@ -45,7 +45,8 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
     init { network.listen(this) }
     override fun newId() = NSUUID().UUIDString.lowercase()
     private fun report(error: String? = mutable.value.error) {
-        mutable.value = mutable.value.copy(elements = elements, previews = previews.values.toList(),
+        val history = crdt.history()
+        mutable.value = mutable.value.copy(canUndo = history.first, canRedo = history.second, elements = elements, previews = previews.values.toList(),
         connected = yReceivers.size, relayed = relayed.size, error = error)
     }
     private fun attempt(block: () -> Unit) {
@@ -55,6 +56,21 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
         Wire.element(Wire.elementJson(element)); local(BoardMessage("put", element = element))
     }
     override fun remove(ids: List<String>) = attempt { if (ids.isNotEmpty()) local(BoardMessage("remove", ids = ids)) }
+    override fun move(ids: List<String>, delta: Point) = attempt {
+        if (delta.x != 0.0 || delta.y != 0.0) {
+            val before = crdt.stateVector()
+            crdt.move(ids, delta)
+            report(); broadcastY(YWire.sync(2, crdt.update(before)))
+        }
+    }
+    override fun undo() = attempt {
+        val before = crdt.stateVector(); crdt.undo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
+    }
+    override fun redo() = attempt {
+        val before = crdt.stateVector(); crdt.redo()
+        report(); broadcastY(YWire.sync(2, crdt.update(before)))
+    }
     private fun local(message: BoardMessage) {
         val board = crdt
         val before = board.stateVector()
@@ -98,18 +114,21 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
     private fun begin(base: String, id: String, keep: Boolean) {
         disconnect(); if (!keep) resetDocument()
         origin = base; room = id
-        mutable.value = BoardState(elements = elements, invite = "$base/#crdt=$id&key=$sessionKey")
+        mutable.value = BoardState(elements = elements, canUndo = crdt.history().first, canRedo = crdt.history().second, invite = "$base/#crdt=$id&key=$sessionKey")
         network.start(base, id, sessionKey)
         awareness = YAwareness(); awareness.local(network.peerId(), null)
         awarenessJob = scope.launch {
             while (isActive) {
                 delay(10_000)
+                reconcile()
                 awareness.expire()?.let(::broadcastY)
                 previews.clear(); previews.putAll(awareness.previews()); report()
                 broadcastY(awareness.local(network.peerId(), pending))
             }
         }
     }
+    // Re-request missing state even when an authenticated channel stays open.
+    internal fun reconcile() { broadcastY(YWire.sync(0, crdt.stateVector())) }
     override fun leave() { disconnect(); room = ""; sessionKey = ""; resetDocument(); mutable.value = BoardState() }
     private fun disconnect() {
         previewJob?.cancel(); previewJob = null; pending = null

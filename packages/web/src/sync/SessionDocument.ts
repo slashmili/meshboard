@@ -10,5 +10,10 @@ export interface SessionDocument {
   receive(message: SessionMessage): SessionMessage | void
   put(element: BoardElement): boolean
   remove(ids: string[]): void
+  move(ids: string[], delta: { x: number; y: number }): void
+  readonly canUndo: boolean
+  readonly canRedo: boolean
+  undo(): void
+  redo(): void
   clear(): void
 }

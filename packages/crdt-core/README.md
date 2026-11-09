@@ -78,3 +78,27 @@ interop suites test y-webrtc signaling/sync/awareness, four mixed peers, creator
 departure, recovery and TURN. See [the validation ledger](../../docs/phase-2-validation.md)
 for completed tests and pending Apple/device checks. Application encryption and
 authenticated admission remain Phase 3.
+
+Atomic selection moves use local ABI operation 9: JSON containing `ids`, `dx`
+and `dy`. The operation reads the current document, skips missing IDs, preserves
+other fields, validates the entire staged result, and commits all selected
+changes together. A rejected move leaves the document unchanged. The transport
+still carries ordinary encrypted Yjs-compatible updates, without a new wire type.
+
+## Local undo history
+
+Validated local mutations retain per-object before/after values, capped at 100
+operations and an 8 MiB serialized inverse-value budget. Undo/redo commits a
+validated inverse through the ordinary CRDT update path. Batch moves and clears
+are single operations; erasing records each committed removal batch. History is
+in memory, belongs to one replica, and is not sent to peers or restored on reload.
+A new effective local change drops redo. Failed validation leaves history intact.
+
+Integrated remote map changes invalidate that object's entries in both stacks,
+including identical-value rewrites; unrelated objects remain undoable. Each
+inverse also checks the current value before writing. Concurrent operations still
+use the existing whole-element CRDT conflict rules; redundant deletes that have
+no map event do not convey a new ownership change. This is conditional inverse
+history, not the Yjs/yrs UndoManager, and does not provide character-level undo.
+C/JNI operations 10/11 perform undo/redo; 12 returns availability flags. Existing
+state vector/update operations propagate their results over encrypted channels.

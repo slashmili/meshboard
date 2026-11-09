@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 data class BoardState(
     val elements: List<BoardElement> = emptyList(), val previews: List<BoardElement> = emptyList(),
     val invite: String = "", val connected: Int = 0, val connecting: Int = 0,
+    val canUndo: Boolean = false, val canRedo: Boolean = false,
     val signaling: Boolean = false, val relayed: Int = 0, val error: String? = null,
 ) {
     val connectionLabel get() = when {
@@ -21,6 +22,9 @@ interface DrawingController {
     fun newId(): String
     fun put(element: BoardElement)
     fun remove(ids: List<String>)
+    fun move(ids: List<String>, delta: Point)
+    fun undo()
+    fun redo()
     fun preview(element: BoardElement?)
 }
 

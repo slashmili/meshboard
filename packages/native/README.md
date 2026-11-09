@@ -137,3 +137,9 @@ PNG with Apple's `sips` and `iconutil` (16–512 point sizes at 1× and 2×).
 References: [Compose Desktop](https://github.com/JetBrains/compose-multiplatform),
 [webrtc-java](https://github.com/devopvoid/webrtc-java),
 [ZXing](https://github.com/zxing/zxing).
+
+Image insertion uses [FileKit](https://filekit.mintlify.app) 0.8.8's Compose file
+picker and bounded stream API, compatible with this project's Kotlin/Compose
+versions. Linux distributions include the `jdk.security.auth` module required by
+the picker. PNG/JPEG decoding uses Compose resources on each platform. See the
+[Phase 4 ledger](../../docs/phase-4-validation.md) for limits and picker checks.

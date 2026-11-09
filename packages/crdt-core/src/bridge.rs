@@ -85,6 +85,32 @@ pub fn call(handle: i64, operation: i32, input: &[u8]) -> Result<Vec<u8>, String
                     .map_err(|e| e.to_string())?;
                 Vec::new()
             }
+            9 => {
+                #[derive(serde::Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Move {
+                    ids: Vec<String>,
+                    dx: f64,
+                    dy: f64,
+                }
+                let change: Move = serde_json::from_slice(input).map_err(|e| e.to_string())?;
+                board
+                    .validated_move(&change.ids, change.dx, change.dy)
+                    .map_err(|e| e.to_string())?;
+                Vec::new()
+            }
+            10 => {
+                board.undo().map_err(|e| e.to_string())?;
+                Vec::new()
+            }
+            11 => {
+                board.redo().map_err(|e| e.to_string())?;
+                Vec::new()
+            }
+            12 => serde_json::to_vec(
+                &serde_json::json!({"undo":board.can_undo(),"redo":board.can_redo()}),
+            )
+            .map_err(|e| e.to_string())?,
             _ => return Err("Unknown CRDT operation".into()),
         }
     };

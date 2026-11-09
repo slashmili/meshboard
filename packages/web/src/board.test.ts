@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { constrainEnd, hitsElement, toWorld, zoomAt, type BoardElement } from './board'
+import { constrainEnd, hitsElement, outline, penWidth, penSample, toWorld, zoomAt, type BoardElement } from './board'
 
 describe('viewport', () => {
   it('keeps the world point under the pointer fixed while zooming', () => {
@@ -58,4 +58,33 @@ describe('constrained shapes', () => {
     expect(end.x).toBeCloseTo(end.y)
     expect(Math.hypot(end.x, end.y)).toBeCloseTo(Math.hypot(100, 90))
   })
+})
+
+describe('arrows', () => {
+  const arrow: BoardElement = { id: 'arrow', type: 'arrow', color: '#293b36', width: 3, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] }
+  it('renders the shaft and both wings, including reverse and zero-length arrows', () => {
+    expect(outline(arrow)).toEqual([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 88, y: 6 }, { x: 100, y: 0 }, { x: 88, y: -6 }])
+    expect(outline({ ...arrow, points: [...arrow.points].reverse() })[2]).toEqual({ x: 12, y: -6 })
+    expect(outline({ ...arrow, points: [arrow.points[0], arrow.points[0]] })).toEqual([arrow.points[0], arrow.points[0]])
+    expect(outline({ ...arrow, points: [{ x: 0, y: 0 }, { x: 4, y: 0 }] })[2]).toEqual({ x: 2, y: 1 })
+  })
+  it('erases arrowheads and snaps arrows to 45 degrees', () => {
+    expect(hitsElement(arrow, { x: 88, y: 6 }, { x: 88, y: 6 }, 0)).toBe(true)
+    expect(hitsElement(arrow, { x: 88, y: 10 }, { x: 88, y: 10 }, 0)).toBe(false)
+    const end = constrainEnd({ x: 0, y: 0 }, { x: 100, y: 90 }, 'arrow')
+    expect(end.x).toBeCloseTo(end.y)
+  })
+})
+
+it('pressure changes pen width and hit testing while mouse and touch remain constant', () => {
+  expect(penWidth(8, 0)).toBe(2)
+  expect(penWidth(8, 1)).toBe(8)
+  expect(penWidth(8, undefined)).toBe(8)
+  expect(penSample({ x: 0, y: 0 }, 'pen', 0.3).pressure).toBe(0.3)
+  expect(penSample({ x: 0, y: 0 }, 'mouse', 0.5).pressure).toBeUndefined()
+  expect(penSample({ x: 0, y: 0 }, 'touch', 0.5).pressure).toBeUndefined()
+  expect(penSample({ x: 0, y: 0 }, 'pen', Number.NaN).pressure).toBeUndefined()
+  const thin: BoardElement = { id: 'thin', type: 'pen', color: '#293b36', width: 8, points: [{ x: 0, y: 0, pressure: 0 }, { x: 100, y: 0, pressure: 0 }] }
+  expect(hitsElement(thin, { x: 50, y: 2 }, { x: 50, y: 2 }, 0)).toBe(false)
+  expect(hitsElement(thin, { x: 50, y: 1 }, { x: 50, y: 1 }, 0)).toBe(true)
 })

@@ -3,14 +3,23 @@ package meshboard
 import kotlinx.serialization.json.*
 
 /** Test adapter only. StateFlow retains its immutable state instance until a change. */
-internal class InteropSnapshot(private val encode: (BoardState) -> String = ::encodeInteropState) {
+internal class InteropSnapshot(
+    private val awaitReceipt: Boolean = false,
+    private val encode: (BoardState) -> String = ::encodeInteropState,
+) {
     private var previous: BoardState? = null
+    // Receipt comes from the consumer after parsing, not merely from a socket send.
+    // While blocked, leave previous untouched and serialize only the latest state next time.
+    private var pending = false
+
+    fun received() { pending = false }
 
     fun changed(state: BoardState): String? {
         // Do not traverse/serialize a large board just to discover it is unchanged.
-        if (state === previous) return null
+        if (pending || state === previous) return null
         val result = encode(state)
         previous = state
+        pending = awaitReceipt
         return result
     }
 }

@@ -1,10 +1,13 @@
+import { beginArrow, dragArrow, resolveConnectors, resolveConnector } from './connectors'
+import { beginSelection, finishSelection, selectionDelta, translated, type Selection } from './selection'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import { MAX_POINTS } from '@meshboard/shared-protocol'
-import { constrainEnd, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
+import { constrainEnd, penSample, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
 import type { SessionDocument } from './sync/SessionDocument'
 
 type Gesture =
-  | { type: 'draw'; pointer: number; element: BoardElement }
+  | { type: 'select'; pointer: number }
+  | { type: 'draw'; pointer: number; element: BoardElement; endpoint?: number; existing?: boolean }
   | { type: 'label'; pointer: number; at: Point; kind: 'text' | 'sticky' }
   | { type: 'erase'; pointer: number; last: Point }
   | { type: 'pan'; pointer: number; start: Point; view: View }
@@ -13,6 +16,9 @@ type Gesture =
 export function useBoard(tool: Tool, color: string, width: number, document: SessionDocument, preview: (element: BoardElement | null) => void, editText: (at: Point, kind: 'text' | 'sticky') => void) {
   const svgRef = useRef<SVGSVGElement>(null)
   const elements = useSyncExternalStore(document.subscribe, document.getElements)
+  const [selection, setSelectionState] = useState<Selection>({ ids: [] })
+  const selectionRef = useRef(selection)
+  function setSelection(next: Selection) { selectionRef.current = next; setSelectionState(next) }
   const [draft, setDraft] = useState<BoardElement | null>(null)
   const [view, setViewState] = useState(INITIAL_VIEW)
   const viewRef = useRef(view)
@@ -27,6 +33,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
 
   const cancelGesture = useCallback(() => {
     gesture.current = null
+    setSelection({ ids: [] })
     pointers.current.clear()
     setDraft(null)
     preview(null)
@@ -80,7 +87,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   }
 
   function erase(from: Point, to: Point) {
-    document.remove(document.getElements().filter(element => hitsElement(element, from, to, 9 / viewRef.current.zoom)).map(element => element.id))
+    document.remove(resolveConnectors(document.getElements()).filter(element => hitsElement(element, from, to, 9 / viewRef.current.zoom)).map(element => element.id))
   }
 
   function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -93,6 +100,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()]
       setDraft(null)
+      setSelection({ ids: [] })
       preview(null)
       gesture.current = { type: 'pinch', distance: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)), anchor: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, view: viewRef.current }
       return
@@ -112,10 +120,16 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       if (event.pointerType !== 'touch') erase(world, world)
       return
     }
-    const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? [world] : [world, world] }
-    gesture.current = { type: 'draw', pointer: event.pointerId, element }
-    setDraft(element)
-    preview(element)
+    if (tool === 'select') {
+      setSelection(beginSelection(selectionRef.current, resolveConnectors(document.getElements()), world, 6 / viewRef.current.zoom, event.shiftKey))
+      gesture.current = { type: 'select', pointer: event.pointerId }
+      return
+    }
+    const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? [penSample(world, event.pointerType, event.pressure)] : [world, world] }
+    const arrow = tool === 'arrow' ? beginArrow(document.getElements(), world, 10/viewRef.current.zoom, element) : null
+    gesture.current = { type: 'draw', pointer: event.pointerId, element: arrow?.element ?? element, endpoint: arrow?.index, existing: arrow?.existing }
+    setDraft(gesture.current.element)
+    preview(gesture.current.element)
   }
 
   function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
@@ -143,11 +157,19 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       active.last = world
       return
     }
+    if (active.type === 'select') { setSelection({ ...selectionRef.current, end: world }); return }
     if (active.type === 'label') return
     const element = active.element
-    if (element.type === 'pen') {
+    if (element.type === 'arrow') {
+      active.element = dragArrow(element, active.endpoint ?? 1, event.shiftKey ? constrainEnd(element.points[active.endpoint === 0 ? 1 : 0], world, 'arrow') : world, document.getElements(), 10/viewRef.current.zoom)
+    } else if (element.type === 'pen') {
       const samples = event.nativeEvent.getCoalescedEvents?.() ?? []
-      const newPoints = (samples.length ? samples : [event]).map(sample => toWorld(localPoint(sample), viewRef.current))
+      const newPoints = (samples.length ? samples : [event]).map(sample => {
+        const world = toWorld(localPoint(sample), viewRef.current)
+        // Pointer-up pressure is zero even when the final contact had pressure.
+        const pressure = event.type === 'pointerup' ? element.points.at(-1)?.pressure : sample.pressure
+        return penSample(world, event.pointerType, pressure ?? Number.NaN)
+      })
       // Split a very long stroke into bounded objects without interrupting input.
       if (element.points.length + newPoints.length > MAX_POINTS) {
         document.put(element)
@@ -163,6 +185,15 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   function onPointerUp(event: ReactPointerEvent<SVGSVGElement>) {
     const active = gesture.current
     if (active && active.type !== 'pinch' && active.pointer === event.pointerId) {
+      if (active.type === 'select') {
+        const next = { ...selectionRef.current, end: toWorld(localPoint(event), viewRef.current) }
+        if (next.moving) document.move(next.ids, selectionDelta(next))
+        setSelection(finishSelection(next, resolveConnectors(document.getElements())))
+        gesture.current = null
+        pointers.current.delete(event.pointerId)
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+        return
+      }
       if (active.type === 'label') {
         const end = toWorld(localPoint(event), viewRef.current)
         if (Math.hypot(end.x - active.at.x, end.y - active.at.y) * viewRef.current.zoom < 10) editText(active.at, active.kind)
@@ -177,7 +208,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
         const element = active.element
         const [start, end = start] = element.points
         if (element.type === 'pen' || Math.hypot(end.x - start.x, end.y - start.y) > 1 / viewRef.current.zoom) {
-          document.put(element)
+          if (!active.existing || document.getElements().some(e => e.id === element.id)) document.put(element)
         }
       }
       gesture.current = null
@@ -201,6 +232,13 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   function resetView() { cancelGesture(); setView(INITIAL_VIEW) }
   function clear() { cancelGesture(); document.clear() }
 
-  return { svgRef, elements, draft, view, spaceDown, zoomBy, resetView, clear, cancelGesture,
+  let displayElements = elements
+  if (selection.moving) {
+    try {
+      const moved = new Map(translated(elements, selection.ids, selectionDelta(selection)).map(e => [e.id, e]))
+      displayElements = elements.map(e => moved.get(e.id) ?? e)
+    } catch { /* Invalid moves keep their original preview until validation reports the error. */ }
+  }
+  return { svgRef, elements: resolveConnectors(displayElements).filter(e=>e.id !== draft?.id), selection, draft: draft ? resolveConnector(draft, displayElements) : null, view, spaceDown, zoomBy, resetView, clear, cancelGesture,
     pointerHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: cancelGesture, onLostPointerCapture: () => { if (pointers.current.size === 0) gesture.current = null } } }
 }

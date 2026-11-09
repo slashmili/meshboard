@@ -1,5 +1,8 @@
+import { resolveConnector } from './connectors'
+import { importImage } from './images'
+import { marquee, selectionBounds } from './selection'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
+import { ImagePlus, Undo2, Redo2, ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
 import { MAX_ZOOM, MIN_ZOOM, hitsElement, type Point, type BoardElement, type Tool } from './board'
 import { textElement } from './textElements'
@@ -10,10 +13,12 @@ import { ShareDialog } from './ShareDialog'
 import { useTheme, type ThemeMode } from './useTheme'
 
 const TOOLS: { id: Tool; label: string; key: string; icon: LucideIcon }[] = [
+  { id: 'select', label: 'Select', key: 'V', icon: MousePointer2 },
   { id: 'pen', label: 'Pen', key: 'P', icon: Pencil },
   { id: 'eraser', label: 'Eraser', key: 'E', icon: Eraser },
   { id: 'rectangle', label: 'Rectangle', key: 'R', icon: Square },
   { id: 'ellipse', label: 'Ellipse', key: 'O', icon: Circle },
+  { id: 'arrow', label: 'Arrow', key: 'A', icon: ArrowUpRight },
   { id: 'line', label: 'Line', key: 'L', icon: Slash },
   { id: 'text', label: 'Text', key: 'T', icon: Type },
   { id: 'sticky', label: 'Sticky note', key: 'N', icon: StickyNote },
@@ -28,10 +33,12 @@ const COLORS = [
   { name: 'Amber', value: '#c49226' },
 ]
 const HINTS: Record<Tool, string> = {
+  select: 'Click an object or drag a box around several, then drag to move. Shift-click toggles objects. Escape cancels.',
   pen: 'Click and drag to draw. A single click makes a dot.',
   eraser: 'Click or drag across a stroke to erase the whole object.',
   rectangle: 'Drag to draw a rectangle. Hold Shift for a square.',
   ellipse: 'Drag to draw an ellipse. Hold Shift for a circle.',
+  arrow: 'Draw from/to an object to attach. Drag an endpoint with Arrow to reconnect or detach. Drag from the tail to the arrowhead. Hold Shift to snap the angle.',
   line: 'Drag to draw a line. Hold Shift to snap the angle.',
   text: 'Click to add text. Click existing text or a note to edit it.',
   sticky: 'Click to add a note. Click existing text or a note to edit it.',
@@ -66,6 +73,9 @@ export function App() {
     } else setTextError('Could not save this text. The board may have reached its size limit.')
   }
   const board = useBoard(tool, color, width, document, session.preview, editText)
+  const imageInput = useRef<HTMLInputElement>(null)
+  const [imageError, setImageError] = useState('')
+  const [imageBusy, setImageBusy] = useState(false)
   const [sharing, setSharing] = useState(false)
   const helpDialog = useRef<HTMLDialogElement>(null)
   const clearDialog = useRef<HTMLDialogElement>(null)
@@ -73,8 +83,13 @@ export function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return
       if (event.target instanceof HTMLElement && (event.target.closest('input, textarea, select, dialog') || event.target.isContentEditable)) return
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && ['z', 'y'].includes(event.key.toLowerCase())) {
+        event.preventDefault(); board.cancelGesture()
+        if (event.shiftKey || event.key.toLowerCase() === 'y') document.redo(); else document.undo()
+        return
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return
       const next = TOOLS.find(item => item.key.toLowerCase() === event.key.toLowerCase())
       if (next) {
         board.cancelGesture()
@@ -83,12 +98,12 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [board.cancelGesture])
+  }, [board.cancelGesture, document])
 
   const { x, y, zoom } = board.view
   const currentTool = TOOLS.find(item => item.id === tool)!
   const drawing = tool !== 'hand' && tool !== 'eraser'
-  const remoteDrafts = session.drafts.filter(draft => !board.elements.some(element => element.id === draft.id))
+  const remoteDrafts = session.drafts.map(e => resolveConnector(e, document.getElements())).filter((e): e is BoardElement => e !== null).filter(draft => !board.elements.some(element => element.id === draft.id))
   const empty = board.elements.length === 0 && !board.draft && remoteDrafts.length === 0
   const connectionLabel = !session.room ? 'Local only' : session.status.connected ? `${session.status.connected} peer${session.status.connected === 1 ? '' : 's'} connected` : session.status.connecting ? 'Connecting…' : session.status.signaling ? 'Waiting for a peer' : 'Joining…'
 
@@ -104,11 +119,23 @@ export function App() {
         <div className="header-actions">
           <span className="local-badge" role="status" data-testid="connection-status"><span className="status-dot" /> {connectionLabel}</span>
           <button className="primary-button share-button" aria-label="Share board" onClick={() => { session.share(); setSharing(true) }}><Share2 size={15} /><span>Share</span></button>
-          <button className="quiet-button clear-button" aria-label="Clear board" disabled={board.elements.length === 0} onClick={() => clearDialog.current?.showModal()}><Trash2 size={16} /><span>Clear board</span></button>
+          <button className="quiet-button clear-button" aria-label="Clear board" disabled={document.getElements().length === 0} onClick={() => clearDialog.current?.showModal()}><Trash2 size={16} /><span>Clear board</span></button>
         </div>
       </header>
 
       <section className="workspace" aria-label="Whiteboard workspace">
+        <input ref={imageInput} type="file" accept="image/png,image/jpeg" aria-label="Image file" hidden onChange={async event => {
+          const file = event.target.files?.[0]; event.target.value = ''
+          if (!file) return
+          setImageBusy(true); setImageError(''); board.cancelGesture()
+          try {
+            const canvas = window.document.querySelector('[aria-label="Drawing canvas"]')!.getBoundingClientRect()
+            const element = await importImage(file, {x:(canvas.width/2-board.view.x)/board.view.zoom,y:(canvas.height/2-board.view.y)/board.view.zoom})
+            if (!document.put(element)) setImageError('Could not insert image. This board has reached its size or image limit.')
+          } catch { setImageError('Cannot insert this image. Choose a valid PNG or JPEG up to 512 KiB and 1024 × 1024 pixels.') }
+          finally { setImageBusy(false) }
+        }} />
+        {imageError && <div className="connection-error" role="alert">{imageError}<button onClick={() => setImageError('')}>Dismiss</button></div>}
         {session.error && <div className="connection-error" role="alert"><span>{session.error}</span>{session.room && <button onClick={session.retry}>Retry</button>}</div>}
         <svg ref={board.svgRef} className={`canvas ${board.spaceDown || tool === 'hand' ? 'canvas-pan' : tool === 'eraser' ? 'canvas-eraser' : ''}`} aria-label="Drawing canvas" aria-describedby="canvas-instructions" tabIndex={0} {...board.pointerHandlers} onContextMenu={event => event.preventDefault()}>
           <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill="#cbd3ca" /></pattern></defs>
@@ -117,6 +144,14 @@ export function App() {
             {board.elements.map(element => <Element key={element.id} element={element} />)}
             {board.draft && <Element element={board.draft} />}
           </g>
+            {tool === 'arrow' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="connector-handles">{board.elements.filter(e=>e.type==='arrow').flatMap(e=>e.points.map((p,i)=><circle key={e.id+i} cx={p.x} cy={p.y} r={4/zoom} fill="white" stroke="#387c59" strokeWidth={1/zoom}/>))}</g>}
+          {tool === 'select' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="selection-overlay">
+            {board.elements.filter(e => board.selection.ids.includes(e.id)).map(e => {
+              const box = selectionBounds(e), padding = 4 / zoom
+              return <rect key={e.id} x={box.x-padding} y={box.y-padding} width={box.width+2*padding} height={box.height+2*padding} fill="none" stroke="#4878c8" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />
+            })}
+            {marquee(board.selection) && <rect {...marquee(board.selection)!} fill="#4878c815" stroke="#4878c8" strokeWidth={1 / zoom} />}
+          </g>}
           <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} />)}</g>
         </svg>
 
@@ -156,7 +191,11 @@ export function App() {
             <span className="zoom-divider" />
             <button aria-label="Reset view" title="Reset view to 100% and original position" onClick={board.resetView}><RotateCcw size={15} /></button>
           </div>
-          <span className="navigation-hint"><MousePointer2 size={13} /> Scroll to pan <span>·</span> Ctrl/⌘ + scroll to zoom</span>
+          <div className="zoom-panel" role="group" aria-label="Edit history">
+            <button aria-label="Insert image" title="Insert PNG or JPEG" disabled={imageBusy} onClick={() => imageInput.current?.click()}><ImagePlus size={17} /></button>
+            <button className="quiet-button history-button" aria-label="Undo" title="Undo (Ctrl/⌘ Z)" disabled={!document.canUndo} onClick={() => { board.cancelGesture(); document.undo() }}><Undo2 size={17} /></button>
+            <button className="quiet-button history-button" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" disabled={!document.canRedo} onClick={() => { board.cancelGesture(); document.redo() }}><Redo2 size={17} /></button>
+          </div>
           <button className="help-button" aria-label="Help and keyboard shortcuts" title="Help and keyboard shortcuts" onClick={() => helpDialog.current?.showModal()}><CircleHelp size={20} /></button>
         </div>
       </section>
@@ -179,7 +218,7 @@ export function App() {
         <span className="eyebrow">MAKE YOURSELF AT HOME</span>
         <h2 id="help-title">A few handy shortcuts</h2>
         <label className="theme-control">Appearance <select aria-label="Appearance" value={theme.mode} onChange={event => theme.setMode(event.target.value as ThemeMode)}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-        <div className="shortcuts">{TOOLS.map(item => <div key={item.id}><span>{item.label}</span><kbd>{item.key}</kbd></div>)}<div><span>Temporary pan</span><kbd>Space + drag</kbd></div><div><span>Square, circle, snapped line</span><kbd>Shift + drag</kbd></div></div>
+        <div className="shortcuts">{TOOLS.map(item => <div key={item.id}><span>{item.label}</span><kbd>{item.key}</kbd></div>)}<div><span>Undo / redo</span><kbd>Ctrl/⌘ Z / Shift Z</kbd></div><div><span>Temporary pan</span><kbd>Space + drag</kbd></div><div><span>Square, circle, snapped line</span><kbd>Shift + drag</kbd></div></div>
         <p>Scroll to pan. Use Ctrl/⌘ + scroll to zoom, or pinch with two fingers on a touch screen. The eraser removes whole strokes and shapes.</p>
         <div className="local-notice"><strong>A board that lives in the moment</strong><p>Use Share to invite another browser. Strokes and erasing sync live. Refreshing a shared board restores it from a connected participant; once everyone leaves, it is gone. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.</p></div>
         <button className="primary-button" onClick={() => helpDialog.current?.close()}>Back to the board <ArrowUpRight size={17} /></button>

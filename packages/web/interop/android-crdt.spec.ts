@@ -1,5 +1,13 @@
+import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
+import { imagesInterop } from './images'
+import { historyInterop } from './history'
+import { selectionInterop } from './selection'
+import { pressureInterop } from './pressure'
+import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
-import { test as base, expect, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test as base } from './server-fixtures'
 import { androidPeer, nativePeer } from './peers'
 import { nativeReconnect } from './native-reconnect'
 import type { UpstreamFixture } from './y-webrtc-peer'
@@ -161,4 +169,32 @@ test('Android app refuses legacy invites and insecure origins without clearing t
 
 test('text and sticky notes synchronize edits and late joins across web and Android', async ({ page, android, browser }) => {
   await textElementsInterop(page, android, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, android }) => {
+  await arrowsInterop(page, android)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, android }) => {
+  await pressureInterop(page, android)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, android }) => {
+  await selectionInterop(page, android)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, android }) => {
+  await historyInterop(page, android)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, android }) => {
+  await imagesInterop(page, android)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, android }) => {
+  await reconciliationInterop(page, android)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, android }) => {
+  await connectorsInterop(page, android)
 })

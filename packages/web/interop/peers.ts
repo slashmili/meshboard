@@ -107,7 +107,12 @@ export async function iosPeer(relay = false) {
       lines = createInterface({ input: socket })
       lines.on('error', () => {})
       lines.on('line', line => {
-        if (line.startsWith('MESHBOARD ')) state = JSON.parse(line.slice(10))
+        if (line.startsWith('MESHBOARD ')) {
+          state = JSON.parse(line.slice(10))
+          // Admit one full snapshot at a time, coalescing changes on the simulator
+          // until this consumer has parsed the previous board.
+          socket?.write(JSON.stringify({ type: 'snapshot-received' }) + '\n')
+        }
         else if (line.startsWith('MESHBOARD_DIAGNOSTIC ')) {
           diagnostics.push(JSON.parse(line.slice(21)))
           if (diagnostics.length > 200) diagnostics.shift()

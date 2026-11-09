@@ -1,5 +1,13 @@
+import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
+import { imagesInterop } from './images'
+import { historyInterop } from './history'
+import { selectionInterop } from './selection'
+import { pressureInterop } from './pressure'
+import { arrowsInterop } from './arrows'
 import { textElementsInterop } from './text-elements'
-import { test as base, expect, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test as base } from './server-fixtures'
 import { iosPeer, nativePeer } from './peers'
 import type { UpstreamFixture } from './y-webrtc-peer'
 
@@ -9,7 +17,14 @@ const test = base.extend<{ ios: Awaited<ReturnType<typeof iosPeer>>; relay: bool
   relay: [false, { option: true }],
   ios: [async ({ relay }, use) => {
     const peer = await iosPeer(relay)
-    try { await use(peer) } finally { await peer.close() }
+    try { await use(peer) } finally {
+      if (test.info().status !== test.info().expectedStatus) {
+        await test.info().attach('ios-fixture-connection-events', {
+          body: JSON.stringify(peer.diagnostics(), null, 2), contentType: 'application/json',
+        })
+      }
+      await peer.close()
+    }
   }, { timeout: 120_000 }],
 })
 const elements = (page: Page) => page.getByTestId('drawing-elements').locator(':scope > *')
@@ -52,6 +67,21 @@ test('web creates; iOS exchanges CRDT drawings and awareness, erases and retries
   await page.keyboard.press('e'); await page.mouse.click(350, 300)
   // Both overlapping strokes are erased; the separate awareness-test stroke remains.
   await expect.poll(() => ios.state().elements.length).toBe(1)
+})
+
+test('iOS repeatedly rejoins as the incoming channel recipient and authenticates immediate traffic', async ({ page, ios }) => {
+  const link = await invite(page)
+  await draw(page)
+  for (let attempt = 0; attempt < 6; attempt++) {
+    ios.send({ type: 'join', invite: link })
+    await expect.poll(() => ios.state().connected).toBe(1)
+    await expect.poll(() => ios.state().elements.length).toBe(attempt + 1)
+    ios.send({ type: 'put', element: stroke(`rejoin-${attempt}`) })
+    await expect(elements(page)).toHaveCount(attempt + 2)
+    ios.send({ type: 'leave' })
+    await expect.poll(() => ios.state().connected).toBe(0)
+    await expect(page.getByTestId('connection-status')).toHaveText('Waiting for a peer')
+  }
 })
 
 test('iOS creates; four peers converge on large state, survive creator departure and recover reloads', async ({ page, browser, ios }, testInfo) => {
@@ -168,4 +198,32 @@ test('iOS app refuses legacy invites and insecure origins without clearing the b
 
 test('text and sticky notes synchronize edits and late joins across web and iOS', async ({ page, ios, browser }) => {
   await textElementsInterop(page, ios, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, ios }) => {
+  await arrowsInterop(page, ios)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, ios }) => {
+  await pressureInterop(page, ios)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, ios }) => {
+  await selectionInterop(page, ios)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, ios }) => {
+  await historyInterop(page, ios)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, ios }) => {
+  await imagesInterop(page, ios)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, ios }) => {
+  await reconciliationInterop(page, ios)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, ios }) => {
+  await connectorsInterop(page, ios)
 })

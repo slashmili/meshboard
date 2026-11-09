@@ -63,8 +63,7 @@ checks that both drawing and the appearance override survive activity recreation
 - macOS: native system-theme changes while open, explicit override, packaged app.
 - iPad/iPhone: system-theme changes, override, safe areas, rotation, native dialogs.
 - Windows: system-theme detection and packaged app.
-- Stylus: Apple Pencil, Android pressure stylus and desktop tablet hardware once
-  pressure support is implemented; synthetic events cannot establish device feel.
+- Stylus: Apple Pencil, Android pressure stylus and desktop tablet hardware; synthetic events cannot establish device feel.
 
 These checks are pending, not implied by Linux or shared Compose tests. Session
 recovery and the other increments above are not implemented by appearance work.
@@ -122,7 +121,350 @@ and preserve error states. The original count and equality requirements and
 30-second assertion timeout remain intact. No production workaround was added
 without a reproduced cause.
 
-The failed iPad job was rerun with `gh` on the same commit (attempt 2). Its result
-is pending; this does not validate the later text/note commit or the new local
-diagnostics. Follow up on that rerun and run the updated iPad suite on macOS/CI.
+The failed iPad job was rerun with `gh` on the same commit (attempt 2). The user confirmed that the rerun passed; this does not validate the later text/note commit or the new local
+diagnostics. Run the updated iPad suite on macOS/CI.
 Do not mark this issue resolved solely because the Linux repetitions pass.
+
+## Straight arrows (checkpoint 4c)
+
+Arrow (A) is available on web, desktop and the shared mobile toolbar. Drag from
+tail to head; desktop/web Shift snaps to 45-degree increments. The arrowhead is
+part of the erasable outline, scales with stroke width, and shrinks for short
+arrows. Zero-length arrows never produce non-finite coordinates. Wire data stores
+two endpoints; both implementations derive matching geometry. These are free-standing
+arrows, without object-attached endpoints or automatic routing.
+
+Verified: shared schema fixtures, web geometry tests, Rust validation/round trips,
+desktop pointer and shared mobile touch UI, seven production-browser drawing tests,
+and encrypted web/desktop arrow edit/reload/erase interoperability. Rust format,
+Clippy, tests and docs passed. The same interop scenario is wired into Android/iOS
+CI; Android pinch cancellation now includes arrows. Android emulator execution
+passed (eight UI tests and arrow/pressure interoperability). macOS/iPad execution
+and physical-device checks remain pending, including touch toolbar scrolling
+and arrowhead rendering at different zooms.
+
+## Pressure-sensitive pen (checkpoint 4d)
+
+Web pointer/coalesced events and native stylus pointer events now capture bounded
+pressure samples. Rendering and erasing use the documented shared width curve;
+mouse/touch retain the chosen constant width. Lift-off preserves the last contact
+pressure. Pressure samples survive encrypted synchronization, native edits and
+browser reloads. This is input/rendering support, not a hardware-quality claim.
+
+Verified: 49 web unit tests, 33 shared-protocol tests, Rust validation/round trips,
+format/Clippy/tests/docs, desktop/common tests including mobile rendering pixels,
+six production-browser tests including Chromium pen injection, live encrypted
+web/desktop pressure and arrow scenarios, Android app/instrumentation APK builds.
+Android and iOS pressure interoperability scenarios are wired into CI. The Android
+tablet emulator passed all eight UI tests and both new encrypted arrow/pressure
+interoperability scenarios after installing the rebuilt APKs.
+
+Pending hardware checks: Apple Pencil and Android stylus light/heavy strokes,
+stationary pressure changes, lift-off, palm/pinch interaction, zoom, coalesced
+input and long strokes; desktop tablet pressure on each OS/driver. Verify the
+pressure curve feels useful at each selected stroke width. iOS runtime execution of
+these new scenarios remains pending; synthetic Chromium events and Compose
+pixel tests do not establish physical-device behavior.
+
+## Multi-select and move (checkpoint 4e)
+
+Select (V) is available on web, desktop and mobile. Click/tap an object to select
+it, or drag a box that fully encloses several objects. Drag a selected object to
+move the group. Web/desktop Shift-click toggles individual objects. Escape,
+changing tools, or adding a second touch cancels an unfinished move. Selection
+outlines and movement previews are device-local; peers receive the committed move
+on release.
+
+Moves preserve IDs, text, pressure and other fields from the current document.
+Objects deleted before the move is committed are skipped. Each move commits as
+one CRDT update; if any object would exceed coordinate/document limits, the whole
+move is rejected. Simultaneous edits to the same object retain the existing
+whole-element CRDT conflict resolution; independent movement of object fields is
+not claimed. A group move is atomic locally and sent as one update, while later
+concurrent edits can still resolve independently per object.
+
+Verified: shared geometry tests, web and Rust atomic rollback/delete/pressure
+checks, JNI bindings, desktop pointer and mobile touch group moves, Escape/pinch
+cancellation, production-browser toolbar and movement tests, and encrypted
+bidirectional web/desktop moves with a remote edit/delete during drag and reload.
+Android passed all eight tablet UI tests and the bidirectional encrypted move
+scenario. Final local totals: 54 web unit tests, 59 desktop/common/JNI tests,
+seven production-browser drawing tests plus a focused final selection rerun,
+Rust format/Clippy/tests/docs and Android APK builds. Apple C binding tests
+and the same mixed-peer scenario are wired into CI but cannot run on Linux.
+
+Mac/iPad follow-up: marquee selection in both directions, Shift-click where a
+keyboard is attached, touch group movement, pinch cancellation, pressure/text
+preservation, and remote deletion during a move. No object resize/rotation,
+attachment routing, or undo is introduced by this increment.
+
+## CI test-server isolation (2026-11-08)
+
+The Linux web/desktop job in run
+[42522240765](https://github.com/slashmili/meshboard/actions/runs/42522240765)
+failed at commit `cfb72d4`, before the pressure scenario could join. Its Playwright
+network trace records HTTP 429 for `/api/rtc-config`. Earlier scenarios consumed
+the shared server's 30-requests-per-minute credential budget. Faster runners could
+hit the limit, while slower runs crossed the expiry window. Both macOS jobs and
+the Android job passed at that commit; this failure was not a pressure assertion.
+
+Interop scenarios now own a fresh Vite/signaling server, started before peer
+fixtures and closed after their cleanup. They use port 5174 and fail if it is
+already occupied instead of reusing an unrelated development server. Desktop,
+Android and iOS suites use the same fixture. Production rate limits are unchanged.
+Two regression scenarios each use all 30 allowed requests, check that request 31
+returns 429 and verify health stays available. With the former shared server,
+the second scenario fails on its first request; with isolation both pass.
+
+Validated locally: the regression fails before the fixture change and passes
+after it; all 15 desktop interoperability scenarios, all 15 signaling tests and
+workspace typechecks pass. The new fixture still needs the next remote CI run
+for macOS/Android/iPad validation. No application code or rate limit was changed.
+
+## CRDT-aware undo/redo (checkpoint 4f)
+
+Web and native keep local, in-memory per-object inverse history (up to 100
+operations and an 8 MiB serialized-value budget). Undo/redo emits normal CRDT
+updates through the authenticated encrypted session. Remote map changes remove
+only the affected objects from both history stacks, including same-value writes.
+A group move or clear is one action; eraser batches are separate actions. New
+local changes clear redo; rejected changes preserve history and board state.
+Reload/leave starts fresh history; temporary transport reconnect keeps the live
+replica's history. Joining does not make received drawings locally undoable.
+
+This uses conditional inverse writes rather than Yjs/yrs UndoManager. Existing
+whole-element concurrent conflict resolution still applies. A redundant remote
+delete of an already absent object may produce no map event and does not itself
+invalidate redo. History is not a shared chronological timeline or character-level
+text editing. See the CRDT core README for the precise model.
+
+Controls are available on web, desktop and mobile. Web/desktop support Ctrl/⌘ Z,
+Ctrl/⌘ Shift Z and Ctrl/⌘ Y; text editors retain their own keyboard handling.
+
+Mac/iPad follow-up: run the new Apple C binding history test and encrypted iPad
+history scenario in CI; manually check Cmd-Z/Shift-Cmd-Z on macOS, iPad touch
+undo/redo, and real stylus stroke undo. These cannot be executed on this Linux
+machine. No physical-device results are claimed.
+
+Validated on Linux (2026-11-08): 61 web unit tests, workspace typechecks and
+production build, 33 shared-protocol and 15 signaling tests; Rust format,
+Clippy with warnings denied, 16 all-feature tests and rustdoc; 62 desktop/common/
+JNI tests; four focused production-browser tests (history, group movement and
+text editing); all 16 encrypted desktop interoperability scenarios, including
+TURN/reconnect regressions; Android debug/test APK builds, all nine tablet UI
+tests, and the encrypted web/Android undo/redo scenario. The Apple binding test
+and matching live scenario are included for CI but were not run locally.
+
+## Embedded images (checkpoint 4g)
+
+Insert PNG/JPEG from the web footer or the native Image button (desktop footer,
+mobile style strip). Native pickers use pinned FileKit 0.8.8; common import reads
+at most 512 KiB plus one detection byte, closes the stream and handles providers
+without file-size metadata. Images enter at the visible canvas center, preserving
+aspect ratio and capped at 400 board units for initial display. Move, marquee,
+whole-object erase, clear and undo/redo use existing CRDT operations.
+
+The shared schema accepts static PNG and baseline/progressive JPEG only, with
+512 KiB per file, 1024 pixels per edge and eight images per board. Existing 2 MiB
+CRDT limits still apply, including historical CRDT data. Header/dimension checks
+precede decoding; local import requires successful decoding. Remote invalid pixel
+streams use a native placeholder. No external image URLs, SVG, APNG, image upload
+server, resize/crop UI or automatic compression are introduced. Embedded metadata
+is retained. Erasing does not revoke bytes already shared or necessarily reclaim
+CRDT capacity. Limits and cross-language fixtures live in the shared protocol.
+
+Mac/iPad follow-up: run the new Apple binding test and image interoperability
+scenario in CI; exercise actual Files/photo-export PNG/JPEG selection, cancel,
+invalid/oversized input, touch move/erase and undo; check packaged macOS picker
+launch/cancel and rotated JPEG display. HEIC must be exported to PNG/JPEG first.
+Windows/Linux packaged native file-dialog interaction also needs a manual smoke
+check; the automated Android import test stubs the system picker result while
+exercising the real callback, stream reader, decoder and production controller.
+
+Validated locally (2026-11-08): 45 shared-protocol, 62 web and 15 signaling unit
+tests; workspace typechecks and production build; Rust format/Clippy (warnings
+denied), 17 all-feature tests and rustdoc; 66 desktop/common/JNI tests including
+PNG/JPEG pixel decoding, painted-canvas pixels and bounded file reads; three
+production-browser scenarios plus an oversized-file regression; all 17 encrypted
+web/desktop interoperability scenarios; ten Android tablet UI tests (including
+picker callback/import/undo) and the final encrypted web/Android image scenario.
+The mixed-peer image scenario includes a 240 kB JPEG metadata payload to exercise
+fragmentation, movement, undo/redo, reload and erasing without losing image bytes.
+Apple binding and interoperability tests are wired into CI but not run on Linux.
+
+## Attached connectors (checkpoint 4h)
+
+The existing Arrow tool attaches endpoints near rectangles, ellipses, text boxes,
+notes and images. With Arrow selected, endpoint handles can be dragged to another
+object or into empty space to detach. Rectangle anchors snap to an edge; ellipse
+anchors snap to its boundary. Shift angle snapping remains available on web and
+desktop. No separate tool, obstacle routing or connector-to-connector links are
+introduced.
+
+Normalized anchor coordinates and target IDs are shared; derived geometry is not
+written back when targets move. This avoids remote target movement overwriting
+connector edits or undo history. Group moves translate free ends, while attached
+ends follow their targets exactly once. Fully attached connectors stay pinned
+when their bodies are dragged: use endpoint handles to change their attachment.
+Deletion hides dependent connectors until the same target is restored, rather
+than cascading edits into arrows owned by another peer. Hidden arrows stay in
+CRDT state and Clear removes them. Unsupported/missing target references are
+hidden deterministically. A remotely deleted arrow is not resurrected when an
+in-progress endpoint edit ends. Same-arrow concurrent edits retain the existing
+whole-element CRDT conflict semantics.
+
+Mac/iPad follow-up: run the new Apple binding and encrypted connector scenarios;
+check touch endpoint targeting, move groups with both attached objects, pinch/
+Escape cancellation, target deletion/undo, and Cmd-Z on desktop. Test endpoints
+on images and text/notes with a real stylus. Apple execution is deferred on Linux.
+
+Validated on Linux (2026-11-09), on top of the CI reconciliation fix: 52 shared
+protocol, 66 web and 15 signaling unit tests; workspace typechecks and production
+build; Rust formatting, Clippy with warnings denied, 18 all-feature tests and
+rustdoc; 68 desktop/common/JNI tests; four production-browser scenarios plus a
+focused endpoint-reattachment rerun; all 19 desktop interoperability scenarios;
+all eleven Android tablet UI tests and encrypted web/Android connector sync.
+The live connector scenario covers remote movement, deletion/undo, reload,
+rebinding and remote deletion during an endpoint drag. Apple binding and the
+same live scenario are wired into CI; Mac/iPad execution remains pending.
+
+
+### macOS x86_64 web history timeout (2026-11-09)
+
+[CI job 129054836357](https://github.com/slashmili/meshboard/actions/runs/42585687845/job/129054836357)
+failed in the web unit test “bounds stored inverse values by bytes as well as
+action count”: 6,295 ms exceeded the unchanged 5,000 ms timeout. The failure
+preceded desktop interoperability tests. Each history append previously encoded
+the whole undo stack, repeatedly serializing unchanged large strokes.
+
+Cache each action's UTF-8 JSON size in a WeakMap, sum cached sizes with exact
+outer-array delimiters, and replace partially invalidated actions so their sizes
+are recalculated. Unchanged actions retain their cache; discarded actions can
+be garbage collected. The original 50-action, 12,000-point regression and byte
+limit remain unchanged, and a new regression covers partial invalidation and
+stack movement.
+
+Linux validation: workspace typechecks, all 67 web unit tests, production build,
+and the production-browser undo/redo scenario pass. A focused run took 193 ms
+for the original large-history regression and 104 ms for the new regression.
+These timings are local evidence, not macOS measurements. macOS x86_64 CI must
+be rerun after the fix is pushed by the maintainer; no remote push was performed.
+
+
+### iPad stale snapshot investigation (2026-11-09)
+
+[Run 42588612989](https://github.com/slashmili/meshboard/actions/runs/42588612989)
+passes Android and all three web/desktop jobs, including macOS x86_64. The iPad
+four-peer large-board test fails at the five-element convergence assertion; the
+other 13 iOS CRDT interoperability scenarios pass.
+
+The attached native state reports only `large` and two previews on iPad, while
+the desktop has all five elements, including the iPad's newly issued `ios`
+stroke. Both browsers also show five elements. The iPad controller reports its
+local mutation before broadcasting it, so the adapter's observed state is stale
+relative to at least that local edit. The artifacts do not establish exactly
+where reporting stalled or prove the iPad received every remote edit.
+
+The debug adapter previously queued changed full snapshots every 50 ms without
+consumer backpressure. It now permits one outstanding snapshot. The Node reader
+acknowledges only after parsing the complete JSON line; until then the snapshot
+helper skips serialization, and the next poll publishes the latest state. This
+bounds queued board snapshots even when many previews change on a large board.
+The change affects only test reporting, not WebRTC, CRDT or production builds;
+the original convergence assertions and timeouts remain intact.
+
+Validation: all 68 web tests, 69 desktop/common native tests and workspace
+typechecks pass. Native snapshot tests
+cover 1,000 intervening preview changes while blocked, latest local/remote edits,
+and session reset after receipt. Node coverage fragments a 12,000-point snapshot
+and verifies no acknowledgment before the full line has been parsed.
+
+Pending on macOS: rerun the unchanged iPad four-peer scenario and the full iOS
+job. Linux cannot confirm the simulator-specific failure is resolved. If it
+persists, investigate simulator main-thread progress and snapshot delivery; do
+not treat this mitigation as proof of a transport/CRDT defect or its resolution.
+
+
+### iPad rejoin authentication race (2026-11-09)
+
+[Run 42599879800](https://github.com/slashmili/meshboard/actions/runs/42599879800)
+passes all web/desktop and Android jobs. The iPad large-board scenario now passes
+five-element convergence, creator departure and browser reload, then fails at
+the iPad rejoin assertion with an authentication error. Its diagnostics show an
+incoming desktop connection closed after 39 ms with the data channel open,
+before authenticated admission; the two browser connections subsequently open.
+The prior stale-snapshot failure is not reproduced in this run.
+
+Code inspection found a main-queue ordering race: the incoming-channel callback
+enqueues `attach`; `attach` installs the message delegate and then enqueues
+channel initialization again. An immediate hello can therefore be queued ahead
+of initialization and encounter a nil secure channel. Initialize synchronously
+inside `attach`, which already runs on main, while keeping off-thread state
+callbacks dispatched to main. Duplicate state callbacks remain idempotent.
+Authentication validation and frame limits are unchanged. Static diagnostic
+events distinguish initialization failure, an uninitialized receive and secure
+frame rejection without exposing payloads or keys.
+
+A new integration regression performs six leave/rejoin cycles as the incoming
+channel recipient, checking existing state transfer and a new authenticated
+write on every cycle. Every failed iOS scenario now attaches connection events.
+Local validation: all 68 web unit tests and workspace typechecks pass; Playwright
+discovers all 15 iOS CRDT scenarios including the new regression.
+
+Pending: compile Swift and execute the new regression and existing four-peer
+scenario on macOS/iPad CI. This Linux host has no Apple compiler or simulator;
+the race is established by code ordering, but the old log's generic rejection
+does not prove this was the specific rejection path. The added diagnostics make
+a continuing failure distinguishable instead of relying on the generic error.
+
+
+### Remaining iPad convergence failure (run 42699417262)
+
+The six-cycle incoming-channel rejoin regression passes, as do the other 13
+iOS CRDT scenarios. The four-peer scenario fails before creator departure:
+iPad has its own edit and both browser edits but lacks `desktop`; desktop has
+its own edit and both browser edits but lacks `ios`. Both browsers show five
+objects. Both native peers report three open connections and no errors. No
+authentication rejection appears in the iPad diagnostics. This differs from
+the preceding run's rejoin authentication failure.
+
+Five unmodified desktop four-peer runs passed locally. An exploratory Rust
+test with 100 pairs of random production client IDs passed in debug and release;
+it did not reproduce this failure and was not retained as a claimed regression.
+The evidence does not establish whether the native document is behind or its
+reported snapshot is stale. Do not increase the convergence timeout or mark
+this failure fixed without observing a passing iPad run.
+
+Added a test-only CRDT decorator to the desktop and iPad harnesses. Reports
+include the last mutation/apply operation, total count, update byte length,
+elapsed time, operation duration and actual document state vector. They exclude
+board content and invitation secrets. iPad also emits compact progress events
+independently of the acknowledged full-snapshot stream, so delayed snapshot
+delivery can be distinguished from document progress. Existing failure artifacts
+capture these fields and events. Production controllers and sync behavior are
+unchanged.
+
+Validation: the diagnostic test uses real JNI insert/apply/delete operations,
+checks clocks against the actual document and checks that text is absent. The
+instrumented desktop four-peer scenario passes. Apple compilation and execution
+remain pending macOS CI. The next failing iPad artifacts must be inspected for
+operation progress and clock differences before selecting a production fix.
+
+Android in this run failed before tests because the emulator download was not
+a valid ZIP archive. Its job was successfully rerun via gh after the workflow
+finished; no repository push was performed.
+
+
+### Diagnostic source-set correction (run 42708062779)
+
+This run failed during `compileKotlinIosSimulatorArm64`, before interoperability
+tests: `AppleInterop.kt` referenced `AppleCrdtBoard` from shared `iosMain`, but
+the implementation is intentionally in the target leaf source sets. That error
+was introduced by the preceding diagnostics change. The harness now uses the
+existing `appleCrdtFactory()` expect/actual boundary, as the production controller
+does. No source-set restructuring is required.
+
+Local validation: four iOS build-configuration tests and five native
+diagnostic/snapshot tests pass. Actual Apple compilation cannot run on this
+Linux host and remains pending CI. This run provides no new evidence about
+the underlying convergence failure because it never reached that scenario.

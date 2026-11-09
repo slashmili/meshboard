@@ -2,6 +2,42 @@
 
 ## Unreleased — Phase 4
 
+### iPad diagnostic build correction
+- Fixed: construct traced iOS documents through the existing platform factory; shared iOS sources cannot reference the leaf source set's `AppleCrdtBoard` directly.
+- Verified: four iOS build-configuration checks and five native diagnostic/snapshot tests. Apple compilation remains a CI check.
+
+### iPad convergence diagnostics
+- Added: test-only native CRDT operation counts, input sizes, timings and state vectors, including compact iPad progress events independent of full-board snapshot delivery.
+- Tested: real JNI diagnostic output and repeated four-peer desktop convergence. The remaining iPad convergence failure is under investigation; no production sync fix is claimed.
+
+### iPad incoming-channel initialization
+- Fixed: initialize already-open incoming WebRTC channels synchronously when attaching their delegates, so an immediate authentication frame cannot overtake setup on the main queue.
+- Added: six-cycle iPad rejoin regression and failure-stage diagnostics without keys or payloads. Apple runtime verification remains pending CI.
+
+### iPad test snapshot delivery
+- Fixed: bound the simulator debug adapter to one unacknowledged full-board snapshot and coalesce intermediate states, preventing an unbounded queue during large-board drawing.
+- Tested: stalled-consumer coalescing and fragmented large-snapshot acknowledgments; iPad four-peer CI confirmation remains pending.
+
+### Undo history performance
+- Fixed: cache serialized action sizes instead of repeatedly encoding the entire undo stack, preserving the exact 8 MiB budget and 100-action limit.
+- Tested: large histories, partial remote invalidation, undo/redo stack movement and production-browser undo controls; fixes the web unit-test timeout in the macOS x86_64 CI job.
+
+### Attached connectors
+- Added: Arrow endpoint attachments and draggable endpoint handles across web and native, with reconnect/detach behavior.
+- Changed: connectors follow target geometry without rewriting arrow state; group moves preserve attached anchors and target deletion hides connectors until restoration.
+- Tested: strict shared fixtures, cross-language history, pointer/touch gestures and encrypted target move/delete/undo/reload synchronization; platform results are recorded in the Phase 4 ledger.
+
+### Embedded images
+- Added: PNG/JPEG file insertion on web and native with bounded file/pixel sizes and an eight-image cap within the existing CRDT budget.
+- Added: embedded raster rendering, selection/movement, interior erasing, undo/redo and encrypted late-join/reload synchronization.
+- Fixed: native imports use bounded streams instead of relying on optional or untrusted file-size metadata.
+- Tested: shared schema fixtures, Rust/JNI history, decoder pixels, browser import and native picker callbacks; platform results and deferred device checks are recorded in the Phase 4 ledger.
+
+### CRDT-aware undo and redo
+- Added: local undo/redo on web and native, web/desktop keyboard shortcuts, and atomic group-move/clear history.
+- Added: bounded per-object inverse history that preserves unrelated remote work and invalidates history for objects changed remotely, including identical-value rewrites.
+- Tested: validation rollback, local history isolation, remote conflicts, action/byte limits, UI controls and encrypted peer synchronization. Platform results and deferred Mac/iPad checks are recorded in the Phase 4 ledger.
+
 ### Appearance and delivery decisions
 - Added: System, Light and Dark appearance on web and shared native UI. Controls and dialogs follow the selected theme; the shared paper and stroke colors stay consistent across peers.
 - Added: web appearance preference storage with a fallback when storage is blocked; native appearance survives Android activity recreation.
@@ -19,6 +55,32 @@
 - Tested: the Linux four-peer regression now includes concurrent edits from both native replicas; ten repeated runs, three single-CPU runs and workspace typechecks pass.
 - Added: element IDs in the iPad convergence assertion and browser-state capture before cleanup. Native failure capture retains errors and omits the invite secret.
 - Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in `docs/phase-4-validation.md`.
+
+### Straight arrows
+- Added: Arrow (A) on web and native with matching arrowheads, whole-object erasing, bounded short-arrow geometry and desktop/web Shift angle snapping.
+- Tested: shared schema fixtures, native and web geometry/UI tests, Rust round trips, seven production-browser tests and live encrypted web/desktop edit/reload/erase interoperability.
+- Verified: eight Android tablet UI tests and the new encrypted arrow interoperability scenario. iPad execution and physical-device checks remain pending. Object-attached connectors remain separate work.
+
+### Pressure-sensitive pen
+- Added: bounded per-point stylus pressure, matching web/native widths and hit testing, mouse/touch fallback, and lift-off pressure preservation.
+- Tested: schema rejection and CRDT round trips, geometry and native rendering pixels, production-browser synthetic pen events, encrypted native edits/reload, and Android APK compilation.
+- Verified: Android emulator UI suite and live encrypted pressure edit/reload scenario. Physical Apple Pencil/Android stylus/desktop tablet behavior and iPad runtime execution remain pending; recorded in the Phase 4 ledger.
+
+### Multi-select and move
+- Added: Select (V), marquee selection, desktop/web Shift-click toggles and group dragging on web and native, with Escape/pinch cancellation and local selection outlines.
+- Added: atomic CRDT moves that preserve current fields, skip deleted objects and reject an invalid group without partial changes.
+- Tested: geometry, atomic rollback and JNI bindings, 59 desktop/common/JNI tests, eight Android UI tests, production browser flows and bidirectional encrypted web/desktop and web/Android moves during remote edits/deletes.
+- Pending: Mac/iPad runtime and physical-device checks remain in the Phase 4 ledger.
+
+### CI interoperability isolation
+- Fixed: test scenarios no longer share a signaling server's credential budget. Each scenario owns and closes its own local server; production limits remain unchanged.
+- Reproduced: the second budget regression failed with the old shared server. The CI pressure scenario trace showed HTTP 429 before joining.
+- Added: regressions proving each scenario receives its own 30-request budget and still rejects request 31.
+- Verified: all 15 desktop interoperability scenarios, 15 signaling tests and workspace typechecks.
+
+### Native convergence recovery
+- Fixed: native sessions periodically request CRDT state over authenticated channels so a missed update does not leave a connected replica permanently stale.
+- Tested: recovery of deliberately missed inserts and delete-only changes; the regression fails without reconciliation. Apple coverage and CI evidence are recorded in `docs/ci-reconciliation-validation.md`.
 
 ## Unreleased — Phase 3
 

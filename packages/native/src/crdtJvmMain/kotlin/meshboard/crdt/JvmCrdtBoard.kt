@@ -2,6 +2,7 @@ package meshboard.crdt
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import meshboard.BoardElement
@@ -52,6 +53,20 @@ class JvmCrdtBoard internal constructor(clientId: Long) : CrdtBoard, AutoCloseab
     override fun removeAll(ids: List<String>) {
         require(ids.size <= Wire.MAX_REMOVED && ids.all { Regex("^[a-zA-Z0-9-]{1,80}$").matches(it) })
         call(8, JsonArray(ids.map(::JsonPrimitive)).toString().encodeToByteArray())
+    }
+    override fun move(ids: List<String>, delta: meshboard.Point) {
+        require(ids.size <= Wire.MAX_ELEMENTS && delta.x.isFinite() && delta.y.isFinite())
+        val request = kotlinx.serialization.json.buildJsonObject {
+            put("ids", JsonArray(ids.map(::JsonPrimitive)))
+            put("dx", JsonPrimitive(delta.x)); put("dy", JsonPrimitive(delta.y))
+        }
+        call(9, request.toString().encodeToByteArray())
+    }
+    override fun undo() { call(10) }
+    override fun redo() { call(11) }
+    override fun history(): Pair<Boolean, Boolean> {
+        val value = Json.parseToJsonElement(call(12).decodeToString()).jsonObject
+        return value.getValue("undo").jsonPrimitive.content.toBooleanStrict() to value.getValue("redo").jsonPrimitive.content.toBooleanStrict()
     }
     override fun elements(): List<BoardElement> {
         val values = Json.parseToJsonElement(call(6).decodeToString()).jsonObject

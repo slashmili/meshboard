@@ -311,3 +311,35 @@ concurrent replacements, remote deletion and encrypted mixed-peer late joins
 are covered. See [the Phase 4 ledger](phase-4-validation.md) for results and Mac/iPad
 checks. Remaining expanded tools, undo/redo, exports, presence, pressure and
 opt-in recovery are still pending.
+
+**4c — Straight arrows.** Shared arrow format, renderer, eraser and tool controls
+are implemented; see the validation ledger for tests and deferred device checks.
+Object-attached connectors and the remaining Phase 4 features are still pending.
+
+**4d — Pen pressure.** Shared pressure samples, stylus capture, variable-width
+rendering and hit testing are implemented. Mouse/touch remain constant-width.
+Hardware and platform checks are tracked in the Phase 4 ledger.
+
+**4e — Multi-select and move.** Local selection, marquee, group movement and
+atomic CRDT commits are implemented on web and native. Cancellation, remote
+deletions and preserving received edits are covered; see the Phase 4 ledger.
+
+**4f — CRDT-aware undo/redo.** Bounded local inverse history and controls are
+implemented on web and native, with web/desktop keyboard shortcuts. Remote
+changes invalidate affected object history; unrelated edits remain undoable.
+Group moves and clears undo atomically. See the Phase 4 ledger for validation
+and remaining Mac/iPad checks. Attached connectors, images, export/import,
+expanded presence and opt-in local recovery remain pending.
+
+**4g — Embedded images.** PNG/JPEG insertion, bounded validation and native/web
+rendering are implemented. Images participate in move, erase, undo/redo and
+creator-independent encrypted synchronization. Platform results and picker/device
+checks are tracked in the Phase 4 ledger. Attached connectors, export/import,
+expanded presence and opt-in recovery remain pending.
+
+**4h — Attached connectors.** The Arrow tool creates and edits endpoint
+attachments to shapes, text, notes and images. Geometry follows targets locally
+from shared references; target deletion hides connectors until restoration.
+Group movement, erasing, undo/redo and encrypted synchronization are covered.
+See the Phase 4 ledger for checks. Export/import, expanded presence and opt-in
+local recovery remain pending.

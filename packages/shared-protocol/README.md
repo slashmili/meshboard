@@ -44,3 +44,68 @@ level collaborative editing. An editor whose object has been deleted cannot save
 and resurrect it. Text and notes use the existing encrypted update path, validation
 staging and document size limits. Older builds that lack these element types reject
 them; participants should use the same current build.
+
+## Arrow elements
+
+`arrow` uses the standard color/width and exactly two points (tail, tip), without
+`text`. Render a shaft plus two open wings: head length is
+`min(endpoint distance / 2, max(12, width * 3))`, wing half-width is half that
+length. A zero-length arrow has no wings. Rendering and hit testing use this same
+outline. Endpoints are absolute board coordinates, not attachments to other objects.
+
+## Pen pressure
+
+Pen points may contain `pressure`, a finite number in `[0, 1]`. Other element
+types must omit it. Missing pressure means constant base width. Null, strings
+and out-of-range values are invalid. For recorded pressure `p`, point width is
+`baseWidth * (0.25 + 0.75 * p)`; a segment uses the mean of its endpoints' widths,
+with round caps. Single points use a round dot. Erasing uses the same widths.
+Mouse and touch input omit pressure. Stylus release retains the last contact
+pressure rather than adding the platform's synthetic zero-pressure lift event.
+Pressure remains part of the encrypted atomic CRDT element and its previews.
+
+### Embedded images
+
+`image` elements have two rectangle corners and an `image` field containing a
+canonical `data:image/png;base64,...` or `data:image/jpeg;base64,...` value.
+The ordinary color/width fields remain present; they do not tint the raster.
+Images preserve aspect ratio inside their bounds and participate in selection,
+move, whole-object erasing and local undo/redo. Insertion centers an image in the
+visible canvas, with a maximum initial display edge of 400 board units.
+
+Each image is limited to 512 KiB of encoded file bytes and 1024 pixels per edge;
+a board permits eight image elements, subject to the existing 2 MiB CRDT budget.
+PNG must be static (APNG is rejected); JPEG supports baseline/progressive frames.
+SVG, external URLs, unknown formats, noncanonical base64 and oversized dimensions
+are rejected before pixel decoding. Local import also requires successful pixel
+decoding. A malformed pixel stream received from a peer cannot launch external
+requests; native rendering shows a placeholder if decoding fails.
+
+Bytes, including file metadata, are embedded unchanged and travel only through
+normal encrypted CRDT synchronization. There is no image upload service or image
+URL fetch. History and CRDT tombstones can retain removed bytes during the session;
+erasing an image is not a security revocation or a promise to reclaim its budget.
+
+### Attached arrows
+
+Arrows may carry `startAttachment` and/or `endAttachment`, each an exact
+`{id, x, y}` object. `id` identifies another element; `x` and `y` are normalized
+coordinates in its bounding rectangle (0 through 1). Only arrows accept these
+fields; self-reference, null, extra fields and invalid coordinates are rejected.
+Absent attachments are omitted. Targets may be rectangles, ellipses, text boxes,
+sticky notes or images. References to missing/unsupported targets hide the arrow;
+there is no recursive connector graph or dependency on message arrival order.
+
+Rendering, hit testing and selection resolve endpoints from the current targets.
+Moving a target does not rewrite any arrow. Group moves translate free ends only;
+attached ends follow targets once. A fully attached arrow cannot be repositioned
+by dragging its body; use the Arrow tool to drag its endpoint handles. Endpoint
+editing rebinds near a target, or detaches when dropped in empty space. New
+attachments snap to a rectangle edge or ellipse boundary. Ordinary free arrows
+and desktop/web Shift snapping remain available.
+
+Deleting a target hides its connectors without mutating another peer's arrows.
+Undo restoring that same target ID makes them visible again. Hidden connectors
+remain in the CRDT and are removed by Clear; deleting is not cascading. Endpoint
+edits use existing atomic whole-element conflict resolution and local history.
+An arrow deleted remotely during endpoint dragging is not recreated on release.

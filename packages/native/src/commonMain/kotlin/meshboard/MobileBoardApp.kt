@@ -40,6 +40,7 @@ private fun mobilePaint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16
 fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https://", boardTitle: String = "Meshboard", qrImage: ((String) -> ImageBitmap)? = null) {
     val sharing = controller as? BoardController
     val state by controller.state.collectAsState()
+    val images = rememberBoardImages(state.elements)
     val latest by rememberUpdatedState(state)
     var toolName by rememberSaveable { mutableStateOf(Tool.Pen.name) }
     val tool = Tool.valueOf(toolName)
@@ -49,6 +50,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     val textMeasurer = rememberTextMeasurer()
     var textEdit by remember { mutableStateOf<BoardElement?>(null) }
     var editingExisting by remember { mutableStateOf(false) }
+    var selection by remember { mutableStateOf(Selection()) }
     var draft by remember { mutableStateOf<BoardElement?>(null) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var widthMenu by remember { mutableStateOf(false) }
@@ -60,7 +62,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val density = LocalDensity.current.density.toDouble()
-    fun cancel() { draft = null; cancelled++; controller.preview(null) }
+    fun cancel() { selection = Selection(); draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2, canvasSize.height / density / 2), view.zoom * factor) }
 
     var appearance by rememberAppearance()
@@ -101,6 +103,9 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                 }
             }
             Row(Modifier.fillMaxWidth().background(colors.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                InsertImageButton(controller, { view.world(Point(canvasSize.width / density / 2, canvasSize.height / density / 2)) }, ::cancel)
+                TextButton(onClick = { cancel(); controller.undo() }, enabled = state.canUndo, modifier = Modifier.testTag("mobile-undo")) { Text("Undo") }
+                TextButton(onClick = { cancel(); controller.redo() }, enabled = state.canRedo, modifier = Modifier.testTag("mobile-redo")) { Text("Redo") }
                 MobilePalette.forEach { (name, hex) ->
                     Box(Modifier.size(48.dp).semantics { contentDescription = "$name stroke"; selected = color == hex }.clickable { cancel(); color = hex }.padding(9.dp)
                         .border(1.dp, if (color == hex) mobilePaint(hex) else Color.Transparent, CircleShape).padding(4.dp).background(mobilePaint(hex), CircleShape))
@@ -123,13 +128,15 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                             awaitPointerEventScope {
                                 var pointer: PointerId? = null
                                 var start: Point? = null
+                                var arrowEndpoint = 1
+                                var editingArrow = false
                                 var last: Point? = null
                                 var navigating = false
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val pressed = event.changes.filter { it.pressed }
                                     if (pressed.size >= 2) {
-                                        draft = null; pointer = null; navigating = true; controller.preview(null)
+                                        selection = Selection(); draft = null; pointer = null; navigating = true; controller.preview(null)
                                         val pair = pressed.take(2)
                                         if (pair.all { it.previousPressed }) {
                                             fun center(previous: Boolean): Point = Point(
@@ -152,23 +159,27 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     val change = event.changes.firstOrNull { it.id == pointer }
                                         ?: event.changes.firstOrNull { it.pressed && !it.previousPressed } ?: continue
                                     val point = Point(change.position.x / density, change.position.y / density)
-                                    val world = view.world(point)
+                                    val world = if (tool == Tool.Pen) penSample(view.world(point), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(point)
                                     if (pointer == null && change.pressed) {
                                         pointer = change.id; start = world; last = point
-                                        if (tool != Tool.Hand && tool != Tool.Eraser && tool != Tool.Text && tool != Tool.Sticky) {
+                                        if (tool == Tool.Select) selection = selection.begin(resolveConnectors(latest.elements), world, 6 / view.zoom)
+                                        if (tool != Tool.Select && tool != Tool.Hand && tool != Tool.Eraser && tool != Tool.Text && tool != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), tool.wire, color, width, if (tool == Tool.Pen) listOf(world) else listOf(world, world))
+                                            if (tool == Tool.Arrow) { val arrow = beginArrow(latest.elements, world, 10 / view.zoom, draft!!); draft = arrow.element; arrowEndpoint = arrow.index; editingArrow = arrow.existing } else editingArrow = false
                                         }
                                     }
                                     if (pointer != change.id) continue
                                     when (tool) {
+                                        Tool.Select -> selection = selection.copy(end = world)
                                         Tool.Hand -> { val previous = last!!; view = view.copy(x = view.x + point.x - previous.x, y = view.y + point.y - previous.y) }
                                         Tool.Eraser -> {
                                             val from = last?.let(view::world) ?: world
-                                            val ids = latest.elements.filter { hits(it, from, world, 12 / view.zoom) }.map { it.id }
+                                            val ids = resolveConnectors(latest.elements).filter { hits(it, from, world, 12 / view.zoom) }.map { it.id }
                                             if (ids.isNotEmpty()) controller.remove(ids)
                                         }
                                         else -> draft?.let { element ->
-                                            if (tool == Tool.Pen && element.points.last() != world) {
+                                            if (tool == Tool.Arrow) draft = dragArrow(element,arrowEndpoint,world,latest.elements,10/view.zoom)
+                                            else if (tool == Tool.Pen && element.points.last() != world) {
                                                 if (element.points.size == Wire.MAX_POINTS) {
                                                     controller.put(element)
                                                     draft = element.copy(id = controller.newId(), points = listOf(element.points.last(), world))
@@ -179,6 +190,10 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     }
                                     last = point
                                     if (!change.pressed) {
+                                        if (tool == Tool.Select) {
+                                            if (selection.moving) controller.move(selection.ids, selection.delta())
+                                            selection = selection.finish(resolveConnectors(latest.elements))
+                                        }
                                         if ((tool == Tool.Text || tool == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
                                             val existing = latest.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
                                             editingExisting = existing != null
@@ -186,14 +201,14 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                         }
                                         draft?.let { element ->
                                             val a = element.points.first(); val b = element.points.last()
-                                            if (element.type == "pen" || hypot(b.x - a.x, b.y - a.y) > 1 / view.zoom) controller.put(element)
+                                            if (element.type == "pen" || hypot(b.x - a.x, b.y - a.y) > 1 / view.zoom) { if (!editingArrow || latest.elements.any { it.id == element.id }) controller.put(element) }
                                         }
                                         draft = null; pointer = null; controller.preview(null)
                                     }
                                     change.consume()
                                 }
                             }
-                        } finally { draft = null; controller.preview(null) }
+                        } finally { selection = Selection(); draft = null; controller.preview(null) }
                     }) {
                     val d = density.toFloat()
                     val spacing = (24 * view.zoom * density).toFloat()
@@ -204,9 +219,13 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                         x += spacing
                     }
                     withTransform({ scale(d, d, Offset.Zero); translate(view.x.toFloat(), view.y.toFloat()); scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero) }) {
-                        state.elements.forEach { mobileElement(it, textMeasurer) }
-                        state.previews.forEach { mobileElement(it, textMeasurer, .65f) }
-                        draft?.let { mobileElement(it, textMeasurer) }
+                        val displayState = selection.display(state.elements)
+                        val displayed = resolveConnectors(displayState).filter { it.id != draft?.id }
+                        displayed.forEach { mobileElement(it, textMeasurer, images) }
+                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(Color.White, (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(Color(0xff387c59), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
+                        if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
+                        state.previews.forEach { mobileElement(it, textMeasurer, images, .65f) }
+                        draft?.let { resolveConnector(it,displayState) }?.let { mobileElement(it, textMeasurer, images) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null) Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -234,7 +253,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
             confirmButton = { Button(onClick = { controller.remove(state.elements.map { it.id }); dialog = null }, modifier = Modifier.testTag("mobile-confirm-clear")) { Text("Clear board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
         if (dialog == "help") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A little space for ideas") }, text = {
-            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nInvites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.")
+            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. Select: tap an object or drag a box around several, then drag to move. A pinch cancels a move. The eraser removes whole objects. Arrow endpoints attach to objects; drag an endpoint with Arrow to reconnect or detach. Deleting a target hides its connectors until restored.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. Select: tap an object or drag a box around several, then drag to move. A pinch cancels a move. The eraser removes whole objects. Arrow endpoints attach to objects; drag an endpoint with Arrow to reconnect or detach. Deleting a target hides its connectors until restored.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nInvites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.")
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
         if (dialog == "appearance") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
             AppearanceOptions(appearance) { appearance = it }
@@ -275,9 +294,11 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     }
 }
 
-private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, alpha: Float = 1f) {
+private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f) {
+    if (element.image != null) { drawImageElement(element, images, alpha); return }
     if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
     val color = mobilePaint(element.color).copy(alpha = alpha)
+    if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }
     val a = element.points.first(); val b = element.points.last()
     if (element.points.size == 1) { drawCircle(color, element.width.toFloat() / 2, Offset(a.x.toFloat(), a.y.toFloat())); return }
     val style = Stroke(element.width.toFloat(), cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -286,7 +307,7 @@ private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMea
         val size = Size(abs(b.x - a.x).toFloat(), abs(b.y - a.y).toFloat())
         if (element.type == "rectangle") drawRect(color, top, size, style = style) else drawOval(color, top, size, style = style)
     } else {
-        val path = Path().apply { moveTo(a.x.toFloat(), a.y.toFloat()); element.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) } }
+        val path = Path().apply { moveTo(a.x.toFloat(), a.y.toFloat()); outline(element).drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) } }
         drawPath(path, color, style = style)
     }
 }

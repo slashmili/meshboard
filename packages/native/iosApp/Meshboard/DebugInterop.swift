@@ -36,6 +36,9 @@ final class DebugInterop {
         timer.schedule(deadline: .now(), repeating: .milliseconds(50))
         timer.setEventHandler { [weak self] in
             guard let self, let connection = self.connection else { return }
+            if let progress = self.controller.progress() {
+                connection.send(content: Data(("MESHBOARD_DIAGNOSTIC " + progress + "\n").utf8), completion: .contentProcessed { _ in })
+            }
             guard let state = self.controller.snapshot() else { return }
             connection.send(content: Data(("MESHBOARD " + state + "\n").utf8), completion: .contentProcessed { _ in })
         }

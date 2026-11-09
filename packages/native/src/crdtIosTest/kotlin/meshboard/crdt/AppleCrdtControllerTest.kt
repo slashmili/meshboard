@@ -63,6 +63,26 @@ class AppleCrdtControllerTest {
         } finally { board.close(); remote.close() }
     }
 
+    @Test fun reconciliationRepairsMissingInsertAndDeletionWithoutReconnect() {
+        val net = Network(); val board = controller(net); val remote = AppleCrdtBoard()
+        try {
+            board.opened("peer")
+            fun reconcile() {
+                net.sent.clear(); board.reconcile()
+                val request = YWire.Reader(Base64.decode(net.sent.single()))
+                assertEquals(0L,request.uint()); assertEquals(0L,request.uint())
+                val vector=request.bytes(); request.end()
+                board.receivedBinary("peer",Base64.encode(YWire.sync(1,remote.update(vector))))
+            }
+            remote.put(stroke) // The original update never reaches this replica.
+            reconcile(); assertEquals(listOf(stroke),board.state.value.elements)
+            val vector=remote.stateVector(); remote.remove(stroke.id)
+            assertContentEquals(vector,remote.stateVector()) // Deletes need repair too.
+            reconcile(); assertTrue(board.state.value.elements.isEmpty())
+            assertEquals(1,board.state.value.connected); assertTrue(net.rejected.isEmpty())
+        } finally { board.close(); remote.close() }
+    }
+
     @Test fun invalidBinaryRejectsOnlyThatPeerAndKeepsValidatedState() {
         val net = Network(); val board = controller(net)
         try {
