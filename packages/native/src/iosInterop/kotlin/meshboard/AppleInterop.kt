@@ -6,7 +6,7 @@ import kotlinx.serialization.json.*
 class AppleInterop(network: AppleNetwork) {
     private var trace: InteropCrdtTrace? = null
     private val controller = AppleBoardController(network) {
-        InteropCrdtTrace(meshboard.crdt.AppleCrdtBoard()).also { trace = it }
+        InteropCrdtTrace(appleCrdtFactory().invoke()).also { trace = it }
     }
     private val snapshots = InteropSnapshot(awaitReceipt = true)
     private var previousProgress: JsonObject? = null

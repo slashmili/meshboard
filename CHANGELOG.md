@@ -2,6 +2,10 @@
 
 ## Unreleased — Phase 4
 
+### iPad diagnostic build correction
+- Fixed: construct traced iOS documents through the existing platform factory; shared iOS sources cannot reference the leaf source set's `AppleCrdtBoard` directly.
+- Verified: four iOS build-configuration checks and five native diagnostic/snapshot tests. Apple compilation remains a CI check.
+
 ### iPad convergence diagnostics
 - Added: test-only native CRDT operation counts, input sizes, timings and state vectors, including compact iPad progress events independent of full-board snapshot delivery.
 - Tested: real JNI diagnostic output and repeated four-peer desktop convergence. The remaining iPad convergence failure is under investigation; no production sync fix is claimed.

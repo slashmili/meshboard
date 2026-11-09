@@ -453,3 +453,18 @@ operation progress and clock differences before selecting a production fix.
 Android in this run failed before tests because the emulator download was not
 a valid ZIP archive. Its job was successfully rerun via gh after the workflow
 finished; no repository push was performed.
+
+
+### Diagnostic source-set correction (run 42708062779)
+
+This run failed during `compileKotlinIosSimulatorArm64`, before interoperability
+tests: `AppleInterop.kt` referenced `AppleCrdtBoard` from shared `iosMain`, but
+the implementation is intentionally in the target leaf source sets. That error
+was introduced by the preceding diagnostics change. The harness now uses the
+existing `appleCrdtFactory()` expect/actual boundary, as the production controller
+does. No source-set restructuring is required.
+
+Local validation: four iOS build-configuration tests and five native
+diagnostic/snapshot tests pass. Actual Apple compilation cannot run on this
+Linux host and remains pending CI. This run provides no new evidence about
+the underlying convergence failure because it never reached that scenario.
