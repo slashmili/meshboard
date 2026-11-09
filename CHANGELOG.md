@@ -2,6 +2,10 @@
 
 ## Unreleased — Phase 4
 
+### iPad convergence diagnostics
+- Added: test-only native CRDT operation counts, input sizes, timings and state vectors, including compact iPad progress events independent of full-board snapshot delivery.
+- Tested: real JNI diagnostic output and repeated four-peer desktop convergence. The remaining iPad convergence failure is under investigation; no production sync fix is claimed.
+
 ### iPad incoming-channel initialization
 - Fixed: initialize already-open incoming WebRTC channels synchronously when attaching their delegates, so an immediate authentication frame cannot overtake setup on the main queue.
 - Added: six-cycle iPad rejoin regression and failure-stage diagnostics without keys or payloads. Apple runtime verification remains pending CI.

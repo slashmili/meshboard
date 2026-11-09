@@ -5,10 +5,14 @@ import kotlinx.serialization.json.*
 
 /** Test-only stdin/stdout adapter; all board and network work uses the real controller. */
 fun main(args: Array<String>) = runBlocking {
-    val controller = DesktopController(forceRelay = "--relay" in args)
+    val trace = java.util.concurrent.atomic.AtomicReference<InteropCrdtTrace>()
+    val controller = DesktopController(forceRelay = "--relay" in args, crdtFactory = {
+        InteropCrdtTrace(meshboard.crdt.JvmCrdtBoard()).also { trace.set(it) }
+    })
     val collector = launch(Dispatchers.Default) {
         controller.state.collect { state ->
             val value = buildJsonObject {
+                put("crdt", trace.get().snapshot())
                 put("connected", state.connected); put("relayed", state.relayed)
                 put("invite", state.invite); put("signaling", state.signaling)
                 put("error", state.error?.let(::JsonPrimitive) ?: JsonNull)

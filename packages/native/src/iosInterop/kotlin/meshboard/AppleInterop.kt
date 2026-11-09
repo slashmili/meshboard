@@ -4,8 +4,18 @@ import kotlinx.serialization.json.*
 
 /** Debug simulator harness; this source directory is excluded from Release builds. */
 class AppleInterop(network: AppleNetwork) {
-    private val controller = AppleBoardController(network)
+    private var trace: InteropCrdtTrace? = null
+    private val controller = AppleBoardController(network) {
+        InteropCrdtTrace(meshboard.crdt.AppleCrdtBoard()).also { trace = it }
+    }
     private val snapshots = InteropSnapshot(awaitReceipt = true)
+    private var previousProgress: JsonObject? = null
+    fun progress(): String? {
+        val current = checkNotNull(trace).snapshot()
+        if (current === previousProgress) return null
+        previousProgress = current
+        return buildJsonObject { put("crdt", current) }.toString()
+    }
     fun command(raw: String) {
         val value = Json.parseToJsonElement(raw).jsonObject
         when (value.text("type")) {
@@ -23,5 +33,7 @@ class AppleInterop(network: AppleNetwork) {
             "close" -> controller.close()
         }
     }
-    fun snapshot(): String? = snapshots.changed(controller.state.value)
+    fun snapshot(): String? = snapshots.changed(controller.state.value)?.let { raw ->
+        JsonObject(Json.parseToJsonElement(raw).jsonObject + ("crdt" to checkNotNull(trace).snapshot())).toString()
+    }
 }

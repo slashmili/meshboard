@@ -416,3 +416,40 @@ scenario on macOS/iPad CI. This Linux host has no Apple compiler or simulator;
 the race is established by code ordering, but the old log's generic rejection
 does not prove this was the specific rejection path. The added diagnostics make
 a continuing failure distinguishable instead of relying on the generic error.
+
+
+### Remaining iPad convergence failure (run 42699417262)
+
+The six-cycle incoming-channel rejoin regression passes, as do the other 13
+iOS CRDT scenarios. The four-peer scenario fails before creator departure:
+iPad has its own edit and both browser edits but lacks `desktop`; desktop has
+its own edit and both browser edits but lacks `ios`. Both browsers show five
+objects. Both native peers report three open connections and no errors. No
+authentication rejection appears in the iPad diagnostics. This differs from
+the preceding run's rejoin authentication failure.
+
+Five unmodified desktop four-peer runs passed locally. An exploratory Rust
+test with 100 pairs of random production client IDs passed in debug and release;
+it did not reproduce this failure and was not retained as a claimed regression.
+The evidence does not establish whether the native document is behind or its
+reported snapshot is stale. Do not increase the convergence timeout or mark
+this failure fixed without observing a passing iPad run.
+
+Added a test-only CRDT decorator to the desktop and iPad harnesses. Reports
+include the last mutation/apply operation, total count, update byte length,
+elapsed time, operation duration and actual document state vector. They exclude
+board content and invitation secrets. iPad also emits compact progress events
+independently of the acknowledged full-snapshot stream, so delayed snapshot
+delivery can be distinguished from document progress. Existing failure artifacts
+capture these fields and events. Production controllers and sync behavior are
+unchanged.
+
+Validation: the diagnostic test uses real JNI insert/apply/delete operations,
+checks clocks against the actual document and checks that text is absent. The
+instrumented desktop four-peer scenario passes. Apple compilation and execution
+remain pending macOS CI. The next failing iPad artifacts must be inspected for
+operation progress and clock differences before selecting a production fix.
+
+Android in this run failed before tests because the emulator download was not
+a valid ZIP archive. Its job was successfully rerun via gh after the workflow
+finished; no repository push was performed.
