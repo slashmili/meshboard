@@ -327,3 +327,25 @@ all eleven Android tablet UI tests and encrypted web/Android connector sync.
 The live connector scenario covers remote movement, deletion/undo, reload,
 rebinding and remote deletion during an endpoint drag. Apple binding and the
 same live scenario are wired into CI; Mac/iPad execution remains pending.
+
+
+### macOS x86_64 web history timeout (2026-11-09)
+
+[CI job 129054836357](https://github.com/slashmili/meshboard/actions/runs/42585687845/job/129054836357)
+failed in the web unit test “bounds stored inverse values by bytes as well as
+action count”: 6,295 ms exceeded the unchanged 5,000 ms timeout. The failure
+preceded desktop interoperability tests. Each history append previously encoded
+the whole undo stack, repeatedly serializing unchanged large strokes.
+
+Cache each action's UTF-8 JSON size in a WeakMap, sum cached sizes with exact
+outer-array delimiters, and replace partially invalidated actions so their sizes
+are recalculated. Unchanged actions retain their cache; discarded actions can
+be garbage collected. The original 50-action, 12,000-point regression and byte
+limit remain unchanged, and a new regression covers partial invalidation and
+stack movement.
+
+Linux validation: workspace typechecks, all 67 web unit tests, production build,
+and the production-browser undo/redo scenario pass. A focused run took 193 ms
+for the original large-history regression and 104 ms for the new regression.
+These timings are local evidence, not macOS measurements. macOS x86_64 CI must
+be rerun after the fix is pushed by the maintainer; no remote push was performed.

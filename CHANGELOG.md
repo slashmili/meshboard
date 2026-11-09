@@ -2,6 +2,10 @@
 
 ## Unreleased — Phase 4
 
+### Undo history performance
+- Fixed: cache serialized action sizes instead of repeatedly encoding the entire undo stack, preserving the exact 8 MiB budget and 100-action limit.
+- Tested: large histories, partial remote invalidation, undo/redo stack movement and production-browser undo controls; fixes the web unit-test timeout in the macOS x86_64 CI job.
+
 ### Attached connectors
 - Added: Arrow endpoint attachments and draggable endpoint handles across web and native, with reconnect/detach behavior.
 - Changed: connectors follow target geometry without rewriting arrow state; group moves preserve attached anchors and target deletion hides connectors until restoration.
