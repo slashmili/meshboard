@@ -17,7 +17,8 @@ fun selectionBounds(element: BoardElement): SelectionBox {
 fun translated(elements: List<BoardElement>, ids: List<String>, delta: Point): List<BoardElement> {
     require(delta.x.isFinite() && delta.y.isFinite())
     val selected = ids.toSet()
-    return elements.filter { it.id in selected }.map { e -> e.copy(points = e.points.map { p ->
+    return elements.filter { it.id in selected && !(it.startAttachment != null && it.endAttachment != null) }.map { e -> e.copy(points = e.points.mapIndexed { index,p ->
+        if ((index==0 && e.startAttachment!=null) || (index==1 && e.endAttachment!=null)) return@mapIndexed p
         p.copy(x = p.x + delta.x, y = p.y + delta.y).also { require(it.x in -1e7..1e7 && it.y in -1e7..1e7) }
     }) }
 }

@@ -115,6 +115,8 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                 var active: Tool? = null
                                 var last: Point? = null
                                 var start: Point? = null
+                                var arrowEndpoint = 1
+                                var editingArrow = false
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull() ?: continue
@@ -124,9 +126,10 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         focus.requestFocus()
                                         active = if (space || event.buttons.isTertiaryPressed) Tool.Hand else tool
                                         last = p; start = world
-                                        if (active == Tool.Select) selection = selection.begin(currentState.elements, world, 6 / view.zoom, event.keyboardModifiers.isShiftPressed)
+                                        if (active == Tool.Select) selection = selection.begin(resolveConnectors(currentState.elements), world, 6 / view.zoom, event.keyboardModifiers.isShiftPressed)
                                         if (active != Tool.Select && active != Tool.Hand && active != Tool.Eraser && active != Tool.Text && active != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), active!!.wire, color, width, if (active == Tool.Pen) listOf(world) else listOf(world, world))
+                                            if (tool == Tool.Arrow) { val arrow = beginArrow(currentState.elements, world, 10 / view.zoom, draft!!); draft = arrow.element; arrowEndpoint = arrow.index; editingArrow = arrow.existing } else editingArrow = false
                                             controller.preview(draft)
                                         }
                                     }
@@ -136,13 +139,14 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                             Tool.Hand -> if (change.previousPressed) { val previous = last!!; view = view.copy(x = view.x + p.x - previous.x, y = view.y + p.y - previous.y) }
                                             Tool.Eraser -> {
                                                 val from = last?.let(view::world) ?: world
-                                                val ids = currentState.elements.filter { hits(it, from, world, 9 / view.zoom) }.map { it.id }
+                                                val ids = resolveConnectors(currentState.elements).filter { hits(it, from, world, 9 / view.zoom) }.map { it.id }
                                                 if (ids.isNotEmpty()) controller.remove(ids)
                                             }
                                             else -> if (change.previousPressed) {
                                                 val element = draft
                                                 if (element != null) {
-                                                    if (active == Tool.Pen) {
+                                                    if (active == Tool.Arrow) draft = dragArrow(element,arrowEndpoint,if (event.keyboardModifiers.isShiftPressed) constrained(element.points[1-arrowEndpoint],world,"arrow") else world,currentState.elements,10/view.zoom)
+                                                    else if (active == Tool.Pen) {
                                                         if (element.points.last() != world) {
                                                             if (element.points.size == Wire.MAX_POINTS) {
                                                                 controller.put(element)
@@ -158,7 +162,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                         if (!change.pressed) {
                                         if (active == Tool.Select) {
                                             if (selection.moving) controller.move(selection.ids, selection.delta())
-                                            selection = selection.finish(currentState.elements)
+                                            selection = selection.finish(resolveConnectors(currentState.elements))
                                         }
                                             if ((active == Tool.Text || active == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
                                                 val existing = currentState.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
@@ -167,7 +171,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                             }
                                             draft?.let { element ->
                                                 val first = element.points.first(); val end = element.points.last()
-                                                if (element.type == "pen" || hypot(end.x - first.x, end.y - first.y) > 1 / view.zoom) controller.put(element)
+                                                if (element.type == "pen" || hypot(end.x - first.x, end.y - first.y) > 1 / view.zoom) { if (!editingArrow || currentState.elements.any { it.id == element.id }) controller.put(element) }
                                             }
                                             draft = null; active = null; controller.preview(null)
                                         }
@@ -187,11 +191,13 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                         translate(view.x.toFloat(), view.y.toFloat())
                         scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero)
                     }) {
-                        val displayed = selection.display(state.elements)
+                        val displayState = selection.display(state.elements)
+                        val displayed = resolveConnectors(displayState).filter { it.id != draft?.id }
                         displayed.forEach { drawElement(it, textMeasurer, images) }
+                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(Color.White, (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(Color(0xff387c59), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
                         if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
-                        state.previews.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, images, .65f) }
-                        draft?.let { drawElement(it, textMeasurer, images) }
+                        state.previews.mapNotNull { resolveConnector(it,state.elements) }.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, images, .65f) }
+                        draft?.let { resolveConnector(it,displayState) }?.let { drawElement(it, textMeasurer, images) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null && state.previews.isEmpty()) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -282,7 +288,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
             "appearance" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
                 AppearanceOptions(appearance) { appearance = it }
             }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } })
-            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("V select · P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan\n\nSelect: click an object or drag a box around several, then drag to move. Shift-click toggles objects.\n\nDrag to draw. The eraser removes whole objects. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
+            "help" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A few handy shortcuts") }, text = { Text("V select · P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan\n\nSelect: click an object or drag a box around several, then drag to move. Shift-click toggles objects.\n\nDrag to draw. The eraser removes whole objects. Arrow endpoints attach to objects; drag an endpoint with Arrow to reconnect or detach. Deleting a target hides its connectors until restored. Hold Shift for squares, circles, or snapped lines. Hold Space and drag to pan; scroll to pan, Ctrl/⌘ + scroll to zoom. Escape cancels a draft.\n\nUse Share to create an invite or Join to paste one. Drawing lives only in participant memory. Invites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read and edit the board.", fontSize = 13.sp) }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
         }
     }
 }

@@ -1,3 +1,4 @@
+import { resolveConnector } from './connectors'
 import { importImage } from './images'
 import { marquee, selectionBounds } from './selection'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
@@ -37,7 +38,7 @@ const HINTS: Record<Tool, string> = {
   eraser: 'Click or drag across a stroke to erase the whole object.',
   rectangle: 'Drag to draw a rectangle. Hold Shift for a square.',
   ellipse: 'Drag to draw an ellipse. Hold Shift for a circle.',
-  arrow: 'Drag from the tail to the arrowhead. Hold Shift to snap the angle.',
+  arrow: 'Draw from/to an object to attach. Drag an endpoint with Arrow to reconnect or detach. Drag from the tail to the arrowhead. Hold Shift to snap the angle.',
   line: 'Drag to draw a line. Hold Shift to snap the angle.',
   text: 'Click to add text. Click existing text or a note to edit it.',
   sticky: 'Click to add a note. Click existing text or a note to edit it.',
@@ -102,7 +103,7 @@ export function App() {
   const { x, y, zoom } = board.view
   const currentTool = TOOLS.find(item => item.id === tool)!
   const drawing = tool !== 'hand' && tool !== 'eraser'
-  const remoteDrafts = session.drafts.filter(draft => !board.elements.some(element => element.id === draft.id))
+  const remoteDrafts = session.drafts.map(e => resolveConnector(e, document.getElements())).filter((e): e is BoardElement => e !== null).filter(draft => !board.elements.some(element => element.id === draft.id))
   const empty = board.elements.length === 0 && !board.draft && remoteDrafts.length === 0
   const connectionLabel = !session.room ? 'Local only' : session.status.connected ? `${session.status.connected} peer${session.status.connected === 1 ? '' : 's'} connected` : session.status.connecting ? 'Connecting…' : session.status.signaling ? 'Waiting for a peer' : 'Joining…'
 
@@ -118,7 +119,7 @@ export function App() {
         <div className="header-actions">
           <span className="local-badge" role="status" data-testid="connection-status"><span className="status-dot" /> {connectionLabel}</span>
           <button className="primary-button share-button" aria-label="Share board" onClick={() => { session.share(); setSharing(true) }}><Share2 size={15} /><span>Share</span></button>
-          <button className="quiet-button clear-button" aria-label="Clear board" disabled={board.elements.length === 0} onClick={() => clearDialog.current?.showModal()}><Trash2 size={16} /><span>Clear board</span></button>
+          <button className="quiet-button clear-button" aria-label="Clear board" disabled={document.getElements().length === 0} onClick={() => clearDialog.current?.showModal()}><Trash2 size={16} /><span>Clear board</span></button>
         </div>
       </header>
 
@@ -143,6 +144,7 @@ export function App() {
             {board.elements.map(element => <Element key={element.id} element={element} />)}
             {board.draft && <Element element={board.draft} />}
           </g>
+            {tool === 'arrow' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="connector-handles">{board.elements.filter(e=>e.type==='arrow').flatMap(e=>e.points.map((p,i)=><circle key={e.id+i} cx={p.x} cy={p.y} r={4/zoom} fill="white" stroke="#387c59" strokeWidth={1/zoom}/>))}</g>}
           {tool === 'select' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="selection-overlay">
             {board.elements.filter(e => board.selection.ids.includes(e.id)).map(e => {
               const box = selectionBounds(e), padding = 4 / zoom

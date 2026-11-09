@@ -66,6 +66,17 @@ class AppleCrdtBoardTest {
         } finally { a.close(); b.close() }
     }
 
+    @Test fun attachedArrowRoundTripsAndKeepsItsAnchorDuringMove() {
+        val a = AppleCrdtBoard(); val b = AppleCrdtBoard()
+        try {
+            val arrow = stroke.copy(type = "arrow", points = listOf(Point(0.0,0.0),Point(40.0,30.0)), startAttachment = meshboard.Attachment("target",1.0,0.5))
+            a.put(arrow); a.move(listOf(arrow.id),Point(20.0,10.0)); b.apply(a.update())
+            assertEquals(arrow.startAttachment,b.elements().single().startAttachment)
+            assertEquals(listOf(Point(0.0,0.0),Point(60.0,40.0)),b.elements().single().points)
+            a.undo(); assertEquals(listOf(arrow),a.elements())
+        } finally { a.close(); b.close() }
+    }
+
     @Test fun closeIsIdempotentAndUseAfterCloseFails() {
         val board = AppleCrdtBoard()
         board.close()

@@ -291,3 +291,39 @@ picker callback/import/undo) and the final encrypted web/Android image scenario.
 The mixed-peer image scenario includes a 240 kB JPEG metadata payload to exercise
 fragmentation, movement, undo/redo, reload and erasing without losing image bytes.
 Apple binding and interoperability tests are wired into CI but not run on Linux.
+
+## Attached connectors (checkpoint 4h)
+
+The existing Arrow tool attaches endpoints near rectangles, ellipses, text boxes,
+notes and images. With Arrow selected, endpoint handles can be dragged to another
+object or into empty space to detach. Rectangle anchors snap to an edge; ellipse
+anchors snap to its boundary. Shift angle snapping remains available on web and
+desktop. No separate tool, obstacle routing or connector-to-connector links are
+introduced.
+
+Normalized anchor coordinates and target IDs are shared; derived geometry is not
+written back when targets move. This avoids remote target movement overwriting
+connector edits or undo history. Group moves translate free ends, while attached
+ends follow their targets exactly once. Fully attached connectors stay pinned
+when their bodies are dragged: use endpoint handles to change their attachment.
+Deletion hides dependent connectors until the same target is restored, rather
+than cascading edits into arrows owned by another peer. Hidden arrows stay in
+CRDT state and Clear removes them. Unsupported/missing target references are
+hidden deterministically. A remotely deleted arrow is not resurrected when an
+in-progress endpoint edit ends. Same-arrow concurrent edits retain the existing
+whole-element CRDT conflict semantics.
+
+Mac/iPad follow-up: run the new Apple binding and encrypted connector scenarios;
+check touch endpoint targeting, move groups with both attached objects, pinch/
+Escape cancellation, target deletion/undo, and Cmd-Z on desktop. Test endpoints
+on images and text/notes with a real stylus. Apple execution is deferred on Linux.
+
+Validated on Linux (2026-11-09), on top of the CI reconciliation fix: 52 shared
+protocol, 66 web and 15 signaling unit tests; workspace typechecks and production
+build; Rust formatting, Clippy with warnings denied, 18 all-feature tests and
+rustdoc; 68 desktop/common/JNI tests; four production-browser scenarios plus a
+focused endpoint-reattachment rerun; all 19 desktop interoperability scenarios;
+all eleven Android tablet UI tests and encrypted web/Android connector sync.
+The live connector scenario covers remote movement, deletion/undo, reload,
+rebinding and remote deletion during an endpoint drag. Apple binding and the
+same live scenario are wired into CI; Mac/iPad execution remains pending.

@@ -16,7 +16,7 @@ enum class Tool(val wire: String, val label: String, val shortcut: String) {
     Rectangle("rectangle", "Rectangle", "R"), Ellipse("ellipse", "Ellipse", "O"),
     Arrow("arrow", "Arrow", "A"), Line("line", "Line", "L"), Text("text", "Text", "T"), Sticky("sticky", "Note", "N"), Hand("hand", "Pan", "H")
 }
-data class BoardElement(val id: String, val type: String, val color: String, val width: Double, val points: List<Point>, val text: String? = null, val image: String? = null)
+data class BoardElement(val id: String, val type: String, val color: String, val width: Double, val points: List<Point>, val text: String? = null, val image: String? = null, val startAttachment: Attachment? = null, val endAttachment: Attachment? = null)
 data class BoardMessage(
     val type: String, val element: BoardElement? = null, val ids: List<String> = emptyList(),
     val elements: List<BoardElement> = emptyList(), val removed: List<String> = emptyList(),

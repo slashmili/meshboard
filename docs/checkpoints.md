@@ -336,3 +336,10 @@ rendering are implemented. Images participate in move, erase, undo/redo and
 creator-independent encrypted synchronization. Platform results and picker/device
 checks are tracked in the Phase 4 ledger. Attached connectors, export/import,
 expanded presence and opt-in recovery remain pending.
+
+**4h — Attached connectors.** The Arrow tool creates and edits endpoint
+attachments to shapes, text, notes and images. Geometry follows targets locally
+from shared references; target deletion hides connectors until restoration.
+Group movement, erasing, undo/redo and encrypted synchronization are covered.
+See the Phase 4 ledger for checks. Export/import, expanded presence and opt-in
+local recovery remain pending.

@@ -128,6 +128,8 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                             awaitPointerEventScope {
                                 var pointer: PointerId? = null
                                 var start: Point? = null
+                                var arrowEndpoint = 1
+                                var editingArrow = false
                                 var last: Point? = null
                                 var navigating = false
                                 while (true) {
@@ -160,9 +162,10 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     val world = if (tool == Tool.Pen) penSample(view.world(point), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(point)
                                     if (pointer == null && change.pressed) {
                                         pointer = change.id; start = world; last = point
-                                        if (tool == Tool.Select) selection = selection.begin(latest.elements, world, 6 / view.zoom)
+                                        if (tool == Tool.Select) selection = selection.begin(resolveConnectors(latest.elements), world, 6 / view.zoom)
                                         if (tool != Tool.Select && tool != Tool.Hand && tool != Tool.Eraser && tool != Tool.Text && tool != Tool.Sticky) {
                                             draft = BoardElement(controller.newId(), tool.wire, color, width, if (tool == Tool.Pen) listOf(world) else listOf(world, world))
+                                            if (tool == Tool.Arrow) { val arrow = beginArrow(latest.elements, world, 10 / view.zoom, draft!!); draft = arrow.element; arrowEndpoint = arrow.index; editingArrow = arrow.existing } else editingArrow = false
                                         }
                                     }
                                     if (pointer != change.id) continue
@@ -171,11 +174,12 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                         Tool.Hand -> { val previous = last!!; view = view.copy(x = view.x + point.x - previous.x, y = view.y + point.y - previous.y) }
                                         Tool.Eraser -> {
                                             val from = last?.let(view::world) ?: world
-                                            val ids = latest.elements.filter { hits(it, from, world, 12 / view.zoom) }.map { it.id }
+                                            val ids = resolveConnectors(latest.elements).filter { hits(it, from, world, 12 / view.zoom) }.map { it.id }
                                             if (ids.isNotEmpty()) controller.remove(ids)
                                         }
                                         else -> draft?.let { element ->
-                                            if (tool == Tool.Pen && element.points.last() != world) {
+                                            if (tool == Tool.Arrow) draft = dragArrow(element,arrowEndpoint,world,latest.elements,10/view.zoom)
+                                            else if (tool == Tool.Pen && element.points.last() != world) {
                                                 if (element.points.size == Wire.MAX_POINTS) {
                                                     controller.put(element)
                                                     draft = element.copy(id = controller.newId(), points = listOf(element.points.last(), world))
@@ -188,7 +192,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                     if (!change.pressed) {
                                         if (tool == Tool.Select) {
                                             if (selection.moving) controller.move(selection.ids, selection.delta())
-                                            selection = selection.finish(latest.elements)
+                                            selection = selection.finish(resolveConnectors(latest.elements))
                                         }
                                         if ((tool == Tool.Text || tool == Tool.Sticky) && start != null && hypot(world.x - start!!.x, world.y - start!!.y) * view.zoom < 10) {
                                             val existing = latest.elements.lastOrNull { it.text != null && hits(it, world, world, 0.0) }
@@ -197,7 +201,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                         }
                                         draft?.let { element ->
                                             val a = element.points.first(); val b = element.points.last()
-                                            if (element.type == "pen" || hypot(b.x - a.x, b.y - a.y) > 1 / view.zoom) controller.put(element)
+                                            if (element.type == "pen" || hypot(b.x - a.x, b.y - a.y) > 1 / view.zoom) { if (!editingArrow || latest.elements.any { it.id == element.id }) controller.put(element) }
                                         }
                                         draft = null; pointer = null; controller.preview(null)
                                     }
@@ -215,11 +219,13 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                         x += spacing
                     }
                     withTransform({ scale(d, d, Offset.Zero); translate(view.x.toFloat(), view.y.toFloat()); scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero) }) {
-                        val displayed = selection.display(state.elements)
+                        val displayState = selection.display(state.elements)
+                        val displayed = resolveConnectors(displayState).filter { it.id != draft?.id }
                         displayed.forEach { mobileElement(it, textMeasurer, images) }
+                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(Color.White, (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(Color(0xff387c59), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
                         if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
                         state.previews.forEach { mobileElement(it, textMeasurer, images, .65f) }
-                        draft?.let { mobileElement(it, textMeasurer, images) }
+                        draft?.let { resolveConnector(it,displayState) }?.let { mobileElement(it, textMeasurer, images) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null) Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -247,7 +253,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
             confirmButton = { Button(onClick = { controller.remove(state.elements.map { it.id }); dialog = null }, modifier = Modifier.testTag("mobile-confirm-clear")) { Text("Clear board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
         if (dialog == "help") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("A little space for ideas") }, text = {
-            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. Select: tap an object or drag a box around several, then drag to move. A pinch cancels a move. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. Select: tap an object or drag a box around several, then drag to move. A pinch cancels a move. The eraser removes whole objects.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nInvites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.")
+            Text(if (sharing == null) "Choose a tool, then drag with one finger or a stylus. Select: tap an object or drag a box around several, then drag to move. A pinch cancels a move. The eraser removes whole objects. Arrow endpoints attach to objects; drag an endpoint with Arrow to reconnect or detach. Deleting a target hides its connectors until restored.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke.\n\nThis iPad/iPhone preview is local only. Rotating keeps your board; closing the app or the system ending it discards your drawing. Sharing and saving are not available yet." else "Choose a tool, then drag with one finger or a stylus. Select: tap an object or drag a box around several, then drag to move. A pinch cancels a move. The eraser removes whole objects. Arrow endpoints attach to objects; drag an endpoint with Arrow to reconnect or detach. Deleting a target hides its connectors until restored.\n\nUse two fingers to pan and pinch to zoom. Adding a second finger cancels the unfinished stroke. Reset view returns to the starting position.\n\nShare this board or paste a web/desktop invite to join. Rotating keeps your board, but leaving or the system ending the app discards it. Export and saving are not available yet.\n\nInvites authenticate peers and board traffic is end-to-end encrypted. Anyone with the link can read, edit, and invite others. Keep it private.")
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Back to the board") } })
         if (dialog == "appearance") AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Appearance") }, text = {
             AppearanceOptions(appearance) { appearance = it }

@@ -175,6 +175,19 @@ class AppTest {
         }
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
+    @Test fun mobileArrowEndpointsAttachAndDetachWithoutCreatingDuplicates() {
+        val controller = LocalBoardController { "arrow" }
+        controller.put(BoardElement("box","rectangle","#123456",3.0,listOf(Point(100.0,100.0),Point(200.0,200.0))))
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-tool-arrow").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(200f,150f)); moveTo(Offset(400f,150f)); up() }
+        rule.runOnIdle { assertEquals("box",controller.state.value.elements.first { it.id=="arrow" }.startAttachment?.id) }
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(200f,150f)); moveTo(Offset(300f,300f)); up() }
+        rule.runOnIdle { assertEquals(2,controller.state.value.elements.size); assertNull(controller.state.value.elements.first { it.id=="arrow" }.startAttachment) }
+        rule.onNodeWithTag("mobile-undo").performClick()
+        rule.runOnIdle { assertEquals("box",controller.state.value.elements.first { it.id=="arrow" }.startAttachment?.id) }
+    }
+
     @Test fun mobileImagesPaintPixelsAndEraseThroughTheirInterior() {
         val controller = LocalBoardController { "unused" }
         val bytes = File(System.getProperty("meshboard.fixtures"),"image.png").readBytes()

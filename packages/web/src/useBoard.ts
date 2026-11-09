@@ -1,3 +1,4 @@
+import { beginArrow, dragArrow, resolveConnectors, resolveConnector } from './connectors'
 import { beginSelection, finishSelection, selectionDelta, translated, type Selection } from './selection'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import { MAX_POINTS } from '@meshboard/shared-protocol'
@@ -6,7 +7,7 @@ import type { SessionDocument } from './sync/SessionDocument'
 
 type Gesture =
   | { type: 'select'; pointer: number }
-  | { type: 'draw'; pointer: number; element: BoardElement }
+  | { type: 'draw'; pointer: number; element: BoardElement; endpoint?: number; existing?: boolean }
   | { type: 'label'; pointer: number; at: Point; kind: 'text' | 'sticky' }
   | { type: 'erase'; pointer: number; last: Point }
   | { type: 'pan'; pointer: number; start: Point; view: View }
@@ -86,7 +87,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   }
 
   function erase(from: Point, to: Point) {
-    document.remove(document.getElements().filter(element => hitsElement(element, from, to, 9 / viewRef.current.zoom)).map(element => element.id))
+    document.remove(resolveConnectors(document.getElements()).filter(element => hitsElement(element, from, to, 9 / viewRef.current.zoom)).map(element => element.id))
   }
 
   function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -120,14 +121,15 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       return
     }
     if (tool === 'select') {
-      setSelection(beginSelection(selectionRef.current, document.getElements(), world, 6 / viewRef.current.zoom, event.shiftKey))
+      setSelection(beginSelection(selectionRef.current, resolveConnectors(document.getElements()), world, 6 / viewRef.current.zoom, event.shiftKey))
       gesture.current = { type: 'select', pointer: event.pointerId }
       return
     }
     const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? [penSample(world, event.pointerType, event.pressure)] : [world, world] }
-    gesture.current = { type: 'draw', pointer: event.pointerId, element }
-    setDraft(element)
-    preview(element)
+    const arrow = tool === 'arrow' ? beginArrow(document.getElements(), world, 10/viewRef.current.zoom, element) : null
+    gesture.current = { type: 'draw', pointer: event.pointerId, element: arrow?.element ?? element, endpoint: arrow?.index, existing: arrow?.existing }
+    setDraft(gesture.current.element)
+    preview(gesture.current.element)
   }
 
   function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
@@ -158,7 +160,9 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
     if (active.type === 'select') { setSelection({ ...selectionRef.current, end: world }); return }
     if (active.type === 'label') return
     const element = active.element
-    if (element.type === 'pen') {
+    if (element.type === 'arrow') {
+      active.element = dragArrow(element, active.endpoint ?? 1, event.shiftKey ? constrainEnd(element.points[active.endpoint === 0 ? 1 : 0], world, 'arrow') : world, document.getElements(), 10/viewRef.current.zoom)
+    } else if (element.type === 'pen') {
       const samples = event.nativeEvent.getCoalescedEvents?.() ?? []
       const newPoints = (samples.length ? samples : [event]).map(sample => {
         const world = toWorld(localPoint(sample), viewRef.current)
@@ -184,7 +188,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       if (active.type === 'select') {
         const next = { ...selectionRef.current, end: toWorld(localPoint(event), viewRef.current) }
         if (next.moving) document.move(next.ids, selectionDelta(next))
-        setSelection(finishSelection(next, document.getElements()))
+        setSelection(finishSelection(next, resolveConnectors(document.getElements())))
         gesture.current = null
         pointers.current.delete(event.pointerId)
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
@@ -204,7 +208,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
         const element = active.element
         const [start, end = start] = element.points
         if (element.type === 'pen' || Math.hypot(end.x - start.x, end.y - start.y) > 1 / viewRef.current.zoom) {
-          document.put(element)
+          if (!active.existing || document.getElements().some(e => e.id === element.id)) document.put(element)
         }
       }
       gesture.current = null
@@ -235,6 +239,6 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       displayElements = elements.map(e => moved.get(e.id) ?? e)
     } catch { /* Invalid moves keep their original preview until validation reports the error. */ }
   }
-  return { svgRef, elements: displayElements, selection, draft, view, spaceDown, zoomBy, resetView, clear, cancelGesture,
+  return { svgRef, elements: resolveConnectors(displayElements).filter(e=>e.id !== draft?.id), selection, draft: draft ? resolveConnector(draft, displayElements) : null, view, spaceDown, zoomBy, resetView, clear, cancelGesture,
     pointerHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: cancelGesture, onLostPointerCapture: () => { if (pointers.current.size === 0) gesture.current = null } } }
 }

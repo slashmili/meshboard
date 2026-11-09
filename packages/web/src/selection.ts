@@ -8,7 +8,8 @@ export function selectionBounds(element: BoardElement) {
 export function translated(elements: BoardElement[], ids: readonly string[], delta: Point) {
   if (!Number.isFinite(delta.x) || !Number.isFinite(delta.y)) throw new Error('Invalid move')
   const selected = new Set(ids)
-  return elements.filter(e => selected.has(e.id)).map(e => ({ ...e, points: e.points.map(p => {
+  return elements.filter(e => selected.has(e.id) && !(e.startAttachment && e.endAttachment)).map(e => ({ ...e, points: e.points.map((p,index) => {
+    if ((index===0 && e.startAttachment) || (index===1 && e.endAttachment)) return p
     const next = { ...p, x: p.x + delta.x, y: p.y + delta.y }
     if (Math.abs(next.x) > 1e7 || Math.abs(next.y) > 1e7) throw new Error('Move exceeds board bounds')
     return next

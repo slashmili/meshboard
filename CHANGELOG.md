@@ -2,6 +2,11 @@
 
 ## Unreleased — Phase 4
 
+### Attached connectors
+- Added: Arrow endpoint attachments and draggable endpoint handles across web and native, with reconnect/detach behavior.
+- Changed: connectors follow target geometry without rewriting arrow state; group moves preserve attached anchors and target deletion hides connectors until restoration.
+- Tested: strict shared fixtures, cross-language history, pointer/touch gestures and encrypted target move/delete/undo/reload synchronization; platform results are recorded in the Phase 4 ledger.
+
 ### Embedded images
 - Added: PNG/JPEG file insertion on web and native with bounded file/pixel sizes and an eight-image cap within the existing CRDT budget.
 - Added: embedded raster rendering, selection/movement, interior erasing, undo/redo and encrypted late-join/reload synchronization.

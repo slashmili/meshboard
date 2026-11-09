@@ -20,6 +20,16 @@ class CanvasTest {
     }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
+    @Test fun connectorEndpointsCanBeMovedWithoutDuplicateArrows() {
+        rule.onNodeWithTag("mobile-tool-rectangle").performClick()
+        canvas().performTouchInput { down(Offset(100f,100f)); moveTo(Offset(200f,200f)); up() }; count(1)
+        rule.onNodeWithTag("mobile-tool-arrow").performClick()
+        canvas().performTouchInput { down(Offset(200f,150f)); moveTo(Offset(400f,150f)); up() }; count(2)
+        canvas().performTouchInput { down(Offset(200f,150f)); moveTo(Offset(300f,300f)); up() }; count(2)
+        rule.onNodeWithTag("mobile-undo").performClick(); count(2)
+        rule.onNodeWithTag("mobile-redo").performClick(); count(2)
+    }
+
     @Test fun imagePickerImportsThroughProductionController() {
         androidx.test.espresso.intent.Intents.init()
         try {

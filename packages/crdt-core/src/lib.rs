@@ -135,7 +135,22 @@ impl Board {
                 if !selected.contains(id.as_str()) {
                     continue;
                 }
-                for point in element["points"].as_array_mut().ok_or("Invalid points")? {
+                let attached = [
+                    element.get("startAttachment").is_some(),
+                    element.get("endAttachment").is_some(),
+                ];
+                if attached == [true, true] {
+                    continue;
+                }
+                for (index, point) in element["points"]
+                    .as_array_mut()
+                    .ok_or("Invalid points")?
+                    .iter_mut()
+                    .enumerate()
+                {
+                    if attached.get(index) == Some(&true) {
+                        continue;
+                    }
                     point["x"] = Value::from(point["x"].as_f64().ok_or("Invalid x")? + dx);
                     point["y"] = Value::from(point["y"].as_f64().ok_or("Invalid y")? + dy);
                 }
@@ -239,6 +254,10 @@ impl Board {
             text: Option<String>,
             #[serde(default)]
             image: Option<String>,
+            #[serde(default, rename = "startAttachment")]
+            start_attachment: Option<Value>,
+            #[serde(default, rename = "endAttachment")]
+            end_attachment: Option<Value>,
         }
         let txn = self.doc.transact();
         if txn.root_refs().any(|(name, _)| name != "elements") || self.elements.len(&txn) > 2000 {
@@ -293,7 +312,35 @@ impl Board {
             } else {
                 value.get("image").is_none()
             };
-            if !valid_image
+            let valid_attachments = [
+                ("startAttachment", &e.start_attachment),
+                ("endAttachment", &e.end_attachment),
+            ]
+            .iter()
+            .all(|(key, anchor)| {
+                if value.get(key).is_none() {
+                    return true;
+                }
+                e.r#type == "arrow"
+                    && anchor.as_ref().and_then(Value::as_object).is_some_and(|a| {
+                        a.len() == 3
+                            && a.get("id").and_then(Value::as_str).is_some_and(|target| {
+                                !target.is_empty()
+                                    && target.len() <= 80
+                                    && target != id
+                                    && target
+                                        .bytes()
+                                        .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                            })
+                            && ["x", "y"].iter().all(|k| {
+                                a.get(*k)
+                                    .and_then(Value::as_f64)
+                                    .is_some_and(|n| (0.0..=1.0).contains(&n))
+                            })
+                    })
+            });
+            if !valid_attachments
+                || !valid_image
                 || !valid_text
                 || !valid_pressure
                 || e.id != *id
@@ -572,6 +619,33 @@ mod tests {
         invalid["points"] = json!([{"x":0,"y":0}]);
         assert!(b.validated_put("arrow", &invalid).is_err());
         assert_eq!(a.elements(), b.elements());
+    }
+
+    #[test]
+    fn connector_fixtures_and_moves_preserve_attached_endpoints() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../shared-protocol/fixtures/connectors.json"
+        ))
+        .unwrap();
+        let mut board = Board::new(1001);
+        for e in fixtures["valid"].as_array().unwrap() {
+            board.validated_put("arrow", e).unwrap();
+        }
+        for e in fixtures["invalid"].as_array().unwrap() {
+            assert!(board.validated_put("arrow", e).is_err());
+        }
+        let before = board.elements();
+        board.validated_move(&["arrow".into()], 20.0, 10.0).unwrap();
+        assert_eq!(board.elements(), before);
+        board.validated_put("arrow", &fixtures["valid"][0]).unwrap();
+        board.validated_move(&["arrow".into()], 20.0, 10.0).unwrap();
+        assert_eq!(
+            board.elements()["arrow"]["points"][0],
+            fixtures["valid"][0]["points"][0]
+        );
+        assert_eq!(board.elements()["arrow"]["points"][1]["x"], 420.0);
+        board.undo().unwrap();
+        assert_eq!(board.elements()["arrow"], fixtures["valid"][0]);
     }
 
     #[test]

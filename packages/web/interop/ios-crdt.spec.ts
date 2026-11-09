@@ -1,4 +1,5 @@
 import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
 import { imagesInterop } from './images'
 import { historyInterop } from './history'
 import { selectionInterop } from './selection'
@@ -199,4 +200,8 @@ test('embedded images survive encrypted sync, movement, history and reload', asy
 
 test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, ios }) => {
   await reconciliationInterop(page, ios)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, ios }) => {
+  await connectorsInterop(page, ios)
 })

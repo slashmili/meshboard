@@ -85,3 +85,27 @@ Bytes, including file metadata, are embedded unchanged and travel only through
 normal encrypted CRDT synchronization. There is no image upload service or image
 URL fetch. History and CRDT tombstones can retain removed bytes during the session;
 erasing an image is not a security revocation or a promise to reclaim its budget.
+
+### Attached arrows
+
+Arrows may carry `startAttachment` and/or `endAttachment`, each an exact
+`{id, x, y}` object. `id` identifies another element; `x` and `y` are normalized
+coordinates in its bounding rectangle (0 through 1). Only arrows accept these
+fields; self-reference, null, extra fields and invalid coordinates are rejected.
+Absent attachments are omitted. Targets may be rectangles, ellipses, text boxes,
+sticky notes or images. References to missing/unsupported targets hide the arrow;
+there is no recursive connector graph or dependency on message arrival order.
+
+Rendering, hit testing and selection resolve endpoints from the current targets.
+Moving a target does not rewrite any arrow. Group moves translate free ends only;
+attached ends follow targets once. A fully attached arrow cannot be repositioned
+by dragging its body; use the Arrow tool to drag its endpoint handles. Endpoint
+editing rebinds near a target, or detaches when dropped in empty space. New
+attachments snap to a rectangle edge or ellipse boundary. Ordinary free arrows
+and desktop/web Shift snapping remain available.
+
+Deleting a target hides its connectors without mutating another peer's arrows.
+Undo restoring that same target ID makes them visible again. Hidden connectors
+remain in the CRDT and are removed by Clear; deleting is not cascading. Endpoint
+edits use existing atomic whole-element conflict resolution and local history.
+An arrow deleted remotely during endpoint dragging is not recreated on release.
