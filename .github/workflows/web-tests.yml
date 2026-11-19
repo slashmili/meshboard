@@ -1,0 +1,46 @@
+name: Web tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web, signaling, and browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium and Coturn
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn
+          sudo systemctl stop coturn
+          pnpm --filter @meshboard/web exec playwright install --with-deps chromium
+      - name: Run web checks and tests
+        run: bash scripts/ci-tests.sh web
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: test-results-web
+          retention-days: 7
+          path: |
+            packages/web/test-results/
+            packages/web/playwright-report/
+            build/ci/

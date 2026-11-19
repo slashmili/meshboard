@@ -134,9 +134,8 @@ issuance because certificate authorities enforce rate limits.
 
 ### Deploy with published images
 
-The image workflow reuses the existing **Tests** run for pushes to `main`,
-including the web, signaling, and browser checks. After the full run passes,
-it builds the tested commit and publishes `ghcr.io/slashmili/meshboard-web:main` and
+After **Web tests** passes on a push to `main`, the image workflow builds the
+tested commit and publishes `ghcr.io/slashmili/meshboard-web:main` and
 `ghcr.io/slashmili/meshboard-signaling:main` for Linux x86-64. Compose pulls
 Coturn and Certbot from their existing upstream images.
 

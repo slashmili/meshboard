@@ -2,7 +2,7 @@ name: Publish server images
 
 on:
   workflow_run:
-    workflows: [Tests]
+    workflows: [Web tests]
     types: [completed]
     branches: [main]
 
