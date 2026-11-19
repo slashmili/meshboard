@@ -18,10 +18,10 @@ jobs:
       version: ${{ steps.config.outputs.version }}
       app-origin: ${{ steps.config.outputs.app-origin }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - id: config
@@ -51,7 +51,7 @@ jobs:
       RELEASE_TURN_DOMAIN: ${{ vars.MESHBOARD_TURN_DOMAIN }}
       PACKAGE_VERSION: ${{ needs.configuration.outputs.version }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
@@ -63,7 +63,7 @@ jobs:
         run: ./packages/native/gradlew -p packages/native "-Pmeshboard.appOrigin=$RELEASE_APP_ORIGIN" "-Pmeshboard.version=$PACKAGE_VERSION" createDistributable
       - name: Build and smoke-test AppImage
         run: bash scripts/package-appimage.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact@v6
         with:
           name: release-linux-x86_64
           if-no-files-found: error
@@ -88,7 +88,7 @@ jobs:
       PACKAGE_VERSION: ${{ needs.configuration.outputs.version }}
       PACKAGE_ARCH: ${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
@@ -104,7 +104,7 @@ jobs:
           packages=(packages/native/build/compose/binaries/main/dmg/*.dmg)
           test "${#packages[@]}" = 1
           cp "${packages[0]}" "build/release/Meshboard-${RELEASE_TAG}-macos-${PACKAGE_ARCH}.dmg"
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact@v6
         with:
           name: release-macos-${{ matrix.arch }}
           if-no-files-found: error
@@ -123,13 +123,13 @@ jobs:
       RELEASE_APP_ORIGIN: ${{ needs.configuration.outputs.app-origin }}
       RELEASE_TURN_DOMAIN: ${{ vars.MESHBOARD_TURN_DOMAIN }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+      - uses: actions/download-artifact@v6
         with:
           pattern: release-*
           merge-multiple: true
