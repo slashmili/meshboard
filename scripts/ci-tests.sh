@@ -4,8 +4,8 @@ cd "$(dirname "$0")/.."
 mkdir -p build/ci
 
 case "${1:-}" in
-  desktop|android|ios) ;;
-  *) echo 'Usage: bash scripts/ci-tests.sh {desktop|android|ios}' >&2; exit 1;;
+  web|desktop|android|ios) ;;
+  *) echo 'Usage: bash scripts/ci-tests.sh {web|desktop|android|ios}' >&2; exit 1;;
 esac
 
 # Own one local-only relay for the entire test step. Never use production TURN
@@ -25,14 +25,17 @@ for attempt in {1..30}; do
 done
 
 case "$1" in
+  web)
+    pnpm --filter @meshboard/web... check
+    pnpm --filter @meshboard/web... test
+    pnpm --filter @meshboard/web build
+    MESHBOARD_TEST_BUILD=1 pnpm test:e2e
+    ;;
   desktop)
     node --test scripts/*.test.mjs
-    pnpm check
-    pnpm test
-    pnpm build
+    pnpm test:crdt
     pnpm test:native
     pnpm test:crdt:kotlin
-    MESHBOARD_TEST_BUILD=1 pnpm test:e2e
     pnpm test:interop
     ;;
   android)

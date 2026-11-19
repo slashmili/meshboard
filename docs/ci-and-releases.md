@@ -2,12 +2,14 @@
 
 ## Pull requests and main
 
-The **Tests** workflow runs on every pull request and push to `main`. It can
-also be started manually from Actions. It runs the existing automated suites:
+The **Web tests** and **Tests** workflows run on pull requests and pushes to
+`main`. Both can also be started manually from Actions. Server image publishing
+depends on **Web tests** alone. Desktop releases require both workflows.
 
 | Runner | Checks |
 | --- | --- |
-| Linux x86_64, macOS Apple Silicon, macOS Intel | TypeScript checks, protocol/signaling/web unit tests, release-script tests, web production build, Kotlin/common and desktop UI tests, browser end-to-end tests, browser/desktop interoperability |
+| Linux x86_64 | TypeScript checks, protocol/signaling/web unit tests, web production build, browser end-to-end tests |
+| Linux x86_64, macOS Apple Silicon, macOS Intel | Release-script tests, Kotlin/common and desktop UI tests, browser/desktop interoperability |
 | Linux Android emulator | Kotlin Android unit tests, instrumented UI tests, browser/Android/desktop interoperability, opt-in CRDT JNI and Yjs compatibility on an Android 15 Nexus 10 tablet |
 | Apple Silicon with Xcode 26.6 | Opt-in iOS CRDT boundary and Yjs compatibility tests, Kotlin iOS simulator tests, iPad/browser/macOS interoperability, unsigned physical-device compilation |
 
@@ -19,7 +21,7 @@ CI lists the SDK hardware profiles and checks for Nexus 10 before creating its
 emulator. The local `pnpm emulator:android` setup remains Pixel Tablet.
 
 Desktop/web jobs also install stable Rust and run the isolated Yjs/yrs binary
-compatibility suite through `pnpm test`. This validates the Phase 2 prototype,
+compatibility suite through `pnpm test:crdt`. This validates the Phase 2 prototype,
 not CRDT integration into the currently shipped apps. `pnpm test:crdt:kotlin`
 also builds the opt-in JNI library for each desktop runner's JVM architecture,
 runs Kotlin lifecycle/validation/concurrency tests, and repeats the seven Yjs
