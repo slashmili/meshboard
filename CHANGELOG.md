@@ -2,6 +2,10 @@
 
 ## Unreleased — Phase 4
 
+### Large transport assertion performance
+- Fixed: use a bytewise assertion for the 500 KB transport reassembly test, avoiding the generic matcher's per-property traversal on macOS Intel runners.
+- Tested: all 68 web unit tests and workspace typechecks; the complete patterned payload, size limits and original timeout remain covered.
+
 ### iPad diagnostic build correction
 - Fixed: construct traced iOS documents through the existing platform factory; shared iOS sources cannot reference the leaf source set's `AppleCrdtBoard` directly.
 - Verified: four iOS build-configuration checks and five native diagnostic/snapshot tests. Apple compilation remains a CI check.

@@ -468,3 +468,18 @@ Local validation: four iOS build-configuration tests and five native
 diagnostic/snapshot tests pass. Actual Apple compilation cannot run on this
 Linux host and remains pending CI. This run provides no new evidence about
 the underlying convergence failure because it never reached that scenario.
+
+
+### Run 42714001604 follow-up (2026-11-19)
+
+Android, Linux and macOS ARM pass. macOS Intel fails the large YTransport
+reassembly test at its unchanged five-second timeout. Replace the generic
+500,000-byte deep matcher with Node's typed-array binary comparison, asserting
+exactly one result and checking every byte. Use a varying byte pattern to catch
+incorrect fragment placement; preserve payload size and timeout. All 68 web
+tests and workspace typechecks pass locally; the focused case takes 20 ms.
+
+The iPad compiles but again reports four elements while desktop reports five.
+Its seven-day diagnostic artifacts had expired by the time of investigation.
+The iPad job was rerun using gh to regenerate evidence; no production sync fix
+is inferred from the expired attachments.
