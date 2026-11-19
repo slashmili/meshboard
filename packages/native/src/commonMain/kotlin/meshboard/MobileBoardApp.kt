@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -57,6 +58,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     var boardMenu by remember { mutableStateOf(false) }
     var cancelled by remember { mutableIntStateOf(0) }
     var canvasSize by remember { mutableStateOf(Size.Zero) }
+    var errorSize by remember { mutableStateOf(Size.Zero) }
     var origin by remember { mutableStateOf(defaultOrigin) }
     var inviteInput by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
@@ -64,6 +66,8 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
     val density = LocalDensity.current.density.toDouble()
     fun cancel() { selection = Selection(); draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2, canvasSize.height / density / 2), view.zoom * factor) }
+
+    val inputBlocked = dialog != null || textEdit != null || widthMenu || boardMenu
 
     var appearance by rememberAppearance()
     val colors = appearanceColors(appearance)
@@ -119,11 +123,11 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
             }
             HorizontalDivider(color = MobileBorder)
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                Canvas(Modifier.fillMaxSize().testTag("mobile-canvas").semantics {
+                Canvas(Modifier.fillMaxSize().clipToBounds().testTag("mobile-canvas").semantics {
                     contentDescription = "Drawing canvas"
                     stateDescription = "${state.elements.size} objects"
                 }.onSizeChanged { canvasSize = Size(it.width.toFloat(), it.height.toFloat()) }
-                    .pointerInput(tool, color, width, density, cancelled) {
+                    .pointerInput(tool, color, width, density, cancelled, inputBlocked) {
                         try {
                             awaitPointerEventScope {
                                 var pointer: PointerId? = null
@@ -132,9 +136,30 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                 var editingArrow = false
                                 var last: Point? = null
                                 var navigating = false
+                                var suppressed = false
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val pressed = event.changes.filter { it.pressed }
+                                    // Captured pointers continue arriving outside the canvas. Cancel
+                                    // before applying coordinates to any tool, and drain the gesture
+                                    // so re-entry cannot start another stroke or trigger a text edit.
+                                    val outside = event.changes.any {
+                                        (it.pressed || it.previousPressed) &&
+                                            (it.position.x < 0 || it.position.y < 0 ||
+                                                it.position.x >= size.width || it.position.y >= size.height)
+                                    }
+                                    val overError = latest.error != null && event.changes.any {
+                                        val left = (size.width - errorSize.width) / 2
+                                        it.position.x >= left && it.position.x < left + errorSize.width &&
+                                            it.position.y >= 0 && it.position.y < errorSize.height
+                                    }
+                                    if (inputBlocked || outside || overError || event.changes.any { it.isConsumed }) suppressed = true
+                                    if (suppressed) {
+                                        selection = Selection(); draft = null; pointer = null
+                                        navigating = false; controller.preview(null)
+                                        suppressed = pressed.isNotEmpty()
+                                        event.changes.forEach { it.consume() }; continue
+                                    }
                                     if (pressed.size >= 2) {
                                         selection = Selection(); draft = null; pointer = null; navigating = true; controller.preview(null)
                                         val pair = pressed.take(2)
@@ -157,7 +182,7 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                                         event.changes.forEach { it.consume() }; continue
                                     }
                                     val change = event.changes.firstOrNull { it.id == pointer }
-                                        ?: event.changes.firstOrNull { it.pressed && !it.previousPressed } ?: continue
+                                        ?: event.changes.firstOrNull { it.changedToDown() } ?: continue
                                     val point = Point(change.position.x / density, change.position.y / density)
                                     val world = if (tool == Tool.Pen) penSample(view.world(point), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(point)
                                     if (pointer == null && change.pressed) {
@@ -235,7 +260,9 @@ fun MobileBoardApp(controller: DrawingController, defaultOrigin: String = "https
                     Spacer(Modifier.height(10.dp))
                     Text("Draw with one finger. Pan and pinch with two.", fontSize = 12.sp, color = MobileMuted)
                 }
-                state.error?.let { Text(it, Modifier.align(Alignment.TopCenter).background(Color(0xfffff2d9)).padding(12.dp), fontSize = 12.sp, color = MobileInk) }
+                state.error?.let { Text(it, Modifier.align(Alignment.TopCenter).onSizeChanged { errorSize = Size(it.width.toFloat(), it.height.toFloat()) }.pointerInput(Unit) {
+                    awaitPointerEventScope { while (true) { awaitPointerEvent().changes.forEach { it.consume() } } }
+                }.background(Color(0xfffff2d9)).padding(12.dp), fontSize = 12.sp, color = MobileInk) }
             }
             HorizontalDivider(color = MobileBorder)
             Row(Modifier.fillMaxWidth().background(colors.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -57,6 +57,131 @@ class AppTest {
         rule.onNodeWithTag("undo").performClick(); drag()
         rule.onNodeWithTag("redo").assertIsNotEnabled()
     }
+    @Test fun mobileCapturedGesturesCancelAtCanvasBoundaryAndRecoverAfterLift() {
+        var next = 0
+        val controller = localBoard { "boundary-${++next}" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        for (tool in listOf("pen", "rectangle", "arrow", "text", "sticky", "hand")) {
+            rule.onNodeWithTag("mobile-tool-$tool").performClick()
+            rule.onNodeWithTag("mobile-canvas").performTouchInput {
+                down(Offset(200f, 100f)); moveTo(Offset(250f, 120f))
+                moveTo(Offset(250f, -20f)); moveTo(Offset(200f, 100f)); up()
+            }
+            rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty(), tool) }
+            rule.onNodeWithTag("text-editor").assertDoesNotExist()
+        }
+        rule.onNodeWithTag("mobile-tool-pen").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(150f, 120f)); cancel()
+        }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(150f, 120f)); up()
+        }
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
+    }
+
+    @Test fun mobileBoundaryProtectsEraserAndCancelsPinchUntilEveryFingerLifts() {
+        var next = 0
+        val controller = localBoard { "routing-${++next}" }
+        val hidden = BoardElement("hidden", "pen", "#293b36", 3.0,
+            listOf(Point(500.0, -50.0), Point(600.0, -50.0)))
+        controller.put(hidden)
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-tool-eraser").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(500f, 100f)); moveTo(Offset(500f, -50f)); up()
+        }
+        rule.runOnIdle { assertEquals(listOf(hidden), controller.state.value.elements) }
+        rule.onNodeWithTag("mobile-tool-pen").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(0, Offset(100f, 100f)); down(1, Offset(200f, 200f))
+            moveTo(1, Offset(200f, -10f)); moveTo(1, Offset(200f, 200f)); up(1)
+            moveTo(0, Offset(150f, 150f)); up(0)
+        }
+        rule.runOnIdle { assertEquals(listOf(hidden), controller.state.value.elements) }
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(150f, 120f)); up()
+        }
+        rule.runOnIdle { assertEquals(2, controller.state.value.elements.size) }
+    }
+
+    @Test fun mobileControlGesturesCannotEnterCanvasAndMenuBlocksDrawing() {
+        var next = 0
+        val controller = localBoard { "controls-${++next}" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-tool-pen").performTouchInput {
+            down(center); moveTo(Offset(center.x, height + 200f)); up()
+        }
+        rule.onNodeWithTag("mobile-header").performTouchInput {
+            down(Offset(200f, 20f)); moveTo(Offset(200f, 350f)); up()
+        }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        rule.onNodeWithTag("mobile-width").performClick()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(200f, 200f)); moveTo(Offset(300f, 250f)); up()
+        }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+    }
+
+    @Test fun mobileErrorOverlayStopsCapturedDrawingAndDialogsBlockCanvas() {
+        val controller = LocalController()
+        controller.state.value = controller.state.value.copy(error = "Connection unavailable")
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(512f, 100f)); moveTo(Offset(512f, 5f));
+            moveTo(Offset(512f, 100f)); up()
+        }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithTag("mobile-help").performClick()
+        rule.onNodeWithText("Back to the board").assertExists()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(150f, 120f)); up()
+        }
+        rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
+        // Touching the scrim dismisses the dialog without drawing underneath.
+        rule.onNodeWithText("Back to the board").assertDoesNotExist()
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(150f, 120f)); up()
+        }
+        rule.runOnIdle { assertEquals(1, controller.state.value.elements.size) }
+    }
+
+    @Test fun mobileRenderingClipsRemoteInkAtToolbarBoundary() {
+        val controller = localBoard { "unused" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        val before = rule.onRoot().captureToImage().toAwtImage()
+        rule.runOnIdle {
+            controller.put(BoardElement("outside", "pen", "#ff0000", 32.0,
+                listOf(Point(500.0, -200.0), Point(500.0, 20.0))))
+        }
+        val canvasTop = rule.onNodeWithTag("mobile-canvas").fetchSemanticsNode().boundsInRoot.top.toInt()
+        fun assertToolbarUnchanged(image: java.awt.image.BufferedImage) {
+            for (y in 0 until canvasTop) {
+                assertEquals(before.getRGB(500, y), image.getRGB(500, y), "Ink leaked at y=$y")
+            }
+        }
+        val after = rule.onRoot().captureToImage().toAwtImage()
+        assertToolbarUnchanged(after)
+        assertEquals(0xff0000, after.getRGB(500, canvasTop + 10) and 0xffffff,
+            "The saved stroke must remain visible inside the canvas")
+        // Draw as high as possible: the upper half of this live stroke would
+        // overlap the toolbar unless drafts are clipped as well as saved ink.
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(400f, 0f)); moveTo(Offset(700f, 0f))
+        }
+        val draft = rule.onRoot().captureToImage().toAwtImage()
+        assertToolbarUnchanged(draft)
+        assertTrue((draft.getRGB(600, canvasTop) and 0xffffff) != (before.getRGB(600, canvasTop) and 0xffffff),
+            "The active top-edge stroke must actually render")
+        val file = File("build/test-artifacts/mobile-toolbar-clipping.png")
+        file.parentFile.mkdirs(); ImageIO.write(draft, "png", file)
+        rule.onNodeWithTag("mobile-canvas").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(2, controller.state.value.elements.size) }
+        assertToolbarUnchanged(rule.onRoot().captureToImage().toAwtImage())
+    }
+
     @Test fun mobileHistoryControlsUndoAndRedoTouchDrawing() {
         var next = 0
         val controller = localBoard { "history-${++next}" }
