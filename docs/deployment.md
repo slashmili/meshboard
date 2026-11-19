@@ -11,7 +11,7 @@ publish without operator-specific configuration.
 Shared sessions authenticate membership with the invitation secret bound to both
 peers' DTLS fingerprints and encrypt all board updates and presence traffic with AES-256-GCM.
 Signaling handles connection metadata; TURN relays encrypted traffic. See the
-[security validation ledger](phase-3-security.md) for tested platforms, pending
+[security validation ledger](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6) for tested platforms, pending
 physical-device checks and audit status. Server backups do not save live boards.
 
 ## 1. Server and DNS

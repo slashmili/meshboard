@@ -6,8 +6,8 @@ is required by native builds. No preview flag or local-only restriction remains;
 remote devices require HTTPS/WSS and reachable TURN.
 
 For validation commands and deferred hardware checks, see
-[Phase 2 validation](phase-2-validation.md) and the active
-[Phase 3 security protocol and validation ledger](phase-3-security.md).
+[Phase 2 validation](https://linear.app/slashmili/document/crdt-migration-historical-validation-d1627c4a82e8) and the active
+[Phase 3 security protocol and validation ledger](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6).
 
 ## Protocol profile
 

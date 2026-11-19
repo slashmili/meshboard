@@ -11,7 +11,7 @@ when you leave. Saving and Apple Pencil pressure/palm rejection remain future wo
 The app uses yrs and the y-webrtc sync profile, with invite-secret authentication
 and AES-256-GCM application encryption through CryptoKit. This Phase 3 Apple
 integration requires Mac compilation and runtime verification; see the
-[security checklist](../../../docs/phase-3-security.md). Run
+[security checklist](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6). Run
 `bash scripts/test-apple-crypto.sh` from the repo root on macOS before simulator tests.
 
 ## Fresh Mac setup
@@ -89,4 +89,4 @@ a reachable HTTPS/WSS origin and TURN service. The test listener remains restric
 to Debug simulator builds; it is not included on devices or in Release.
 
 The default-app migration must be compiled and run on macOS before Apple validation
-can be marked complete. Follow the [Apple checklist](../../../docs/phase-2-validation.md).
+can be marked complete. Follow the [Apple checklist](https://linear.app/slashmili/document/crdt-migration-historical-validation-d1627c4a82e8).
