@@ -2,6 +2,12 @@
 
 ## Unreleased — Phase 4
 
+### Remove obsolete synchronization prototypes
+- Removed unused Phase 1 JSON board framing and temporary Phase 2 JSON/base64 synchronization wrappers; retained encrypted Yjs/yrs transport and ephemeral awareness previews.
+- Migrated shared fixtures to atomic board elements and native UI tests to the real JNI document; removed duplicate preview commands and ignored harness flags.
+- Corrected deployment and CI documentation to describe authenticated encrypted sessions and default native CRDT bindings.
+- Validation is recorded in `docs/legacy-cleanup-validation.md`; Apple-only runtime checks remain pending on macOS.
+
 ### iPad four-peer convergence
 - Fixed: the iPad controller reuses the decoded board and history until the document changes. Every presence or connection report previously re-decoded all elements, so cursor traffic over a large board saturated the main thread and delayed edits and state reports past the test's convergence window.
 - Fixed: install the delegate of an incoming WebRTC data channel before returning to WebRTC. A remote hello arriving ahead of the main-queue attach was dropped, and the following frame failed authentication with a transient error.

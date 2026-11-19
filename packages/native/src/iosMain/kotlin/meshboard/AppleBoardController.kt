@@ -55,9 +55,9 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
         try { block() } catch (e: Exception) { report(e.message ?: "The connection could not complete.") }
     }
     override fun put(element: BoardElement) = attempt {
-        Wire.element(Wire.elementJson(element)); local(BoardMessage("put", element = element))
+        Wire.element(Wire.elementJson(element)); local { put(element) }
     }
-    override fun remove(ids: List<String>) = attempt { if (ids.isNotEmpty()) local(BoardMessage("remove", ids = ids)) }
+    override fun remove(ids: List<String>) = attempt { if (ids.isNotEmpty()) local { removeAll(ids) } }
     override fun move(ids: List<String>, delta: Point) = attempt {
         if (delta.x != 0.0 || delta.y != 0.0) {
             val before = crdt.stateVector()
@@ -73,14 +73,10 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
         val before = crdt.stateVector(); crdt.redo()
         report(); broadcastY(YWire.sync(2, crdt.update(before)))
     }
-    private fun local(message: BoardMessage) {
+    private fun local(change: CrdtBoard.() -> Unit) {
         val board = crdt
         val before = board.stateVector()
-        when (message.type) {
-            "put" -> board.put(requireNotNull(message.element))
-            "remove" -> board.removeAll(message.ids)
-            else -> error("Unsupported local CRDT operation")
-        }
+        board.change()
         report(); broadcastY(YWire.sync(2, board.update(before)))
     }
     private fun broadcastPreview(element: BoardElement?) {

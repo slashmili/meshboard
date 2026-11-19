@@ -14,8 +14,9 @@ networking, not Docker Desktop or rootless Docker. See the
 [deployment reference](../docs/deployment.md) for architecture, limits, rollback,
 and the optional two-IP TURN/TLS-on-443 configuration.
 
-**Testing release:** application-layer encryption and authenticated invites are
-not implemented yet. Do not use this checkpoint for sensitive boards.
+Shared sessions use authenticated invites and AES-256-GCM application encryption.
+See the [security validation ledger](../docs/phase-3-security.md) for verification
+coverage, pending physical-device checks and audit status.
 
 ## 1. Prepare Ubuntu and install supporting packages
 

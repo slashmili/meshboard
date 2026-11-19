@@ -6,12 +6,12 @@ import kotlin.test.*
 
 class WireTest {
     @Test fun sharedTypeScriptKotlinFixtures() {
-        val fixtures = Json.parseToJsonElement(File(System.getProperty("meshboard.fixtures"), "board-messages.json").readText()).jsonObject
+        val fixtures = Json.parseToJsonElement(File(System.getProperty("meshboard.fixtures"), "board-elements.json").readText()).jsonObject
         fixtures.getValue("valid").jsonArray.forEach { fixture ->
-            val decoded = Wire.decode(fixture.toString())
-            assertEquals(decoded, Wire.decode(Wire.encode(decoded)))
+            val decoded = Wire.element(fixture)
+            assertEquals(decoded, Wire.element(Wire.elementJson(decoded)))
         }
-        fixtures.getValue("invalid").jsonArray.forEach { fixture -> assertFails(fixture.toString()) { Wire.decode(fixture.toString()) } }
+        fixtures.getValue("invalid").jsonArray.forEach { fixture -> assertFails(fixture.toString()) { Wire.element(fixture) } }
     }
     @Test fun invitesRequireSupportedOriginAndRoom() {
         val room = "123e4567-e89b-42d3-a456-426614174000"

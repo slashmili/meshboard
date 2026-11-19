@@ -10,8 +10,8 @@ depends on **Web tests** alone. Desktop releases require both workflows.
 | --- | --- |
 | Linux x86_64 | TypeScript checks, protocol/signaling/web unit tests, web production build, browser end-to-end tests |
 | Linux x86_64, macOS Apple Silicon, macOS Intel | Release-script tests, Kotlin/common and desktop UI tests, browser/desktop interoperability |
-| Linux Android emulator | Kotlin Android unit tests, instrumented UI tests, browser/Android/desktop interoperability, opt-in CRDT JNI and Yjs compatibility on an Android 15 Nexus 10 tablet |
-| Apple Silicon with Xcode 26.6 | Opt-in iOS CRDT boundary and Yjs compatibility tests, Kotlin iOS simulator tests, iPad/browser/macOS interoperability, unsigned physical-device compilation |
+| Linux Android emulator | Kotlin Android unit tests, instrumented UI tests, browser/Android/desktop interoperability, CRDT JNI and Yjs compatibility on an Android 15 Nexus 10 tablet |
+| Apple Silicon with Xcode 26.6 | iOS CRDT boundary and Yjs compatibility tests, Kotlin iOS simulator tests, iPad/browser/macOS interoperability, unsigned physical-device compilation |
 
 Interop tests include real local Coturn relay traffic. CI never needs production
 TURN credentials or contacts the production deployment. Failing test reports,
@@ -21,49 +21,27 @@ CI lists the SDK hardware profiles and checks for Nexus 10 before creating its
 emulator. The local `pnpm emulator:android` setup remains Pixel Tablet.
 
 Desktop/web jobs also install stable Rust and run the isolated Yjs/yrs binary
-compatibility suite through `pnpm test:crdt`. This validates the Phase 2 prototype,
-not CRDT integration into the currently shipped apps. `pnpm test:crdt:kotlin`
-also builds the opt-in JNI library for each desktop runner's JVM architecture,
-runs Kotlin lifecycle/validation/concurrency tests, and repeats the seven Yjs
-scenarios through Kotlin and JNI. The library is not packaged into releases yet.
-`pnpm test:interop:crdt` then tests the opt-in local preview through real WebRTC
-and TURN on a separate development server (port 5174), including four-peer
-convergence, signaling loss, repeated disconnection/recovery with offline edits
-and deletions (isolating browser and native desktop peers), and legacy/preview
-protocol isolation. The preview uses actual
-y-webrtc in the browser; tests also exercise an unmodified upstream provider's
-raw sync/awareness against desktop and rejection of invalid updates. Large
-Meshboard messages use the documented, negotiated fragmentation extension.
+compatibility suite through `pnpm test:crdt`. The shipped apps use Yjs/yrs;
+`pnpm test:crdt:kotlin` repeats compatibility scenarios through the desktop JNI
+binding. Normal native builds package the platform Rust library.
+`pnpm test:interop` exercises encrypted browser/desktop sessions through real
+WebRTC and TURN, including four-peer convergence, creator departure, reconnects,
+offline edits, large messages and rejection of incompatible protocols.
 
-The Android job installs NDK 28.2.13676358 and Rust targets for x86_64/ARM64,
-then runs `pnpm test:crdt:android`: six JNI tests and the same seven Yjs scenarios
-inside the x86_64 tablet emulator. Both Android ABIs are compiled; ARM64 device
-execution is not claimed. This debug-only checkpoint leaves default sync and
-release APK contents unchanged. Its instrumentation reports are kept separately
-from UI reports, and the Yjs/instrumentation console log is included in CI artifacts.
-`pnpm test:interop:android:crdt` additionally runs six tablet UI tests in the
-opt-in preview and seven live Android/browser/desktop CRDT scenarios, including
-native disconnection/offline-edit recovery, large snapshots, four-peer convergence,
-TURN and unmodified upstream-provider
-interoperability. Its log is `build/ci/android-crdt-interop.log`; preview UI
-reports are kept under `androidApp/build/reports/androidTests/crdt-preview`.
+The Android job compiles the x86_64 and ARM64 bindings and runs UI, binding and
+interop checks on an x86_64 emulator. `pnpm test:crdt:android` tests JNI and Yjs/yrs
+compatibility; `pnpm test:interop:android` exercises live Android/browser/desktop
+sessions. ARM64 physical-device execution is not claimed.
 
-The iOS job installs Rust's `aarch64-apple-ios` and `aarch64-apple-ios-sim` targets.
-`pnpm test:crdt:ios` runs five Kotlin/Native boundary tests, four controller tests and the same seven Yjs
-scenarios through a simulator executable, then links the opt-in device framework.
-The following normal app/tests still run without the opt-in. Binding XML/HTML reports are kept under `test-results/crdt-ios`
-and `reports/tests/crdt-ios`; the compatibility log is `build/ci/ios-crdt.log`.
-The original binding checkpoint passed Apple CI (user-confirmed).
-`pnpm test:interop:ios:crdt` additionally builds/installs the opt-in Debug simulator
-preview and runs six live browser/iPad/desktop scenarios. These cover awareness,
-retry, large snapshots, four peers, creator departure/rejoin, reload, real TURN,
-unmodified upstream providers and input/protocol/origin guards. Its log is
-`build/ci/ios-crdt-interop.log`, with traces under `packages/web/test-results/ios-crdt`.
-The live preview passed CI after the snapshot-polling fix (user-confirmed).
-Manual Apple preview checks remain deferred. Normal device compilation
-runs afterwards with the preview explicitly disabled. No physical-device CRDT is enabled.
+The iOS job builds simulator and device bindings. `pnpm test:crdt:ios` checks the
+Kotlin/Native boundary and Yjs/yrs compatibility; `pnpm test:interop:ios` exercises
+live browser/iPad/desktop sessions with the normal encrypted CRDT implementation.
+The job also runs controller tests and device compilation. See the security ledger
+and delivery checkpoints for Apple results and outstanding verification; simulator
+coverage does not establish physical-device behavior.
 
-iOS interop scenarios retain a 60-second test timeout with no automatic retries.
+
+iOS interop scenarios retain a 120-second test timeout with no automatic retries.
 Simulator startup and cleanup run in a separate 120-second Playwright fixture
 budget; each asynchronous `simctl` command is capped at 30 seconds. The fixture
 also allows 20 seconds for the debug adapter to become ready and cleans up failed

@@ -1,26 +1,12 @@
 import { LocalHistory, type Direction } from './LocalHistory'
 import { translated } from '../selection'
 import * as Y from 'yjs'
-import { elementSchema, MAX_ELEMENTS, type BoardElement, type CrdtMessage, type SessionMessage } from '@meshboard/shared-protocol'
+import { elementSchema, MAX_ELEMENTS, type BoardElement } from '@meshboard/shared-protocol'
 import type { SessionDocument } from './SessionDocument'
 
 const LIMIT = 2 * 1024 * 1024
-const EMPTY = new Uint8Array([0])
-function decode(data: string) {
-  const raw = atob(data)
-  if (raw.length > LIMIT) throw new Error('CRDT update exceeds session limits.')
-  return Uint8Array.from(raw, char => char.charCodeAt(0))
-}
-function message(step: CrdtMessage['step'], bytes: Uint8Array): CrdtMessage {
-  if (bytes.length > LIMIT) throw new Error('CRDT state exceeds session limits.')
-  let raw = ''
-  for (let i = 0; i < bytes.length; i += 8192) raw += String.fromCharCode(...bytes.subarray(i, i + 8192))
-  return { v: 2, type: 'crdt', step, data: btoa(raw) }
-}
-
 /** Stage mutations so invalid state cannot replace the board. */
 export class CrdtDocument implements SessionDocument {
-  readonly crdt = true
   readonly ydoc = new Y.Doc()
   private get doc() { return this.ydoc }
   private history = new LocalHistory()
@@ -29,7 +15,6 @@ export class CrdtDocument implements SessionDocument {
   get canRedo() { return this.history.redo.length > 0 }
   private visible: BoardElement[] = []
   private listeners = new Set<() => void>()
-  private outgoing = new Set<(message: SessionMessage) => void>()
   private errors = new Set<(message: string) => void>()
   constructor() {
     this.doc.getMap('elements').observe(event => {
@@ -40,9 +25,7 @@ export class CrdtDocument implements SessionDocument {
   private notify() { this.visible = this.readElements(this.doc); for (const fn of this.listeners) fn() }
   getElements = () => this.visible
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn) } }
-  onLocalMessage = (fn: (message: SessionMessage) => void) => { this.outgoing.add(fn); return () => { this.outgoing.delete(fn) } }
   onError = (fn: (message: string) => void) => { this.errors.add(fn); return () => { this.errors.delete(fn) } }
-  snapshot() { return message('vector', Y.encodeStateVector(this.doc)) }
 
   private readElements(candidate: Y.Doc) {
     if ([...candidate.share.keys()].some(key => key !== 'elements')) throw new Error('Unknown CRDT root.')
@@ -75,15 +58,11 @@ export class CrdtDocument implements SessionDocument {
   }
   private commit(change: (candidate: Y.Doc) => void, local: boolean) {
     this.validate(change)
-    const before = Y.encodeStateVector(this.doc)
     this.localMutation = local
     try { change(this.doc) } finally { this.localMutation = false }
-    if (local) for (const fn of this.outgoing) fn(message('update', Y.encodeStateAsUpdate(this.doc, before)))
   }
-  receive(value: SessionMessage) {
-    if (value.type !== 'crdt') throw new Error('Expected CRDT synchronization.')
-    const bytes = decode(value.data)
-    if (value.step === 'vector') return message('update', Y.encodeStateAsUpdate(this.doc, bytes))
+  applyUpdate(bytes: Uint8Array) {
+    if (bytes.length > LIMIT) throw new Error('CRDT update exceeds session limits.')
     this.commit(candidate => Y.applyUpdate(candidate, bytes), false)
   }
   private local(change: (candidate: Y.Doc) => void, capture = true) {
@@ -124,6 +103,4 @@ export class CrdtDocument implements SessionDocument {
     }
   }
   clear() { this.remove(this.visible.map(e => e.id)) }
-  // Used by validation tests; joining uses state vectors, including delete-only changes.
-  fullState() { return message('update', Y.encodeStateAsUpdate(this.doc, EMPTY)) }
 }
