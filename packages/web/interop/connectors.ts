@@ -22,7 +22,8 @@ export async function connectorsInterop(page:Page,native:Pick<ReturnType<typeof 
  native.send({type:'remove',ids:native.state().elements.map(e=>e.id)})
  await expect(page.getByTestId('drawing-elements').locator('rect')).toHaveCount(0)
  await page.mouse.up();await expect(arrow).toHaveCount(0)
- expect(native.state().elements).toHaveLength(0)
+ // The native harness reports state asynchronously; its last snapshot may predate the removal.
+ await expect.poll(()=>native.state().elements).toHaveLength(0)
  native.send({type:'undo'});await expect(arrow).toHaveCount(1)
 
 }

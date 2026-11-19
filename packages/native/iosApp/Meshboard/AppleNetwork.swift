@@ -352,8 +352,8 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
         if offer { pc.offer(for: constraints, completionHandler: completion) } else { pc.answer(for: constraints, completionHandler: completion) }
     }
     func attach(_ channel: RTCDataChannel) {
-        guard self.channel == nil, owner != nil, channel.label == fragmentChannel else { channel.close(); return }
-        guard (channel.isOrdered && channel.isReliable) else { channel.close(); return }
+        guard self.channel == nil, owner != nil, channel.label == fragmentChannel else { channel.delegate = nil; channel.close(); return }
+        guard (channel.isOrdered && channel.isReliable) else { channel.delegate = nil; channel.close(); return }
         self.channel = channel; channel.delegate = self
         // attach already runs on main. Initialize an incoming open channel here,
         // before messages queued by its newly installed delegate can be handled.
@@ -418,6 +418,8 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
         guard accepted else { if rejectNow { main { peer, owner in owner.reject(peer: peer.id) } }; return }
         main { peer, owner in
             peer.incomingLock.lock(); peer.incomingBytes -= data.count; peer.incomingFrames -= 1; peer.incomingLock.unlock()
+            // Frames from a channel that attach() refused never reach the secure session.
+            guard dataChannel === peer.channel else { return }
             do {
                 guard let secure = peer.secure else {
                     owner.diagnose("secure-channel-uninitialized", peer)
@@ -437,7 +439,13 @@ private final class ApplePeer: NSObject, RTCPeerConnectionDelegate, RTCDataChann
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) { main { peer, owner in
         owner.signal(peer, ["candidate": ["candidate": candidate.sdp, "sdpMid": candidate.sdpMid as Any? ?? NSNull(), "sdpMLineIndex": candidate.sdpMLineIndex]])
     } }
-    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) { main { peer, _ in peer.attach(dataChannel) } }
+    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
+        // Install the delegate before returning to WebRTC. The remote hello can follow the
+        // channel-open message immediately; without a delegate it is dropped, not queued,
+        // and the next frame then fails authentication.
+        dataChannel.delegate = self
+        main { peer, _ in peer.attach(dataChannel) }
+    }
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCPeerConnectionState) { main { peer, owner in
         owner.diagnose("connection-state-\(newState.rawValue)", peer)
         if newState == .failed { owner.failed(peer) }; if newState == .connected { peer.route() }

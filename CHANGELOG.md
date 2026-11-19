@@ -2,6 +2,12 @@
 
 ## Unreleased — Phase 4
 
+### iPad four-peer convergence
+- Fixed: the iPad controller reuses the decoded board and history until the document changes. Every presence or connection report previously re-decoded all elements, so cursor traffic over a large board saturated the main thread and delayed edits and state reports past the test's convergence window.
+- Fixed: install the delegate of an incoming WebRTC data channel before returning to WebRTC. A remote hello arriving ahead of the main-queue attach was dropped, and the following frame failed authentication with a transient error.
+- Fixed: the connector interop scenario polls the native harness after a concurrent removal instead of reading a snapshot that may predate it.
+- Tested: decode-count regressions for the cache and the iPad controller; the complete `ci-tests.sh ios` script and 45 further iPad interop runs pass on a local simulator (Xcode 27.2). The four-peer scenario failed 2 of 7 local runs before the channel fix and 0 of 16 after. macOS CI confirmation is pending.
+
 ### Large transport assertion performance
 - Fixed: use a bytewise assertion for the 500 KB transport reassembly test, avoiding the generic matcher's per-property traversal on macOS Intel runners.
 - Tested: all 68 web unit tests and workspace typechecks; the complete patterned payload, size limits and original timeout remain covered.
