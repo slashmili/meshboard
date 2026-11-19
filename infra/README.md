@@ -15,7 +15,7 @@ networking, not Docker Desktop or rootless Docker. See the
 and the optional two-IP TURN/TLS-on-443 configuration.
 
 Shared sessions use authenticated invites and AES-256-GCM application encryption.
-See the [security validation ledger](../docs/phase-3-security.md) for verification
+See the [security validation ledger](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6) for verification
 coverage, pending physical-device checks and audit status.
 
 ## 1. Prepare Ubuntu and install supporting packages

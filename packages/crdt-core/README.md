@@ -15,7 +15,7 @@ pnpm test:crdt:ios     # iOS binding/controller tests and compatibility (Mac req
 
 Stable Rust, Node 22 and pnpm are required; JVM tests also need JDK 21. Android
 needs NDK 28.2 and both Rust Android targets; iOS needs Xcode and both Apple ARM64
-targets. See [current validation and setup](../../docs/phase-2-validation.md).
+targets. See [current validation and setup](https://linear.app/slashmili/document/crdt-migration-historical-validation-d1627c4a82e8).
 
 The Rust side keeps opaque, non-reused handle IDs under a mutex. Calls copy byte
 arrays, cap boundary input/output at 4 MiB and translate errors into exceptions.
@@ -75,7 +75,7 @@ See the [Yjs update API](https://docs.yjs.dev/api/document-updates) and
 
 Binary tests alone do not establish live transport behavior. The normal-app
 interop suites test y-webrtc signaling/sync/awareness, four mixed peers, creator
-departure, recovery and TURN. See [the validation ledger](../../docs/phase-2-validation.md)
+departure, recovery and TURN. See [the validation ledger](https://linear.app/slashmili/document/crdt-migration-historical-validation-d1627c4a82e8)
 for completed tests and pending Apple/device checks. Application encryption and
 authenticated admission remain Phase 3.
 
