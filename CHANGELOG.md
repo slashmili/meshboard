@@ -5,8 +5,14 @@
 ### Server log privacy
 - Fixed: Caddy discards all runtime logs globally. HTTP handler errors (such as a 502 when signaling is down) and ACME challenge warnings previously recorded visitor addresses, user agents, URIs and headers even with access logging disabled.
 - Fixed: Coturn uses `simple-log`, so `log-file=/dev/null` really discards output. Coturn previously wrote a dated `/dev/null_YYYY-MM-DD.log` inside the container, including TURN usernames from failed authentications. Removed the `no-tlsv1`, `no-tlsv1_1` and `no-dtls` options, which Coturn 4.18 rejects as unknown. Its defaults already require TLS 1.2 or later and start no DTLS listener.
-- Added: `scripts/test-log-privacy.mjs`, a local check that runs dummy-IP and marker traffic through Caddy, signaling and Coturn, with control runs. The logging policy and its limits are documented in docs/deployment.md.
+- Added: `scripts/test-log-privacy.mjs`, a check that runs dummy-IP and marker traffic through Caddy, signaling and Coturn, with control runs. It runs before server images are published.
 - Tested: the privacy check passes, and fails against the previous configs. The existing deployment smoke test passes: TURN UDP/TLS relay and browser drawing. TLS 1.0/1.1 are still rejected by Coturn.
+
+### Remove obsolete synchronization prototypes
+- Removed unused Phase 1 JSON board framing and temporary Phase 2 JSON/base64 synchronization wrappers; retained encrypted Yjs/yrs transport and ephemeral awareness previews.
+- Migrated shared fixtures to atomic board elements and native UI tests to the real JNI document; removed duplicate preview commands and ignored harness flags.
+- Corrected deployment and CI documentation to describe authenticated encrypted sessions and default native CRDT bindings.
+- Validation is recorded in [Obsolete synchronization cleanup — validation](https://linear.app/slashmili/document/obsolete-synchronization-cleanup-validation-fc1b8c8bbf1b); Apple-only runtime checks remain pending on macOS.
 
 ### iPad four-peer convergence
 - Fixed: the iPad controller reuses the decoded board and history until the document changes. Every presence or connection report previously re-decoded all elements, so cursor traffic over a large board saturated the main thread and delayed edits and state reports past the test's convergence window.
@@ -59,7 +65,7 @@
 - Added: web appearance preference storage with a fallback when storage is blocked; native appearance survives Android activity recreation.
 - Fixed: Share/Help and mobile connection labels now describe the implemented authenticated end-to-end encryption instead of the old Phase 1 prototype.
 - Verified: 44 web unit tests, six production-browser drawing/appearance tests, 44 desktop tests and seven Android tablet UI tests; Android APK build and dark-layout screenshot review. Apple/Windows appearance checks remain tracked.
-- Spec: local board recovery will be opt-in, default off, with a delete action. Record scope, implementation order and deferred Mac/iPad checks in `docs/phase-4-validation.md`.
+- Spec: local board recovery will be opt-in, default off, with a delete action. Record scope, implementation order and deferred Mac/iPad checks in [Feature expansion — implementation and validation](https://linear.app/slashmili/document/feature-expansion-implementation-and-validation-dbe73ad92e32).
 
 ### Text boxes and sticky notes
 - Added: text (T) and note (N) tools on web, desktop and shared mobile UI, with click/tap creation and editing, cancel, multiline Unicode content, content-sized boxes and whole-area erasing.
@@ -70,7 +76,7 @@
 ### iPad convergence investigation
 - Tested: the Linux four-peer regression now includes concurrent edits from both native replicas; ten repeated runs, three single-CPU runs and workspace typechecks pass.
 - Added: element IDs in the iPad convergence assertion and browser-state capture before cleanup. Native failure capture retains errors and omits the invite secret.
-- Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in `docs/phase-4-validation.md`.
+- Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in [Feature expansion — implementation and validation](https://linear.app/slashmili/document/feature-expansion-implementation-and-validation-dbe73ad92e32).
 
 ### Straight arrows
 - Added: Arrow (A) on web and native with matching arrowheads, whole-object erasing, bounded short-arrow geometry and desktop/web Shift angle snapping.
@@ -96,21 +102,21 @@
 
 ### Native convergence recovery
 - Fixed: native sessions periodically request CRDT state over authenticated channels so a missed update does not leave a connected replica permanently stale.
-- Tested: recovery of deliberately missed inserts and delete-only changes; the regression fails without reconciliation. Apple coverage and CI evidence are recorded in `docs/ci-reconciliation-validation.md`.
+- Tested: recovery of deliberately missed inserts and delete-only changes; the regression fails without reconciliation. Apple coverage and CI evidence are recorded in [Native convergence recovery — validation](https://linear.app/slashmili/document/native-convergence-recovery-validation-07b77b13b6a6).
 
 ## Unreleased — Phase 3
 
 ### Added
 - Matching Web Crypto and JVM/Android AES-256-GCM record ciphers with HKDF-SHA-256 derivation, canonical 256-bit key encoding, bounded frames, strict counters and fatal-error disposal.
 - Cross-platform ciphertext vectors and tests for wrong keys/contexts, every-byte tampering, replay, truncation, plaintext, size limits, nonce-budget exhaustion and disposal.
-- A concrete peer-authentication proposal and remaining Apple/live-session validation checklist in `docs/phase-3-security.md`.
+- A concrete peer-authentication proposal and remaining Apple/live-session validation checklist in [Encrypted sessions — security design and validation](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6).
 
 ### Verified
 - All 37 web unit tests and web/test-harness typechecks.
 - Seven JVM cipher tests and the same seven tests on the Android 35 x86_64 tablet emulator; Android debug/app-test APK builds.
 
 ### Security decision and pending verification
-- Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the new trust model in AGENTS.md.
+- Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the trust model in [Product requirements](https://linear.app/slashmili/document/product-requirements-9d44b4d02dc7).
 - Apple compilation/runtime verification and independent security review. Live-session integration is recorded below. No pushes.
 
 ### Phase 3 authenticated sessions
@@ -175,7 +181,7 @@
 - Changed: normal simulator/device and Debug/Release frameworks link yrs; the Swift/Kotlin controllers now use CRDT-only networking and HTTPS remote origins.
 - Removed: preview factory/build gates and legacy signaling/data-channel branches; debug interop remains simulator-only.
 - Added/updated: normal-factory controller tests, deletion synchronization tests, and build-script tests for all four configuration/platform combinations.
-- Verified here: build-script tests and interop TypeScript checks. Xcode compilation, iOS controller/live tests, physical iPad and packaged macOS checks require the user's Mac; tracked in docs/phase-2-validation.md.
+- Verified here: build-script tests and interop TypeScript checks. Xcode compilation, iOS controller/live tests, physical iPad and packaged macOS checks require the user's Mac; tracked in [Linear](https://linear.app/slashmili/document/crdt-migration-historical-validation-d1627c4a82e8).
 
 ### Phase 2 handoff
 - Added: a validation ledger and explicit macOS/iPad checklist; refreshed platform and protocol documentation.

@@ -1,3 +1,4 @@
+import * as Y from 'yjs'
 import { expect,it } from 'vitest'
 import { attach,beginArrow,dragArrow,resolveConnectors } from './connectors'
 import { translated } from './selection'
@@ -6,8 +7,8 @@ import type { BoardElement } from './board'
 const target:BoardElement={id:'target',type:'rectangle',color:'#123456',width:3,points:[{x:100,y:100},{x:200,y:200}]}
 const arrow:BoardElement={id:'arrow',type:'arrow',color:'#123456',width:3,points:[{x:200,y:150},{x:300,y:150}],startAttachment:{id:'target',x:1,y:.5}}
 it('follows targets without writing connector state and restores after target undo',()=>{
- const a=new CrdtDocument(),b=new CrdtDocument();a.put(target);a.put(arrow);b.receive(a.fullState())
- a.move(['target'],{x:50,y:20});b.receive(a.fullState())
+ const a=new CrdtDocument(),b=new CrdtDocument();a.put(target);a.put(arrow);b.applyUpdate(Y.encodeStateAsUpdate(a.ydoc))
+ a.move(['target'],{x:50,y:20});b.applyUpdate(Y.encodeStateAsUpdate(a.ydoc))
  expect(b.getElements().find(e=>e.id==='arrow')).toEqual(arrow)
  expect(resolveConnectors(b.getElements()).find(e=>e.id==='arrow')?.points[0]).toEqual({x:250,y:170})
  a.remove(['target']); expect(resolveConnectors(a.getElements())).toEqual([])

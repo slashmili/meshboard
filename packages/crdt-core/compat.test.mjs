@@ -12,8 +12,8 @@ const target = resolve(root, process.env.CARGO_TARGET_DIR || 'target')
 const binary = join(target, 'debug', process.platform === 'win32' ? 'compat.exe' : 'compat')
 const jvm = process.env.MESHBOARD_CRDT_JVM === '1'
   ? JSON.parse(readFileSync(new URL('../native/build/crdt/interop.json', import.meta.url), 'utf8')) : null
-const fixtures = JSON.parse(readFileSync(new URL('../shared-protocol/fixtures/board-messages.json', import.meta.url), 'utf8'))
-const strokes = fixtures.valid.filter(message => message.type === 'put').map(message => message.element)
+const fixtures = JSON.parse(readFileSync(new URL('../shared-protocol/fixtures/board-elements.json', import.meta.url), 'utf8'))
+const strokes = fixtures.valid
 const put = element => ({ type: 'put', id: element.id, element })
 const remove = id => ({ type: 'remove', id })
 const bytes = value => Array.from(value)

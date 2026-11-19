@@ -9,7 +9,7 @@ import meshboard.Wire
 import meshboard.crdt.ffi.*
 import platform.Foundation.NSRecursiveLock
 
-/** Owns one Rust document. Opt-in only; not connected to AppleBoardController yet. */
+/** Owns one Rust document for Apple sessions; serializes calls across the native boundary. */
 class AppleCrdtBoard internal constructor(clientId: Long) : CrdtBoard {
     constructor() : this(-1)
     private val lock = NSRecursiveLock()

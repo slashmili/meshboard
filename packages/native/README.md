@@ -78,11 +78,9 @@ Shift constrains shapes. Escape cancels a draft. Sharing shows a copyable link a
 Paste links into desktop; native deep-link registration and camera QR scanning are
 not implemented at this checkpoint.
 
-This is a CRDT collaboration prototype. Invites are unauthenticated and there
-is no application-layer encryption yet; WebRTC supplies DTLS transport encryption.
 Normal sessions authenticate peer DTLS fingerprints using the invite secret and
-encrypt all application data. See [the security ledger](../../docs/phase-3-security.md)
-for verified platforms and pending Apple checks.
+encrypt all board updates and presence traffic. See [the security ledger](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6)
+for verified platforms and pending physical-device checks.
 
 ## Verify and package
 
@@ -142,4 +140,4 @@ Image insertion uses [FileKit](https://filekit.mintlify.app) 0.8.8's Compose fil
 picker and bounded stream API, compatible with this project's Kotlin/Compose
 versions. Linux distributions include the `jdk.security.auth` module required by
 the picker. PNG/JPEG decoding uses Compose resources on each platform. See the
-[Phase 4 ledger](../../docs/phase-4-validation.md) for limits and picker checks.
+[Phase 4 ledger](https://linear.app/slashmili/document/feature-expansion-implementation-and-validation-dbe73ad92e32) for limits and picker checks.

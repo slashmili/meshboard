@@ -4,8 +4,8 @@ import { join } from 'node:path'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const action = process.argv[2] || 'run'
-if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop', 'crdt-test', 'crdt-run', 'crdt-interop'].includes(action)) {
-  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop|crdt-test|crdt-run|crdt-interop]')
+if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop', 'crdt-test'].includes(action)) {
+  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop|crdt-test]')
   process.exit(1)
 }
 function run(command, args, capture = false) {
@@ -18,8 +18,8 @@ function run(command, args, capture = false) {
   return result.stdout
 }
 const deviceBuild = action === 'device-build'
-const interop = action === 'interop' || action === 'crdt-interop'
-const launch = action === 'run' || action === 'crdt-run'
+const interop = action === 'interop'
+const launch = action === 'run'
 let simulator
 if (!deviceBuild) {
   const { devices } = JSON.parse(run('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], true))

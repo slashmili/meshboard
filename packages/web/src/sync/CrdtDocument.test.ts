@@ -1,15 +1,14 @@
 import { expect, it } from 'vitest'
 import * as Y from 'yjs'
-import type { BoardElement, CrdtMessage } from '@meshboard/shared-protocol'
+import type { BoardElement } from '@meshboard/shared-protocol'
 import { CrdtDocument } from './CrdtDocument'
-import { encodeFrames, FrameReceiver } from './frames'
 
 const shape = (id: string): BoardElement => ({ id, type: 'pen', color: '#123456', width: 3, points: [{ x: 12, y: 34 }] })
-function sync(from: CrdtDocument, to: CrdtDocument) { to.receive(from.receive(to.snapshot())!) }
-function malicious(change: (doc: Y.Doc) => void): CrdtMessage {
+function sync(from: CrdtDocument, to: CrdtDocument) { to.applyUpdate(Y.encodeStateAsUpdate(from.ydoc, Y.encodeStateVector(to.ydoc))) }
+function malicious(change: (doc: Y.Doc) => void): Uint8Array {
   const doc = new Y.Doc(); change(doc)
-  const raw = Array.from(Y.encodeStateAsUpdate(doc), byte => String.fromCharCode(byte)).join(''); doc.destroy()
-  return { v: 2, type: 'crdt', step: 'update', data: btoa(raw) }
+  const update = Y.encodeStateAsUpdate(doc); doc.destroy()
+  return update
 }
 it('synchronizes current state, concurrent edits and delete-only differences', () => {
   const a = new CrdtDocument(), b = new CrdtDocument()
@@ -19,12 +18,11 @@ it('synchronizes current state, concurrent edits and delete-only differences', (
   expect(a.getElements()).toEqual([shape('b')])
   expect(b.getElements()).toEqual(a.getElements())
 })
-it('does not revive deletes from old snapshots or echo incoming updates', () => {
+it('does not revive deletes from old updates', () => {
   const a = new CrdtDocument(), b = new CrdtDocument()
-  a.put(shape('a')); const stale = a.fullState(); a.remove(['a'])
-  const sent: unknown[] = []; b.onLocalMessage(message => sent.push(message))
-  b.receive(a.fullState()); b.receive(stale)
-  expect(b.getElements()).toEqual([]); expect(sent).toEqual([])
+  a.put(shape('a')); const stale = Y.encodeStateAsUpdate(a.ydoc); a.remove(['a'])
+  b.applyUpdate(Y.encodeStateAsUpdate(a.ydoc)); b.applyUpdate(stale)
+  expect(b.getElements()).toEqual([])
 })
 it('rejects invalid shapes, foreign roots and shared nested values without changing the board', () => {
   const doc = new CrdtDocument(); doc.put(shape('safe'))
@@ -33,9 +31,9 @@ it('rejects invalid shapes, foreign roots and shared nested values without chang
     malicious(d => d.getMap('elements').set('wrong-id', shape('other'))),
     malicious(d => d.getMap('foreign').set('secret', 'unexpected')),
     malicious(d => d.getMap('elements').set('nested', new Y.Map())),
-    { v: 2, type: 'crdt', step: 'update', data: '/w==' } as CrdtMessage,
+    new Uint8Array([255]),
   ]) {
-    expect(() => doc.receive(update)).toThrow()
+    expect(() => doc.applyUpdate(update)).toThrow()
     expect(doc.getElements()).toEqual([shape('safe')])
   }
   expect(doc.put(shape('after-rejection'))).toBe(true)
@@ -43,18 +41,9 @@ it('rejects invalid shapes, foreign roots and shared nested values without chang
 it('rejects over-limit updates and keeps local validation failures out of the document', () => {
   const doc = new CrdtDocument(); doc.put(shape('safe'))
   expect(doc.put({ ...shape('bad'), points: [] })).toBe(false)
-  expect(() => doc.receive({ v: 2, type: 'crdt', step: 'update', data: 'AAAA'.repeat(700_000) })).toThrow()
+  expect(() => doc.applyUpdate(new Uint8Array(2 * 1024 * 1024 + 1))).toThrow()
   expect(doc.getElements()).toEqual([shape('safe')])
 })
-it('frames preview traffic but never accepts legacy drawing messages in CRDT mode', () => {
-  const doc = new CrdtDocument(); doc.put(shape('a'))
-  const receiver = new FrameReceiver(true)
-  const message = doc.fullState()
-  expect(encodeFrames(message).map(frame => receiver.accept(frame)).filter(Boolean)).toEqual([message])
-  expect(() => new FrameReceiver().accept(encodeFrames(message)[0])).toThrow()
-  expect(() => new FrameReceiver(true).accept(encodeFrames({ v: 1, type: 'remove', ids: [] })[0])).toThrow()
-})
-
 it('moves a group in one update, preserves fields and skips remotely deleted objects', () => {
   const a = new CrdtDocument(), b = new CrdtDocument()
   a.put({ ...shape('a'), points: [{ x: 12, y: 34, pressure: 0.5 }] }); a.put(shape('b'))
@@ -116,7 +105,7 @@ it('a group move and a clear each undo in one action; a new action discards redo
 })
 it('undo rejects a restore that exceeds document limits without losing history', () => {
   const a = new CrdtDocument(), b = new CrdtDocument()
-  a.receive(malicious(doc => { for(let i=0;i<2000;i++) doc.getMap('elements').set(`e-${i}`,shape(`e-${i}`)) }))
+  a.applyUpdate(malicious(doc => { for(let i=0;i<2000;i++) doc.getMap('elements').set(`e-${i}`,shape(`e-${i}`)) }))
   a.remove(['e-0']); sync(a,b); b.put(shape('new')); sync(b,a)
   const before = a.getElements(); a.undo()
   expect(a.getElements()).toEqual(before); expect(a.canUndo).toBe(true); expect(a.canRedo).toBe(false)
@@ -131,7 +120,7 @@ it('bounds history to the newest 100 local actions', () => {
 it('invalid remote input preserves history and remote edits prune only one group member', () => {
   const a = new CrdtDocument(), b = new CrdtDocument()
   a.put(shape('a')); a.put(shape('b')); a.move(['a','b'],{x:20,y:0}); sync(a,b)
-  expect(() => a.receive(malicious(d => d.getMap('elements').set('bad',{})))).toThrow()
+  expect(() => a.applyUpdate(malicious(d => d.getMap('elements').set('bad',{})))).toThrow()
   expect(a.canUndo).toBe(true)
   b.put({...shape('a'),color:'#abcdef'}); sync(b,a)
   a.undo()

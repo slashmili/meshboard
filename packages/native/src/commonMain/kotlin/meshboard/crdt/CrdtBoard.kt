@@ -2,7 +2,7 @@ package meshboard.crdt
 
 import meshboard.BoardElement
 
-/** Phase 2 document API for opt-in platform bindings and local sharing previews. */
+/** Shared CRDT document API for native platform bindings. */
 interface CrdtBoard {
     fun put(element: BoardElement)
     fun remove(id: String)

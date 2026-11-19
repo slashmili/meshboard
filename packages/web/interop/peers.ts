@@ -40,7 +40,7 @@ export async function androidPeer(relay = false) {
   const serial = process.env.ANDROID_SERIAL || 'emulator-5554'
   const run = (args: string[]) => execFileSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: 15_000 })
   const port = Number(run(['forward', 'tcp:0', 'tcp:18765']).trim())
-  const child = spawn(adb, ['-s', serial, 'shell', 'am', 'instrument', '-w', '-e', 'class', 'dev.meshboard.android.InteropTest', '-e', 'meshboard.interop', 'true', '-e', 'meshboard.relay', String(relay), '-e', 'meshboard.crdt', String(process.env.MESHBOARD_CRDT_PREVIEW === '1'), 'dev.meshboard.android.test/androidx.test.runner.AndroidJUnitRunner'])
+  const child = spawn(adb, ['-s', serial, 'shell', 'am', 'instrument', '-w', '-e', 'class', 'dev.meshboard.android.InteropTest', '-e', 'meshboard.interop', 'true', '-e', 'meshboard.relay', String(relay), 'dev.meshboard.android.test/androidx.test.runner.AndroidJUnitRunner'])
   let diagnostics = ''
   let spawnError: Error | undefined
   child.stdout.on('data', data => { diagnostics += data })
@@ -97,7 +97,7 @@ export async function iosPeer(relay = false) {
   try {
     // A previous test may have exited before it could stop the app.
     await runIos(['simctl', 'terminate', serial, 'dev.meshboard.ios'], false)
-    await runIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : []), ...(process.env.MESHBOARD_CRDT_PREVIEW === '1' ? ['--crdt'] : [])])
+    await runIos(['simctl', 'launch', serial, 'dev.meshboard.ios', '--meshboard-interop', ...(relay ? ['--relay'] : [])])
     const deadline = Date.now() + 20_000
     while (!state && Date.now() < deadline) {
       if (socket && !socket.destroyed) { await new Promise(resolve => setTimeout(resolve, 100)); continue }

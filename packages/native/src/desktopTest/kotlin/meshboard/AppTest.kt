@@ -12,15 +12,19 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 import javax.imageio.ImageIO
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.*
 
 class AppTest {
     @get:Rule val rule = createComposeRule()
-    private class LocalController : BoardController {
+    private val documents = mutableListOf<LocalBoardController>()
+    private fun localBoard(createId: () -> String) = LocalBoardController(createId).also { documents.add(it) }
+    @After fun closeDocuments() { documents.forEach { it.close() }; documents.clear() }
+    private inner class LocalController : BoardController {
         override val state = MutableStateFlow(BoardState())
-        private val local = LocalBoardController { "unused" }
+        private val local = localBoard { "unused" }
         private var next = 0
         override fun newId() = "test-${++next}"
         private fun sync() { val next = local.state.value; state.value = state.value.copy(elements = next.elements, canUndo = next.canUndo, canRedo = next.canRedo) }
@@ -55,7 +59,7 @@ class AppTest {
     }
     @Test fun mobileHistoryControlsUndoAndRedoTouchDrawing() {
         var next = 0
-        val controller = LocalBoardController { "history-${++next}" }
+        val controller = localBoard { "history-${++next}" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-undo").assertIsNotEnabled()
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
@@ -109,7 +113,7 @@ class AppTest {
 
     @Test fun localMobileCanvasDrawsAndConfirmsClearWithoutSharing() {
         var next = 0
-        val controller = LocalBoardController { "local-${++next}" }
+        val controller = localBoard { "local-${++next}" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-connection-status").assertTextEquals("Local only")
         rule.onNodeWithTag("mobile-join").assertDoesNotExist()
@@ -161,7 +165,7 @@ class AppTest {
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
     @Test fun mobileSelectionMovesGroupsAndPinchCancelsMovement() {
-        val controller = LocalBoardController { "unused" }
+        val controller = localBoard { "unused" }
         for ((id,x) in listOf("one" to 100.0, "two" to 240.0)) controller.put(BoardElement(id,"rectangle","#293b36",3.0,listOf(Point(x,100.0),Point(x+40,140.0))))
         rule.setContent { Box(Modifier.requiredSize(390.dp,844.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-tool-select").performScrollTo().performClick()
@@ -176,7 +180,7 @@ class AppTest {
         rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
     }
     @Test fun mobileArrowEndpointsAttachAndDetachWithoutCreatingDuplicates() {
-        val controller = LocalBoardController { "arrow" }
+        val controller = localBoard { "arrow" }
         controller.put(BoardElement("box","rectangle","#123456",3.0,listOf(Point(100.0,100.0),Point(200.0,200.0))))
         rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-tool-arrow").performClick()
@@ -189,7 +193,7 @@ class AppTest {
     }
 
     @Test fun mobileImagesPaintPixelsAndEraseThroughTheirInterior() {
-        val controller = LocalBoardController { "unused" }
+        val controller = localBoard { "unused" }
         val bytes = File(System.getProperty("meshboard.fixtures"),"image.png").readBytes()
         controller.put(imageElement("image",bytes,Point(200.0,200.0)))
         rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
@@ -206,7 +210,7 @@ class AppTest {
     }
 
     @Test fun mobilePressureStrokePaintsDifferentWidths() {
-        val controller = LocalBoardController { "pressure" }
+        val controller = localBoard { "pressure" }
         controller.put(BoardElement("pressure", "pen", "#293b36", 8.0, listOf(
             Point(100.0,100.0,0.0), Point(200.0,100.0,0.0), Point(300.0,100.0,1.0), Point(400.0,100.0,1.0))))
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
@@ -217,7 +221,7 @@ class AppTest {
         assertTrue(pixel(350, 103).red < 150, "High pressure must paint a wider stroke")
     }
     @Test fun mobileArrowsDrawAndEraseWithTouch() {
-        val controller = LocalBoardController { "mobile-arrow" }
+        val controller = localBoard { "mobile-arrow" }
         rule.setContent { Box(Modifier.requiredSize(390.dp, 844.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-tool-arrow").performScrollTo().performClick()
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
@@ -233,7 +237,7 @@ class AppTest {
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
     }
     @Test fun mobileAppearanceIsAvailableInOverflow() {
-        val controller = LocalBoardController { "theme-stroke" }
+        val controller = localBoard { "theme-stroke" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithText("Appearance").performClick()

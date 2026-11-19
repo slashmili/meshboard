@@ -81,9 +81,9 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
     override fun newId() = "${System.currentTimeMillis().toString(36)}-${UUID.randomUUID()}"
     override fun put(element: BoardElement) = post {
         Wire.element(Wire.elementJson(element))
-        local(BoardMessage("put", element = element))
+        local { put(element) }
     }
-    override fun remove(ids: List<String>) = post { if (ids.isNotEmpty()) local(BoardMessage("remove", ids = ids)) }
+    override fun remove(ids: List<String>) = post { if (ids.isNotEmpty()) local { removeAll(ids) } }
     override fun move(ids: List<String>, delta: Point) = post {
         if (delta.x != 0.0 || delta.y != 0.0) {
             val before = crdt.stateVector()
@@ -99,14 +99,10 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
         val before = crdt.stateVector(); crdt.redo()
         report(); broadcastY(YWire.sync(2, crdt.update(before)))
     }
-    private fun local(message: BoardMessage) {
+    private fun local(change: CrdtBoard.() -> Unit) {
         val board = crdt
         val before = board.stateVector()
-        when (message.type) {
-            "put" -> board.put(requireNotNull(message.element))
-            "remove" -> board.removeAll(message.ids)
-            else -> error("Invalid local CRDT operation")
-        }
+        board.change()
         report()
         broadcastY(YWire.sync(2, board.update(before)))
     }

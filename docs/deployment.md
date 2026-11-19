@@ -8,10 +8,11 @@ VPS. It requires no managed TURN service or database. All domain names, addresse
 email addresses, and secrets are supplied at runtime; the repository is safe to
 publish without operator-specific configuration.
 
-**Testing release:** WebRTC encrypts transport traffic, but Meshboard's planned
-application-layer encryption and authenticated invites are not implemented yet.
-Do not advertise this deployment as meeting the complete security model in
-AGENTS.md or use it for sensitive boards. Server backups do not save live boards.
+Shared sessions authenticate membership with the invitation secret bound to both
+peers' DTLS fingerprints and encrypt all board updates and presence traffic with AES-256-GCM.
+Signaling handles connection metadata; TURN relays encrypted traffic. See the
+[security validation ledger](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6) for tested platforms, pending
+physical-device checks and audit status. Server backups do not save live boards.
 
 ## 1. Server and DNS
 
