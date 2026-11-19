@@ -2,6 +2,12 @@
 
 ## Unreleased — Phase 4
 
+### Server log privacy
+- Fixed: Caddy discards all runtime logs globally. HTTP handler errors (such as a 502 when signaling is down) and ACME challenge warnings previously recorded visitor addresses, user agents, URIs and headers even with access logging disabled.
+- Fixed: Coturn uses `simple-log`, so `log-file=/dev/null` really discards output. Coturn previously wrote a dated `/dev/null_YYYY-MM-DD.log` inside the container, including TURN usernames from failed authentications. Removed the `no-tlsv1`, `no-tlsv1_1` and `no-dtls` options, which Coturn 4.18 rejects as unknown. Its defaults already require TLS 1.2 or later and start no DTLS listener.
+- Added: `scripts/test-log-privacy.mjs`, a local check that runs dummy-IP and marker traffic through Caddy, signaling and Coturn, with control runs. The logging policy and its limits are documented in docs/deployment.md.
+- Tested: the privacy check passes, and fails against the previous configs. The existing deployment smoke test passes: TURN UDP/TLS relay and browser drawing. TLS 1.0/1.1 are still rejected by Coturn.
+
 ### iPad four-peer convergence
 - Fixed: the iPad controller reuses the decoded board and history until the document changes. Every presence or connection report previously re-decoded all elements, so cursor traffic over a large board saturated the main thread and delayed edits and state reports past the test's convergence window.
 - Fixed: install the delegate of an incoming WebRTC data channel before returning to WebRTC. A remote hello arriving ahead of the main-queue attach was dropped, and the following frame failed authentication with a transient error.

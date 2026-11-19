@@ -277,6 +277,16 @@ secrets and account keys. No board database exists. **Never run `down -v` or vol
 pruning as an update step:** that removes certificate/account state. Ordinary
 `docker compose --env-file infra/deploy/.env down` stops services but retains it.
 
+## 7. Logging and privacy
+
+Server logs must not retain visitor IPs, user agents, URLs, headers, room/peer
+IDs, invite secrets, signaling payloads, or board content. Caddy discards all
+runtime logs (including HTTP errors and ACME warnings) and Coturn logs nothing.
+As a result, Caddy startup and app-certificate errors are not visible; monitor
+certificate expiry externally. Host firewall/journal logging, Docker log
+forwarding and provider flow logs are outside this repository; check them on
+the server. Run `node scripts/test-log-privacy.mjs` locally to verify.
+
 ## Validation boundary
 
 The repository's automated tests cover credential generation, expiry, API rate
