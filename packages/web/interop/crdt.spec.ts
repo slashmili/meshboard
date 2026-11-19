@@ -1,4 +1,13 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
+import { imagesInterop } from './images'
+import { historyInterop } from './history'
+import { selectionInterop } from './selection'
+import { pressureInterop } from './pressure'
+import { arrowsInterop } from './arrows'
+import { textElementsInterop } from './text-elements'
+import { expect, type Page } from '@playwright/test'
+import { test as base } from './server-fixtures'
 import { nativePeer } from './peers'
 import { networkFault } from './network-fault'
 import { nativeReconnect } from './native-reconnect'
@@ -20,7 +29,7 @@ async function draw(page: Page) {
   await page.mouse.move(450, 360, { steps: 8 }); await page.mouse.up()
 }
 async function invite(page: Page) {
-  await page.goto('/?crdt=1')
+  await page.goto('/')
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   const value = await page.getByLabel('Board invite', { exact: true }).inputValue()
   await page.getByRole('button', { name: 'Close sharing' }).click()
@@ -75,20 +84,21 @@ test('four mixed peers converge, continue after creator departure, and restore a
       await meshExpect(elements(peer)).toHaveCount(1)
     }
     await Promise.all([draw(page), draw(fourth)])
+    native.send({ type: 'put', element: stroke('creator-native') })
     secondNative.send({ type: 'put', element: stroke('second-native') })
-    await meshExpect.poll(() => [native.state().elements.length, secondNative.state().elements.length]).toEqual([4, 4])
+    await meshExpect.poll(() => [native.state().elements.length, secondNative.state().elements.length]).toEqual([5, 5])
     await meshExpect.poll(() => secondNative.state().elements).toEqual(native.state().elements)
-    await meshExpect(elements(page)).toHaveCount(4)
-    await meshExpect(elements(fourth)).toHaveCount(4)
+    await meshExpect(elements(page)).toHaveCount(5)
+    await meshExpect(elements(fourth)).toHaveCount(5)
     await meshExpect.poll(() => elements(page).evaluateAll(nodes => nodes.map(node => node.outerHTML))).toEqual(await elements(fourth).evaluateAll(nodes => nodes.map(node => node.outerHTML)))
     native.send({ type: 'leave' })
     await meshExpect.poll(() => secondNative.state().connected).toBe(2)
     secondNative.send({ type: 'remove', ids: ['large'] })
-    await meshExpect(elements(fourth)).toHaveCount(3)
+    await meshExpect(elements(fourth)).toHaveCount(4)
     await page.reload()
-    await expect(elements(page)).toHaveCount(3, { timeout: 30_000 })
+    await expect(elements(page)).toHaveCount(4, { timeout: 30_000 })
     native.send({ type: 'join', invite: link })
-    await expect.poll(() => native.state().elements.length, { timeout: 30_000 }).toBe(3)
+    await expect.poll(() => native.state().elements.length, { timeout: 30_000 }).toBe(4)
     await meshExpect.poll(() => native.state().elements).toEqual(secondNative.state().elements)
     secondNative.send({ type: 'remove', ids: secondNative.state().elements.map(element => element.id) })
     await meshExpect(elements(page)).toHaveCount(0)
@@ -203,63 +213,87 @@ relayTest('CRDT updates use real TURN when direct candidates are disabled', asyn
   await expect(elements(page)).toHaveCount(2)
 })
 
-test('legacy links are refused by preview mode and vice versa', async ({ page }) => {
+test('legacy links are refused by the default CRDT app', async ({ page }) => {
   const id = '12345678-1234-4234-8234-123456789abc'
-  await page.goto(`/?crdt=1#room=${id}`)
+  await page.goto(`/#room=${id}`)
   await expect(page.getByRole('alert')).toContainText('another protocol')
-  await page.goto(`/#crdt=${id}`)
+  await page.goto(`/#room=${id}`)
   await expect(page.getByRole('alert')).toContainText('another protocol')
 })
 
-for (const creator of ['web', 'desktop']) test(`unmodified upstream y-webrtc exchanges raw sync, awareness and deletes (${creator} creates)`, async ({ page, native }) => {
-  let room = crypto.randomUUID() as string
-  if (creator === 'desktop') {
-    // Larger than a fragment, smaller than standard SCTP limits. A channel label
-    // selected by native must NOT force fragments on an unmodified provider.
-    native.send({ type: 'put', element: stroke('raw-seed', 1000) })
+for (const creator of ['web', 'desktop']) test(`plaintext upstream peers cannot read a board (${creator} creates)`, async ({ page, browser, native }) => {
+  let link: string
+  if (creator === 'web') { link = await invite(page); await draw(page) }
+  else {
     native.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
-    await expect.poll(() => native.state().signaling, { timeout: 30_000 }).toBe(true)
-    room = new URLSearchParams(new URL(native.state().invite).hash.slice(1)).get('crdt')!
+    await expect.poll(() => native.state(true).invite).not.toBe('')
+    native.send({ type: 'put', element: stroke('private-seed') })
+    link = native.state(true).invite
   }
-  await page.goto(`/interop/y-webrtc.html?room=${room}`)
-  await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') native.send({ type: 'join', invite: `http://127.0.0.1:5174/?crdt=1#crdt=${room}` })
-  await expect.poll(() => page.evaluate(() => window.upstream.peers()), { timeout: 30_000 }).toBe(1)
-  if (creator === 'desktop') {
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
-    native.send({ type: 'remove', ids: ['raw-seed'] })
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-  }
-  await page.evaluate(element => window.upstream.put(element), stroke('upstream'))
-  await expect.poll(() => native.state().elements.length).toBe(1)
-  native.send({ type: 'put', element: stroke('native') })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(2)
-  await page.evaluate(element => window.upstream.preview(element), stroke('draft'))
-  await expect.poll(() => native.state().previews.length).toBe(1)
-  await page.evaluate(() => window.upstream.preview(null))
-  await expect.poll(() => native.state().previews.length).toBe(0)
-  native.send({ type: 'preview', element: stroke('desktop-draft') })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(1)
-  native.send({ type: 'preview', element: null })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(0)
-  await page.evaluate(() => window.upstream.remove('native'))
-  await expect.poll(() => native.state().elements.map(e => e.id)).toEqual(['upstream'])
-  native.send({ type: 'remove', ids: ['upstream'] })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-})
-
-test('rejects an invalid upstream update before it reaches the visible browser document', async ({ page, browser }) => {
-  const link = await invite(page)
-  await draw(page)
-  const room = new URLSearchParams(new URL(link).hash.slice(1)).get('crdt')
+  const room = new URLSearchParams(new URL(link).hash.slice(1)).get('crdt')!
   const context = await browser.newContext()
   try {
-    const upstream = await context.newPage()
-    await upstream.goto(new URL(`/interop/y-webrtc.html?room=${room}`, link).href)
-    await upstream.waitForFunction(() => !!window.upstream)
-    await expect.poll(() => upstream.evaluate(() => window.upstream.elements().length)).toBe(1)
-    await upstream.evaluate(() => window.upstream.invalid())
-    await expect(page.getByRole('alert')).toContainText('invalid or oversized')
-    await expect(elements(page)).toHaveCount(1)
+    const outsider = await context.newPage()
+    await outsider.goto(new URL(`/interop/y-webrtc.html?room=${room}`, link).href)
+    await outsider.waitForFunction(() => !!window.upstream)
+    if (creator === 'web') await expect(page.getByRole('alert')).toContainText('authenticate')
+    else await expect.poll(() => native.state(true).error).toMatch(/could not authenticate|could not connect/)
+    expect(await outsider.evaluate(() => window.upstream.elements())).toEqual([])
+    if (creator === 'web') await expect(elements(page)).toHaveCount(1)
+    else {
+      expect(native.state(true).elements.map(element => element.id)).toEqual(['private-seed'])
+      expect(native.state(true).connected).toBe(0)
+    }
   } finally { await context.close() }
+})
+
+test('wrong-key browser and native peers cannot read or modify a board', async ({ page, browser, native }) => {
+  const link = await invite(page); await draw(page)
+  const wrong = new URL(link), params = new URLSearchParams(wrong.hash.slice(1))
+  params.set('key', 'A'.repeat(43)); wrong.hash = params.toString()
+  const context = await browser.newContext()
+  try {
+    const outsider = await context.newPage(); await outsider.goto(wrong.href)
+    await expect(outsider.getByRole('alert')).toContainText('authenticate')
+    await expect(elements(outsider)).toHaveCount(0)
+    await draw(outsider)
+    await expect(elements(page)).toHaveCount(1)
+    await context.close()
+    native.send({ type: 'join', invite: wrong.href })
+    await expect.poll(() => native.state(true).error).not.toBeNull()
+    expect(native.state(true).elements).toHaveLength(0)
+    expect(native.state(true).connected).toBe(0)
+  } finally { await context.close() }
+})
+
+test('text and sticky notes synchronize edits and late joins across web and native', async ({ page, native, browser }) => {
+  await textElementsInterop(page, native, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, native }) => {
+  await arrowsInterop(page, native)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, native }) => {
+  await pressureInterop(page, native)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, native }) => {
+  await selectionInterop(page, native)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, native }) => {
+  await historyInterop(page, native)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, native }) => {
+  await imagesInterop(page, native)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, native }) => {
+  await reconciliationInterop(page, native)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, native }) => {
+  await connectorsInterop(page, native)
 })

@@ -15,16 +15,12 @@ class WireTest {
     }
     @Test fun invitesRequireSupportedOriginAndRoom() {
         val room = "123e4567-e89b-42d3-a456-426614174000"
-        assertEquals("http://127.0.0.1:5173" to room, DesktopController.parseInvite("http://127.0.0.1:5173/#room=$room"))
-        for (url in listOf("http://192.168.1.2/#room=$room", "https://example.org/", "https://example.org/#room=bad", "https://user:pass@example.org/#room=$room", "file:///tmp/#room=$room")) {
+        assertEquals(Triple("http://127.0.0.1:5173", room, "A".repeat(43)), DesktopController.parseInvite("http://127.0.0.1:5173/#crdt=$room&key=${"A".repeat(43)}"))
+        for (url in listOf("http://192.168.1.2/#crdt=$room&key=${"A".repeat(43)}", "https://example.org/", "https://example.org/#crdt=bad", "https://user:pass@example.org/#crdt=$room&key=${"A".repeat(43)}", "file:///tmp/#crdt=$room&key=${"A".repeat(43)}")) {
             assertFails(url) { DesktopController.parseInvite(url) }
         }
     }
-    @Test fun crdtPreviewInvitesCannotJoinLegacySessions() {
-        val room = "123e4567-e89b-42d3-a456-426614174000"
-        val preview = "http://127.0.0.1:5174/?crdt=1#crdt=$room"
-        assertEquals("http://127.0.0.1:5174" to room, DesktopController.parseInvite(preview, crdt = true))
-        assertFails { DesktopController.parseInvite(preview) }
-        assertFails { DesktopController.parseInvite("http://127.0.0.1:5174/#room=$room", crdt = true) }
+    @Test fun oldInvitesCannotJoinCrdtSessions() {
+        assertFails { DesktopController.parseInvite("http://127.0.0.1:5174/#room=123e4567-e89b-42d3-a456-426614174000") }
     }
 }

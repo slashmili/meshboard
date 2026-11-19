@@ -18,11 +18,8 @@ function run(command, args, capture = false) {
   return result.stdout
 }
 const deviceBuild = action === 'device-build'
-const preview = action === 'crdt-run' || action === 'crdt-interop'
 const interop = action === 'interop' || action === 'crdt-interop'
 const launch = action === 'run' || action === 'crdt-run'
-// An inherited preview flag must never silently change an ordinary build.
-process.env.MESHBOARD_CRDT_PREVIEW = preview ? '1' : '0'
 let simulator
 if (!deviceBuild) {
   const { devices } = JSON.parse(run('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], true))
@@ -40,20 +37,20 @@ if (action === 'crdt-test') {
   // Standalone simulator executable: no app install, live transport, or signing changes.
   if (simulator.state !== 'Booted') run('xcrun', ['simctl', 'boot', simulator.udid])
   run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b'])
-  run('./packages/native/gradlew', ['-p', 'packages/native', '-Pmeshboard.ios=true', '-Pmeshboard.crdtIos=true',
+  run('./packages/native/gradlew', ['-p', 'packages/native', '-Pmeshboard.ios=true',
     `-Pmeshboard.iosTestDevice=${simulator.udid}`, 'iosSimulatorArm64Test',
     'linkCrdtCompatDebugExecutableIosSimulatorArm64', 'linkDebugFrameworkIosArm64'])
   process.env.MESHBOARD_IOS_SIMULATOR = simulator.udid
   process.env.MESHBOARD_CRDT_IOS_BINARY = join(root, 'packages/native/build/bin/iosSimulatorArm64/crdtCompatDebugExecutable/crdtCompat.kexe')
   run('node', ['--test', 'packages/crdt-core/compat.test.mjs'])
-  console.log('iOS CRDT bindings checked; normal iOS sharing still uses the existing protocol.')
+  console.log('iOS CRDT bindings and controller tests passed.')
   process.exit(0)
 }
-const output = join(root, 'packages/native/build', deviceBuild ? 'ios-device' : preview ? 'ios-crdt-preview' : 'ios')
+const output = join(root, 'packages/native/build', deviceBuild ? 'ios-device' : 'ios')
 run('xcodebuild', ['-project', 'packages/native/iosApp/Meshboard.xcodeproj', '-scheme', 'Meshboard',
   '-configuration', 'Debug', '-destination', deviceBuild ? 'generic/platform=iOS' : `platform=iOS Simulator,id=${simulator.udid}`,
   '-clonedSourcePackagesDirPath', join(root, 'packages/native/build/SourcePackages'),
-  '-derivedDataPath', output, 'build', 'CODE_SIGNING_ALLOWED=NO', `MESHBOARD_CRDT_PREVIEW=${preview ? '1' : '0'}`])
+  '-derivedDataPath', output, 'build', 'CODE_SIGNING_ALLOWED=NO'])
 if (launch || interop) {
   if (simulator.state !== 'Booted') run('xcrun', ['simctl', 'boot', simulator.udid])
   run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b'])
@@ -71,6 +68,6 @@ if (interop) {
   const invoke = (command, args) => mise
     ? run('mise', ['exec', 'java@temurin-21', 'node@22', 'pnpm@9', '--', command, ...args])
     : run(command, args)
-  invoke('./packages/native/gradlew', ['-p', 'packages/native', ...(preview ? ['-Pmeshboard.crdtInterop=true', 'prepareCrdtInterop'] : []), 'prepareInterop'])
-  invoke('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', preview ? 'playwright.ios-crdt.config.ts' : 'playwright.ios.config.ts', ...process.argv.slice(3)])
+  invoke('./packages/native/gradlew', ['-p', 'packages/native', 'prepareInterop'])
+  invoke('pnpm', ['--filter', '@meshboard/web', 'exec', 'playwright', 'test', '-c', 'playwright.ios-crdt.config.ts', ...process.argv.slice(3)])
 }

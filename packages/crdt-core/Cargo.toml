@@ -5,6 +5,9 @@ edition = "2021"
 license = "MPL-2.0"
 publish = false
 
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
 [lib]
 crate-type = ["rlib", "cdylib", "staticlib"]
 
@@ -13,6 +16,7 @@ jvm = ["dep:jni"]
 c-api = []
 
 [dependencies]
+base64 = "=0.22.1"
 yrs = "=0.27.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

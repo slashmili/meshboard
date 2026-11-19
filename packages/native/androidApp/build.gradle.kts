@@ -4,23 +4,18 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val crdtPreview = providers.gradleProperty("meshboard.crdtPreview").orNull == "true"
-require(!crdtPreview || providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
-    "Android CRDT preview requires -Pmeshboard.crdtAndroid=true"
-}
 android {
     namespace = "dev.meshboard.android"
     compileSdk = 35
     defaultConfig {
         applicationId = "dev.meshboard.android"
+        ndk { abiFilters += listOf("x86_64", "arm64-v8a") }
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("boolean", "CRDT_PREVIEW", "false")
     }
-    buildTypes.getByName("debug").buildConfigField("boolean", "CRDT_PREVIEW", crdtPreview.toString())
     buildFeatures { compose = true; buildConfig = true }
     sourceSets.getByName("androidTest").java.srcDir(rootProject.file("src/jvmInterop/kotlin"))
     compileOptions {
@@ -30,9 +25,8 @@ android {
 }
 kotlin { jvmToolchain(21) }
 
-// Neither normal nor release builds need Rust. Live preview additionally
-// requires meshboard.crdtPreview and is enabled only in the debug build type.
-if (providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
+// Package yrs for both debug and release apps.
+run {
     android.ndkVersion = "28.2.13676358"
     val targets = mapOf("x86_64" to "x86_64-linux-android", "arm64-v8a" to "aarch64-linux-android")
     val host = when {
@@ -65,7 +59,7 @@ if (providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
         }
         into(layout.buildDirectory.dir("generated/crdtJniLibs"))
     }
-    android.sourceSets.getByName("debug") {
+    android.sourceSets.getByName("main") {
         java.srcDir(rootProject.file("src/crdtJvmMain/kotlin"))
         jniLibs.srcDir(layout.buildDirectory.dir("generated/crdtJniLibs"))
     }
@@ -73,9 +67,9 @@ if (providers.gradleProperty("meshboard.crdtAndroid").orNull == "true") {
         java.srcDir(rootProject.file("src/crdtJvmTest/kotlin"))
         java.srcDir("src/crdtAndroidTest/kotlin")
     }
-    tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(prepareCrdtAndroid) }
+    tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareCrdtAndroid) }
     android.testOptions {
-        val reports = if (crdtPreview) "crdt-preview" else "crdt"
+        val reports = "crdt"
         resultsDir = layout.buildDirectory.dir("outputs/androidTest-results/$reports").get().asFile.absolutePath
         reportDir = layout.buildDirectory.dir("reports/androidTests/$reports").get().asFile.absolutePath
     }
@@ -95,6 +89,7 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.9.3")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.9.3")

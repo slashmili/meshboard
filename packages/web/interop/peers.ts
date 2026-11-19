@@ -11,8 +11,7 @@ type NativeState = { connected: number; relayed: number; invite: string; signali
 const execFileAsync = promisify(execFile)
 export function nativePeer(relay = false) {
   const classpath = readFileSync(new URL('../../native/build/interop/classpath.txt', import.meta.url), 'utf8')
-  const crdt = process.env.MESHBOARD_CRDT_PREVIEW === '1' ? JSON.parse(readFileSync(new URL('../../native/build/crdt/interop.json', import.meta.url), 'utf8')) : null
-  const child = spawn(crdt?.java ?? 'java', [...(crdt ? ['-Dmeshboard.crdt.preview=true', `-Dmeshboard.crdt.library=${crdt.library}`] : []), '-cp', crdt?.classpath ?? classpath, 'meshboard.InteropPeerKt', ...(relay ? ['--relay'] : [])])
+  const child = spawn('java', ['-cp', classpath, 'meshboard.InteropPeerKt', ...(relay ? ['--relay'] : [])])
   let state: NativeState = { connected: 0, relayed: 0, invite: '', signaling: false, error: null, elements: [], previews: [] }
   let diagnostics = ''
   child.stderr.on('data', data => { diagnostics = (diagnostics + data).slice(-8000) })
@@ -108,7 +107,12 @@ export async function iosPeer(relay = false) {
       lines = createInterface({ input: socket })
       lines.on('error', () => {})
       lines.on('line', line => {
-        if (line.startsWith('MESHBOARD ')) state = JSON.parse(line.slice(10))
+        if (line.startsWith('MESHBOARD ')) {
+          state = JSON.parse(line.slice(10))
+          // Admit one full snapshot at a time, coalescing changes on the simulator
+          // until this consumer has parsed the previous board.
+          socket?.write(JSON.stringify({ type: 'snapshot-received' }) + '\n')
+        }
         else if (line.startsWith('MESHBOARD_DIAGNOSTIC ')) {
           diagnostics.push(JSON.parse(line.slice(21)))
           if (diagnostics.length > 200) diagnostics.shift()

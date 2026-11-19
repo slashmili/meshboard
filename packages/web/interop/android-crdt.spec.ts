@@ -1,4 +1,13 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
+import { imagesInterop } from './images'
+import { historyInterop } from './history'
+import { selectionInterop } from './selection'
+import { pressureInterop } from './pressure'
+import { arrowsInterop } from './arrows'
+import { textElementsInterop } from './text-elements'
+import { expect, type Page } from '@playwright/test'
+import { test as base } from './server-fixtures'
 import { androidPeer, nativePeer } from './peers'
 import { nativeReconnect } from './native-reconnect'
 import type { UpstreamFixture } from './y-webrtc-peer'
@@ -19,7 +28,7 @@ async function draw(page: Page) {
   await page.mouse.move(450, 360, { steps: 8 }); await page.mouse.up()
 }
 async function invite(page: Page) {
-  await page.goto('/?crdt=1')
+  await page.goto('/')
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   const link = await page.getByLabel('Board invite', { exact: true }).inputValue()
   await page.getByRole('button', { name: 'Close sharing' }).click()
@@ -119,49 +128,73 @@ relayTest('Android CRDT updates use real TURN with direct candidates disabled', 
   await expect(elements(page)).toHaveCount(2)
 })
 
-for (const creator of ['web', 'android']) test(`Android exchanges raw updates and awareness with unmodified y-webrtc (${creator} creates)`, async ({ page, android }) => {
-  let room = crypto.randomUUID() as string
-  if (creator === 'android') {
-    android.send({ type: 'put', element: stroke('raw-seed', 1000) })
-    android.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
-    await expect.poll(() => android.state().signaling).toBe(true)
-    room = new URLSearchParams(new URL(android.state().invite).hash.slice(1)).get('crdt')!
-  }
+test('Android rejects plaintext peers before sharing document state', async ({ page, android }) => {
+  android.send({ type: 'put', element: stroke('private-seed') })
+  android.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
+  await expect.poll(() => android.state().signaling).toBe(true)
+  const room = new URLSearchParams(new URL(android.state().invite).hash.slice(1)).get('crdt')!
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') android.send({ type: 'join', invite: `http://127.0.0.1:5174/?crdt=1#crdt=${room}` })
-  await expect.poll(() => page.evaluate(() => window.upstream.peers())).toBe(1)
-  if (creator === 'android') {
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
-    android.send({ type: 'remove', ids: ['raw-seed'] })
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-  }
-  await page.evaluate(element => window.upstream.put(element), stroke('upstream'))
-  await expect.poll(() => android.state().elements.map(e => e.id)).toEqual(['upstream'])
-  android.send({ type: 'put', element: stroke('android') })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(2)
-  await page.evaluate(element => window.upstream.preview(element), stroke('draft'))
-  await expect.poll(() => android.state().previews.length).toBe(1)
-  await page.evaluate(() => window.upstream.preview(null))
-  await expect.poll(() => android.state().previews.length).toBe(0)
-  android.send({ type: 'preview', element: stroke('android-draft') })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(1)
-  await page.evaluate(() => window.upstream.remove('android'))
-  await expect.poll(() => android.state().elements.map(e => e.id)).toEqual(['upstream'])
-  // Invalid input must not poison Android's already-validated document.
-  await page.evaluate(() => window.upstream.invalid())
-  await expect.poll(() => android.state(true).error).toContain('invalid or oversized')
-  expect(android.state(true).elements.map(e => e.id)).toEqual(['upstream'])
+  await expect.poll(() => android.state(true).error).toMatch(/could not authenticate|could not connect/)
+  expect(await page.evaluate(() => window.upstream.elements())).toEqual([])
+  expect(android.state(true).elements.map(e => e.id)).toEqual(['private-seed'])
+  expect(android.state(true).connected).toBe(0)
 })
 
-test('Android preview refuses legacy invites and non-local origins without clearing the board', async ({ android }) => {
+test('Android cannot join with the wrong invitation secret', async ({ page, android }) => {
+  const link = await invite(page); await draw(page)
+  const wrong = new URL(link), params = new URLSearchParams(wrong.hash.slice(1))
+  params.set('key', 'A'.repeat(43)); wrong.hash = params.toString()
+  android.send({ type: 'join', invite: wrong.href })
+  await expect.poll(() => android.state(true).error).not.toBeNull()
+  expect(android.state(true).elements).toHaveLength(0)
+  expect(android.state(true).connected).toBe(0)
+  await expect(elements(page)).toHaveCount(1)
+  android.send({ type: 'join', invite: link })
+  await expect.poll(() => android.state(true).elements.length).toBe(1)
+  expect(android.state().connected).toBe(1)
+})
+
+test('Android app refuses legacy invites and insecure origins without clearing the board', async ({ android }) => {
   android.send({ type: 'put', element: stroke('keep') })
   await expect.poll(() => android.state().elements.length).toBe(1)
   android.send({ type: 'join', invite: 'http://127.0.0.1:5174/#room=12345678-1234-4234-8234-123456789abc' })
-  await expect.poll(() => android.state(true).error).toContain('another protocol')
+  await expect.poll(() => android.state(true).error).toContain('including its key')
   expect(android.state(true).elements.map(e => e.id)).toEqual(['keep'])
-  android.send({ type: 'share', origin: 'https://example.invalid' })
-  await expect.poll(() => android.state(true).error).toContain('local-only')
+  android.send({ type: 'share', origin: 'http://example.invalid' })
+  await expect.poll(() => android.state(true).error).toContain('HTTPS')
   expect(android.state(true).invite).toBe('')
   expect(android.state(true).elements.map(e => e.id)).toEqual(['keep'])
+})
+
+test('text and sticky notes synchronize edits and late joins across web and Android', async ({ page, android, browser }) => {
+  await textElementsInterop(page, android, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, android }) => {
+  await arrowsInterop(page, android)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, android }) => {
+  await pressureInterop(page, android)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, android }) => {
+  await selectionInterop(page, android)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, android }) => {
+  await historyInterop(page, android)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, android }) => {
+  await imagesInterop(page, android)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, android }) => {
+  await reconciliationInterop(page, android)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, android }) => {
+  await connectorsInterop(page, android)
 })

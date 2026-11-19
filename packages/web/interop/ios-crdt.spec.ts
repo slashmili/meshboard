@@ -1,4 +1,13 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { reconciliationInterop } from './reconciliation'
+import { connectorsInterop } from './connectors'
+import { imagesInterop } from './images'
+import { historyInterop } from './history'
+import { selectionInterop } from './selection'
+import { pressureInterop } from './pressure'
+import { arrowsInterop } from './arrows'
+import { textElementsInterop } from './text-elements'
+import { expect, type Page } from '@playwright/test'
+import { test as base } from './server-fixtures'
 import { iosPeer, nativePeer } from './peers'
 import type { UpstreamFixture } from './y-webrtc-peer'
 
@@ -8,7 +17,14 @@ const test = base.extend<{ ios: Awaited<ReturnType<typeof iosPeer>>; relay: bool
   relay: [false, { option: true }],
   ios: [async ({ relay }, use) => {
     const peer = await iosPeer(relay)
-    try { await use(peer) } finally { await peer.close() }
+    try { await use(peer) } finally {
+      if (test.info().status !== test.info().expectedStatus) {
+        await test.info().attach('ios-fixture-connection-events', {
+          body: JSON.stringify(peer.diagnostics(), null, 2), contentType: 'application/json',
+        })
+      }
+      await peer.close()
+    }
   }, { timeout: 120_000 }],
 })
 const elements = (page: Page) => page.getByTestId('drawing-elements').locator(':scope > *')
@@ -18,7 +34,7 @@ async function draw(page: Page) {
   await page.mouse.move(450, 360, { steps: 8 }); await page.mouse.up()
 }
 async function invite(page: Page) {
-  await page.goto('/?crdt=1')
+  await page.goto('/')
   await page.getByRole('button', { name: 'Share board', exact: true }).click()
   const link = await page.getByLabel('Board invite', { exact: true }).inputValue()
   await page.getByRole('button', { name: 'Close sharing' }).click()
@@ -53,6 +69,21 @@ test('web creates; iOS exchanges CRDT drawings and awareness, erases and retries
   await expect.poll(() => ios.state().elements.length).toBe(1)
 })
 
+test('iOS repeatedly rejoins as the incoming channel recipient and authenticates immediate traffic', async ({ page, ios }) => {
+  const link = await invite(page)
+  await draw(page)
+  for (let attempt = 0; attempt < 6; attempt++) {
+    ios.send({ type: 'join', invite: link })
+    await expect.poll(() => ios.state().connected).toBe(1)
+    await expect.poll(() => ios.state().elements.length).toBe(attempt + 1)
+    ios.send({ type: 'put', element: stroke(`rejoin-${attempt}`) })
+    await expect(elements(page)).toHaveCount(attempt + 2)
+    ios.send({ type: 'leave' })
+    await expect.poll(() => ios.state().connected).toBe(0)
+    await expect(page.getByTestId('connection-status')).toHaveText('Waiting for a peer')
+  }
+})
+
 test('iOS creates; four peers converge on large state, survive creator departure and recover reloads', async ({ page, browser, ios }, testInfo) => {
   const desktop = nativePeer()
   const context = await browser.newContext()
@@ -75,7 +106,13 @@ test('iOS creates; four peers converge on large state, survive creator departure
     await Promise.all([draw(page), draw(fourth)])
     ios.send({ type: 'put', element: stroke('ios') })
     desktop.send({ type: 'put', element: stroke('desktop') })
-    await expect.poll(() => [ios.state().elements.length, desktop.state().elements.length]).toEqual([5, 5])
+    await expect.poll(() => [ios, desktop].map(peer => ({
+      ids: peer.state().elements.map(e => e.id).sort(),
+      count: peer.state().elements.length,
+    })), { message: 'Both native replicas must receive both native edits and both browser strokes' }).toEqual([
+      { ids: expect.arrayContaining(['desktop', 'ios', 'large']), count: 5 },
+      { ids: expect.arrayContaining(['desktop', 'ios', 'large']), count: 5 },
+    ])
     await expect.poll(() => ios.state().elements).toEqual(desktop.state().elements)
     await expect(elements(page)).toHaveCount(5); await expect(elements(fourth)).toHaveCount(5)
     await expect.poll(() => elements(page).evaluateAll(nodes => nodes.map(node => node.outerHTML))).toEqual(await elements(fourth).evaluateAll(nodes => nodes.map(node => node.outerHTML)))
@@ -91,9 +128,15 @@ test('iOS creates; four peers converge on large state, survive creator departure
     await expect(elements(page)).toHaveCount(0); await expect(elements(fourth)).toHaveCount(0)
   } catch (error) {
     const states = [ios, desktop].map(peer => {
-      try { const { elements, previews, ...state } = peer.state(); return { ...state, ids: elements.map(e => e.id), previews: previews.length } }
+      try { const { elements, previews, invite: _invite, ...state } = peer.state(true); return { ...state, ids: elements.map(e => e.id), previews: previews.length } }
       catch (stateError) { return { error: String(stateError) } }
     })
+    const browsers = await Promise.allSettled([page, fourth].filter((peer): peer is Page => !!peer).map(peer => peer.evaluate(() => ({
+      status: document.querySelector('[data-testid="connection-status"]')?.textContent,
+      elements: document.querySelector('[data-testid="drawing-elements"]')?.childElementCount,
+      error: document.querySelector('[role="alert"]')?.textContent,
+    }))))
+    await testInfo.attach('browser-states-before-cleanup', { body: JSON.stringify(browsers, null, 2), contentType: 'application/json' })
     await testInfo.attach('native-peer-states-before-cleanup', { body: JSON.stringify(states, null, 2), contentType: 'application/json' })
     await testInfo.attach('ios-connection-events', { body: JSON.stringify(ios.diagnostics(), null, 2), contentType: 'application/json' })
     throw error
@@ -114,49 +157,73 @@ relayTest('iOS CRDT updates use real TURN with direct candidates disabled', asyn
   await expect(elements(page)).toHaveCount(2)
 })
 
-for (const creator of ['web', 'ios']) test(`iOS exchanges raw updates and awareness with unmodified y-webrtc (${creator} creates)`, async ({ page, ios }) => {
-  let room = crypto.randomUUID() as string
-  if (creator === 'ios') {
-    ios.send({ type: 'put', element: stroke('raw-seed', 1000) })
-    ios.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
-    await expect.poll(() => ios.state().signaling).toBe(true)
-    room = new URLSearchParams(new URL(ios.state().invite).hash.slice(1)).get('crdt')!
-  }
+test('iOS rejects plaintext peers before sharing document state', async ({ page, ios }) => {
+  ios.send({ type: 'put', element: stroke('private-seed') })
+  ios.send({ type: 'share', origin: 'http://127.0.0.1:5174' })
+  await expect.poll(() => ios.state().signaling).toBe(true)
+  const room = new URLSearchParams(new URL(ios.state().invite).hash.slice(1)).get('crdt')!
   await page.goto(`/interop/y-webrtc.html?room=${room}`)
   await page.waitForFunction(() => !!window.upstream)
-  if (creator === 'web') ios.send({ type: 'join', invite: `http://127.0.0.1:5174/?crdt=1#crdt=${room}` })
-  await expect.poll(() => page.evaluate(() => window.upstream.peers())).toBe(1)
-  if (creator === 'ios') {
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(1)
-    ios.send({ type: 'remove', ids: ['raw-seed'] })
-    await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(0)
-  }
-  await page.evaluate(element => window.upstream.put(element), stroke('upstream'))
-  await expect.poll(() => ios.state().elements.map(e => e.id)).toEqual(['upstream'])
-  ios.send({ type: 'put', element: stroke('ios') })
-  await expect.poll(() => page.evaluate(() => window.upstream.elements().length)).toBe(2)
-  await page.evaluate(element => window.upstream.preview(element), stroke('draft'))
-  await expect.poll(() => ios.state().previews.length).toBe(1)
-  await page.evaluate(() => window.upstream.preview(null))
-  await expect.poll(() => ios.state().previews.length).toBe(0)
-  ios.send({ type: 'preview', element: stroke('ios-draft') })
-  await expect.poll(() => page.evaluate(() => window.upstream.drafts().length)).toBe(1)
-  await page.evaluate(() => window.upstream.remove('ios'))
-  await expect.poll(() => ios.state().elements.map(e => e.id)).toEqual(['upstream'])
-  // Invalid input must not poison iOS's already-validated document.
-  await page.evaluate(() => window.upstream.invalid())
-  await expect.poll(() => ios.state(true).error).toContain('invalid or oversized')
-  expect(ios.state(true).elements.map(e => e.id)).toEqual(['upstream'])
+  await expect.poll(() => ios.state(true).error).toMatch(/could not authenticate|could not connect/)
+  expect(await page.evaluate(() => window.upstream.elements())).toEqual([])
+  expect(ios.state(true).elements.map(e => e.id)).toEqual(['private-seed'])
+  expect(ios.state(true).connected).toBe(0)
 })
 
-test('iOS preview refuses legacy invites and non-local origins without clearing the board', async ({ ios }) => {
+test('iOS cannot join with the wrong invitation secret', async ({ page, ios }) => {
+  const link = await invite(page); await draw(page)
+  const wrong = new URL(link), params = new URLSearchParams(wrong.hash.slice(1))
+  params.set('key', 'A'.repeat(43)); wrong.hash = params.toString()
+  ios.send({ type: 'join', invite: wrong.href })
+  await expect.poll(() => ios.state(true).error).not.toBeNull()
+  expect(ios.state(true).elements).toHaveLength(0)
+  expect(ios.state(true).connected).toBe(0)
+  await expect(elements(page)).toHaveCount(1)
+  ios.send({ type: 'join', invite: link })
+  await expect.poll(() => ios.state(true).elements.length).toBe(1)
+  expect(ios.state().connected).toBe(1)
+})
+
+test('iOS app refuses legacy invites and insecure origins without clearing the board', async ({ ios }) => {
   ios.send({ type: 'put', element: stroke('keep') })
   await expect.poll(() => ios.state().elements.length).toBe(1)
   ios.send({ type: 'join', invite: 'http://127.0.0.1:5174/#room=12345678-1234-4234-8234-123456789abc' })
   await expect.poll(() => ios.state(true).error).toContain('another protocol')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
-  ios.send({ type: 'share', origin: 'https://example.invalid' })
-  await expect.poll(() => ios.state(true).error).toContain('local-only')
+  ios.send({ type: 'share', origin: 'http://example.invalid' })
+  await expect.poll(() => ios.state(true).error).toContain('HTTPS')
   expect(ios.state(true).invite).toBe('')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
+})
+
+test('text and sticky notes synchronize edits and late joins across web and iOS', async ({ page, ios, browser }) => {
+  await textElementsInterop(page, ios, browser)
+})
+
+test('arrows synchronize native edits, reloads and erasing', async ({ page, ios }) => {
+  await arrowsInterop(page, ios)
+})
+
+test('pressure samples synchronize native edits and reloads', async ({ page, ios }) => {
+  await pressureInterop(page, ios)
+})
+
+test('selection moves preserve remote edits and skip deleted objects', async ({ page, ios }) => {
+  await selectionInterop(page, ios)
+})
+
+test('undo and redo preserve remote objects across encrypted peers', async ({ page, ios }) => {
+  await historyInterop(page, ios)
+})
+
+test('embedded images survive encrypted sync, movement, history and reload', async ({ page, ios }) => {
+  await imagesInterop(page, ios)
+})
+
+test('periodic reconciliation repairs missed inserts and deletes on an open channel', async ({ page, ios }) => {
+  await reconciliationInterop(page, ios)
+})
+
+test('attached connectors follow remote moves, deletion, undo and reload', async ({ page, ios }) => {
+  await connectorsInterop(page, ios)
 })

@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest'
+import { deepStrictEqual } from 'node:assert'
 import * as encoding from 'lib0/encoding'
 import * as sync from 'y-protocols/sync'
 import * as awareness from 'y-protocols/awareness'
@@ -17,10 +18,12 @@ it('matches the native fixtures with upstream sync and awareness encoders', () =
 it('passes standard messages unchanged and reassembles a bounded large update', () => {
   const small = new Uint8Array([0, 0, 1, 0])
   expect(fragmentYMessage(small)).toEqual([small])
-  const bytes = new Uint8Array(500_000).fill(42); bytes[0] = 0
+  const bytes = Uint8Array.from({ length: 500_000 }, (_, i) => i % 251)
   const receiver = new YMessageReceiver()
   const results = fragmentYMessage(bytes).map(frame => receiver.accept(frame)).filter(Boolean)
-  expect(results).toEqual([bytes])
+  expect(results).toHaveLength(1)
+  // Compare every byte without the generic matcher walking 500,000 properties.
+  deepStrictEqual(results[0], bytes)
   expect(() => fragmentYMessage(new Uint8Array(MAX_Y_MESSAGE + 1))).toThrow()
 })
 it('rejects truncated, interleaved, oversized, nested and expired fragments', () => {

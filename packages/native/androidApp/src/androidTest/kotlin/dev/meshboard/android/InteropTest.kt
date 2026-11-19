@@ -14,7 +14,6 @@ class InteropTest {
     @Test fun peer() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         assumeTrue("Run with test:interop:android", args.getString("meshboard.interop") == "true")
-        check(BuildConfig.CRDT_PREVIEW == (args.getString("meshboard.crdt") == "true")) { "Install the matching legacy/CRDT Android test build." }
         val controller = AndroidController(InstrumentationRegistry.getInstrumentation().targetContext, args.getString("meshboard.relay") == "true")
         try {
             ServerSocket(18765, 1, InetAddress.getByName("127.0.0.1")).use { server ->
@@ -43,6 +42,9 @@ class InteropTest {
                                 "share" -> controller.share(command.text("origin"))
                                 "join" -> controller.join(command.text("invite"))
                                 "put" -> controller.put(Wire.element(command.getValue("element")))
+                                "undo" -> controller.undo()
+                                "redo" -> controller.redo()
+                                "move" -> controller.move(command.getValue("ids").jsonArray.map { it.jsonPrimitive.content }, meshboard.Point(command.getValue("dx").jsonPrimitive.double, command.getValue("dy").jsonPrimitive.double))
                                 "remove" -> controller.remove(command.getValue("ids").jsonArray.map { it.jsonPrimitive.content })
                                 "preview" -> controller.preview(command["element"]?.takeUnless { it == JsonNull }?.let(Wire::element))
                                 "leave" -> controller.leave()

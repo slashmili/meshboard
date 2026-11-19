@@ -2,17 +2,30 @@ package meshboard.crdt
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import meshboard.BoardElement
 import meshboard.Wire
 
-/** Loaded only in opt-in desktop/Android CRDT checkpoints. */
+/** Shared JNI binding, packaged with every desktop and Android app. */
 internal object CrdtJni {
     init {
         val desktopLibrary = System.getProperty("meshboard.crdt.library")
         if (desktopLibrary != null) System.load(desktopLibrary)
-        else System.loadLibrary("meshboard_crdt_core") // Android's ABI-specific APK library.
+        else {
+            val name = System.mapLibraryName("meshboard_crdt_core")
+            val resource = CrdtJni::class.java.getResourceAsStream("/meshboard/native/$name")
+            if (resource == null) System.loadLibrary("meshboard_crdt_core") // Android APK ABI directory.
+            else resource.use { input ->
+                val directory = java.nio.file.Files.createTempDirectory("meshboard-crdt-").toFile()
+                directory.deleteOnExit()
+                val library = java.io.File(directory, name)
+                library.deleteOnExit()
+                library.outputStream().use { input.copyTo(it) }
+                System.load(library.absolutePath)
+            }
+        }
     }
     external fun create(clientId: Long): Long
     external fun call(handle: Long, operation: Int, input: ByteArray): ByteArray
@@ -40,6 +53,20 @@ class JvmCrdtBoard internal constructor(clientId: Long) : CrdtBoard, AutoCloseab
     override fun removeAll(ids: List<String>) {
         require(ids.size <= Wire.MAX_REMOVED && ids.all { Regex("^[a-zA-Z0-9-]{1,80}$").matches(it) })
         call(8, JsonArray(ids.map(::JsonPrimitive)).toString().encodeToByteArray())
+    }
+    override fun move(ids: List<String>, delta: meshboard.Point) {
+        require(ids.size <= Wire.MAX_ELEMENTS && delta.x.isFinite() && delta.y.isFinite())
+        val request = kotlinx.serialization.json.buildJsonObject {
+            put("ids", JsonArray(ids.map(::JsonPrimitive)))
+            put("dx", JsonPrimitive(delta.x)); put("dy", JsonPrimitive(delta.y))
+        }
+        call(9, request.toString().encodeToByteArray())
+    }
+    override fun undo() { call(10) }
+    override fun redo() { call(11) }
+    override fun history(): Pair<Boolean, Boolean> {
+        val value = Json.parseToJsonElement(call(12).decodeToString()).jsonObject
+        return value.getValue("undo").jsonPrimitive.content.toBooleanStrict() to value.getValue("redo").jsonPrimitive.content.toBooleanStrict()
     }
     override fun elements(): List<BoardElement> {
         val values = Json.parseToJsonElement(call(6).decodeToString()).jsonObject

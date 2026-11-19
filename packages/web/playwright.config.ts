@@ -13,8 +13,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm dev',
+    command: process.env.MESHBOARD_TEST_BUILD === '1' ? 'pnpm preview --port 5173' : 'pnpm dev',
     url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && process.env.MESHBOARD_TEST_BUILD !== '1',
   },
 })

@@ -1,0 +1,179 @@
+{
+  "valid": [
+    {
+      "id": "text-fixture",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": "Hello <script> & team\n\u4e16\u754c \ud83d\udc4b"
+    },
+    {
+      "id": "note-fixture",
+      "type": "sticky",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": "A note"
+    },
+    {
+      "id": "unicode-limit",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00"
+    }
+  ],
+  "invalid": [
+    {
+      "id": "text-fixture",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": ""
+    },
+    {
+      "id": "text-fixture",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "text-fixture",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": null
+    },
+    {
+      "id": "text-fixture",
+      "type": "pen",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ],
+      "text": "Hello <script> & team\n\u4e16\u754c \ud83d\udc4b"
+    },
+    {
+      "id": "text-fixture",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "text": "Hello <script> & team\n\u4e16\u754c \ud83d\udc4b"
+    },
+    {
+      "id": "text-fixture",
+      "type": "text",
+      "color": "#293b36",
+      "width": 1,
+      "points": [
+        {
+          "x": 10,
+          "y": 20
+        },
+        {
+          "x": 298,
+          "y": 116
+        }
+      ]
+    }
+  ],
+  "layout": [
+    {
+      "text": "abcdefghijklmnopqrstuvwxy",
+      "lines": [
+        "abcdefghijklmnopqrstuvwx",
+        "y"
+      ]
+    },
+    {
+      "text": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+      "lines": [
+        "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+        "\ud83d\ude00"
+      ]
+    },
+    {
+      "text": "a\r\nb\rc\n",
+      "lines": [
+        "a",
+        "b",
+        "c",
+        ""
+      ]
+    }
+  ]
+}

@@ -4,6 +4,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct MeshboardCrdtResult {
     handle: i64,
     status: i32,
@@ -16,7 +17,7 @@ fn result(handle: i64, status: i32, bytes: Vec<u8>) -> MeshboardCrdtResult {
     let data = if len == 0 {
         ptr::null_mut()
     } else {
-        Box::into_raw(bytes.into_boxed_slice()) as *mut u8
+        Box::into_raw(bytes.into_boxed_slice()).cast::<u8>()
     };
     MeshboardCrdtResult {
         handle,
@@ -40,7 +41,7 @@ pub extern "C" fn meshboard_crdt_create(client_id: i64) -> MeshboardCrdtResult {
 }
 
 /// # Safety
-/// Non-empty input must point to input_len readable bytes for the duration of this call.
+/// Non-empty input must point to `input_len` readable bytes for the duration of this call.
 #[no_mangle]
 pub unsafe extern "C" fn meshboard_crdt_call(
     handle: i64,
@@ -58,6 +59,8 @@ pub unsafe extern "C" fn meshboard_crdt_call(
             if input.is_null() {
                 return Err("Null CRDT input".into());
             }
+            // SAFETY: the caller guarantees readable storage for this call;
+            // the checked nonzero length is bounded below isize::MAX.
             unsafe { std::slice::from_raw_parts(input, input_len) }
         };
         bridge::call(handle, operation, bytes).map(|bytes| (handle, bytes))
@@ -69,11 +72,13 @@ pub unsafe extern "C" fn meshboard_crdt_call(
 #[no_mangle]
 pub unsafe extern "C" fn meshboard_crdt_result_free(result: MeshboardCrdtResult) {
     if !result.data.is_null() {
+        // SAFETY: the caller returns the original allocation exactly once.
+        // `result` created this boxed slice with the same pointer and length.
         unsafe {
             drop(Box::from_raw(ptr::slice_from_raw_parts_mut(
                 result.data,
                 result.len,
-            )))
+            )));
         };
     }
 }
@@ -86,9 +91,11 @@ mod tests {
         let data = if result.len == 0 {
             Vec::new()
         } else {
+            // SAFETY: this helper only consumes live results from this library.
             unsafe { std::slice::from_raw_parts(result.data, result.len).to_vec() }
         };
         let values = (result.handle, result.status, data);
+        // SAFETY: bytes have been copied and this is the only release.
         unsafe { meshboard_crdt_result_free(result) };
         values
     }
@@ -98,6 +105,8 @@ mod tests {
         let (handle, status, bytes) = consume(meshboard_crdt_create(-1));
         assert_eq!(status, 0);
         assert!(handle > 0 && bytes.is_empty());
+        // SAFETY: null inputs have zero length or exercise checks that reject
+        // them before dereferencing; every returned allocation is consumed once.
         unsafe {
             let (_, status, bytes) = consume(meshboard_crdt_call(handle, 4, ptr::null(), 0));
             assert_eq!((status, bytes), (0, vec![0]));
@@ -114,6 +123,7 @@ mod tests {
         assert_eq!(consume(meshboard_crdt_create(0)).1, 1);
         let (next, _, _) = consume(meshboard_crdt_create(-1));
         assert!(next > handle);
+        // SAFETY: the empty input is never dereferenced; consume releases once.
         unsafe {
             consume(meshboard_crdt_call(next, 7, ptr::null(), 0));
         }

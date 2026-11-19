@@ -166,18 +166,19 @@ try {
   assert(!response.body.includes(secret))
   assert.equal(credential, createHmac('sha1', secret).update(username).digest('base64'))
   await new Promise((resolve, reject) => {
-    const socket = new WebSocket(`${origin.replace('https:', 'wss:')}/signal`, { rejectUnauthorized: false, origin })
+    const socket = new WebSocket(`${origin.replace('https:', 'wss:')}/signal-y-webrtc`, { rejectUnauthorized: false, origin })
     const timeout = setTimeout(() => { socket.terminate(); reject(new Error('WSS timeout')) }, 5000)
     socket.on('error', reject)
-    socket.on('open', () => socket.send(JSON.stringify({ v: 1, type: 'join', room: '01234567-89ab-4def-8123-456789abcdef' })))
+    socket.on('open', () => socket.send(JSON.stringify({ type: 'ping' })))
     socket.on('message', data => {
-      try { assert.equal(JSON.parse(data).type, 'welcome'); resolve() } catch (error) { reject(error) }
+      try { assert.equal(JSON.parse(data).type, 'pong'); resolve() } catch (error) { reject(error) }
       finally { clearTimeout(timeout); socket.close() }
     })
   })
   console.log('PASS: built web assets, HTTPS, proxy health, WSS, temporary credentials')
 
-  await start('turn', ['--user', '0:0', '--read-only', '--tmpfs', '/tmp', '--cap-drop', 'ALL', '--cap-add', 'NET_BIND_SERVICE',
+  // The fixture key belongs to the host user, unlike root-owned production cert volumes.
+  await start('turn', ['--user', `${process.getuid()}:${process.getgid()}`, '--read-only', '--tmpfs', '/tmp', '--cap-drop', 'ALL', '--cap-add', 'NET_BIND_SERVICE',
     '--entrypoint', '/bin/sh', '-e', `TURN_SECRET=${secret}`, '-e', 'TURN_DOMAIN=localhost',
     '-e', 'TURN_PUBLIC_IP=127.0.0.1', '-e', `TURN_TLS_PORT=${tlsPort}`, '-e', 'WEB_BIND_IP=127.0.0.1',
     '-e', 'TURN_MIN_PORT=55000', '-e', 'TURN_MAX_PORT=55099', '-e', 'TURN_TOTAL_QUOTA=100',
@@ -202,6 +203,36 @@ try {
       `Bidirectional relay smoke test did not deliver enough packets:\n${result}`)
     console.log(`PASS: authenticated TURN ${label} allocation and bidirectional relay data (${totals[2]}/${totals[1]} packets)`)
   }
+  // Exercise the built app through Caddy and production RTC configuration,
+  // without preview flags, mocked signaling, or development-server middleware.
+  const { chromium, expect } = createRequire(new URL('../packages/web/package.json', import.meta.url))('@playwright/test')
+  const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH })
+  try {
+    const a = await browser.newContext({ ignoreHTTPSErrors: true })
+    const b = await browser.newContext({ ignoreHTTPSErrors: true })
+    const first = await a.newPage(), second = await b.newPage()
+    await first.goto(origin)
+    await first.getByRole('button', { name: 'Share board', exact: true }).click()
+    const invite = await first.getByLabel('Board invite', { exact: true }).inputValue()
+    assert.match(new URL(invite).hash, /^#crdt=/)
+    await first.getByRole('button', { name: 'Close sharing' }).click()
+    await second.goto(invite)
+    await expect(first.getByTestId('connection-status')).toHaveText('1 peer connected', { timeout: 30_000 })
+    const elements = page => page.getByTestId('drawing-elements').locator(':scope > *')
+    for (const [page, other, count] of [[first, second, 1], [second, first, 2]]) {
+      await page.mouse.move(350 + count * 100, 300)
+      await page.mouse.down()
+      await page.mouse.move(430 + count * 100, 380, { steps: 8 })
+      await page.mouse.up()
+      await expect(elements(other)).toHaveCount(count, { timeout: 15_000 })
+    }
+    await a.close()
+    const c = await browser.newContext({ ignoreHTTPSErrors: true })
+    const late = await c.newPage()
+    await late.goto(invite)
+    await expect(elements(late)).toHaveCount(2, { timeout: 30_000 })
+    console.log('PASS: production browser CRDT drawing and late join after creator departure through HTTPS/WSS')
+  } finally { await browser.close() }
 } catch (error) {
   for (const name of names) {
     try { console.error(name, (await command(['logs', '--tail', '15', name])).replaceAll(secret, '[test-secret]')) } catch { /* best effort */ }

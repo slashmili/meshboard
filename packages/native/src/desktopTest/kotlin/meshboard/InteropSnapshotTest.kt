@@ -41,6 +41,26 @@ class InteropSnapshotTest {
         }
     }
 
+    @Test fun slowConsumerCoalescesLargeSnapshotsUntilReceipt() {
+        var serializations = 0
+        val snapshots = InteropSnapshot(awaitReceipt = true) { serializations++; encodeInteropState(it) }
+        val initial = BoardState(elements = listOf(large))
+        assertEquals(encodeInteropState(initial), snapshots.changed(initial))
+        repeat(1_000) { i ->
+            assertNull(snapshots.changed(initial.copy(previews = listOf(large.copy(id = "preview-$i")))))
+        }
+        val final = initial.copy(elements = listOf(large, large.copy(id = "local"), large.copy(id = "remote")))
+        assertNull(snapshots.changed(final))
+        assertEquals(1, serializations)
+        snapshots.received()
+        assertEquals(encodeInteropState(final), snapshots.changed(final))
+        assertEquals(2, serializations)
+        assertNull(snapshots.changed(BoardState()))
+        snapshots.received()
+        assertNull(snapshots.changed(final))
+        assertEquals(encodeInteropState(BoardState()), snapshots.changed(BoardState()))
+    }
+
     @Test fun failedSerializationDoesNotConsumeTheChange() {
         var fail = true
         val snapshots = InteropSnapshot { check(!fail); encodeInteropState(it) }

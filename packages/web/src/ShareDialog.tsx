@@ -33,7 +33,7 @@ export function ShareDialog({ open, invite, onClose, onLeave }: { open: boolean;
     <div className="invite-copy"><input id="invite-link" readOnly value={invite} onFocus={event => event.currentTarget.select()} /><button className="primary-button" aria-label="Copy invite link" onClick={() => void copy()}>{copied ? <Check size={17} /> : <Copy size={17} />}</button></div>
     <div className="copy-status" role="status">{copyError ? 'Select the link above and copy it manually.' : copied ? 'Link copied. Send it to someone you trust.' : '\u00a0'}</div>
     {loopback && <p className="local-link-note">This address works on this computer only. Use two tabs or browser windows for this checkpoint.</p>}
-    <div className="local-notice"><strong>Connection prototype</strong><p>WebRTC encrypts transport, but invitations are not yet authenticated and application-layer encryption is not implemented. Use this checkpoint for test drawings.</p></div>
+    <div className="local-notice"><strong>Encrypted sharing</strong><p>Board traffic is end-to-end encrypted. Anyone with this link can read, edit, and invite others. Keep it private.</p></div>
     <p className="session-lifetime">The board lives with its participants. It disappears when everyone leaves.</p>
     <button className="quiet-button leave-button" onClick={onLeave}><LogOut size={15} /> Leave this board</button>
   </dialog>

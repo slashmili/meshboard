@@ -33,7 +33,7 @@ https://{$APP_DOMAIN} {
 		Strict-Transport-Security "max-age=86400"
 		-Server
 	}
-	@backend path /signal /api/rtc-config /health
+	@backend path /signal-y-webrtc /api/rtc-config /health
 	handle @backend {
 		reverse_proxy 127.0.0.1:4444
 	}

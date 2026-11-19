@@ -1,7 +1,7 @@
 # Meshboard desktop (macOS and Linux)
 
-Checkpoint 03: Kotlin Multiplatform with Compose Desktop **on the JVM**, running
-on Linux x86_64. Native WebRTC uses `webrtc-java`'s libwebrtc JNI bindings. The
+Kotlin Multiplatform with Compose Desktop **on the JVM**, validated on Linux
+x86_64. Phase 2 adds bundled yrs CRDT state. Native WebRTC uses `webrtc-java`'s libwebrtc JNI bindings. The
 desktop application is not a Kotlin/Native executable; packaged distributions
 include a Java runtime. This is the approved desktop architecture.
 
@@ -59,7 +59,7 @@ mise exec java@temurin-21 -- ./packages/native/gradlew -p packages/native packag
 The DMG is written under `build/compose/binaries/main/dmg/`. These are local
 development bundles, without Developer ID signing or notarization. The macOS
 packaging version is `1.0.0` because Compose's Apple version validator requires a
-positive major number; the project remains the Phase 1 prototype at `0.1.0`.
+positive major number; the current app version remains `0.1.0`.
 
 Use **Share → Create invite** to include your local drawing in a new shared board.
 Use **Join** to paste an invite from either desktop or web. Both can create a session;
@@ -78,9 +78,11 @@ Shift constrains shapes. Escape cancels a draft. Sharing shows a copyable link a
 Paste links into desktop; native deep-link registration and camera QR scanning are
 not implemented at this checkpoint.
 
-This remains a Phase 1 connection prototype. Invites are unauthenticated and there
+This is a CRDT collaboration prototype. Invites are unauthenticated and there
 is no application-layer encryption yet; WebRTC supplies DTLS transport encryption.
-Use test drawings. Yjs/yrs and the final authenticated protocol come in later phases.
+Normal sessions authenticate peer DTLS fingerprints using the invite secret and
+encrypt all application data. See [the security ledger](../../docs/phase-3-security.md)
+for verified platforms and pending Apple checks.
 
 ## Verify and package
 
@@ -106,8 +108,10 @@ Windows and Intel Mac execution remain separate validation checkpoints.
 
 ## Layout
 
-- `commonMain`: board geometry, in-memory insert/delete document, strict v1 JSON
-  codec/framing, controller contracts, local controller, and mobile Compose UI.
+- `commonMain`: geometry, element validation, Yjs binary sync/awareness codec,
+  controller contracts, local-only model and mobile Compose UI.
+- `crdtJvmMain`: shared desktop/Android JNI wrapper; yrs is bundled in every build.
+- `crdtIosMain`: iOS static C bindings and the default CRDT factory.
 - `desktopMain`: desktop Compose UI, JVM launcher, QR generator, native WebRTC controller and Java
   HTTP/WebSocket signaling client.
 - `androidApp`: Android activity, ViewModel, native WebRTC/OkHttp transport,
@@ -133,3 +137,9 @@ PNG with Apple's `sips` and `iconutil` (16–512 point sizes at 1× and 2×).
 References: [Compose Desktop](https://github.com/JetBrains/compose-multiplatform),
 [webrtc-java](https://github.com/devopvoid/webrtc-java),
 [ZXing](https://github.com/zxing/zxing).
+
+Image insertion uses [FileKit](https://filekit.mintlify.app) 0.8.8's Compose file
+picker and bounded stream API, compatible with this project's Kotlin/Compose
+versions. Linux distributions include the `jdk.security.auth` module required by
+the picker. PNG/JPEG decoding uses Compose resources on each platform. See the
+[Phase 4 ledger](../../docs/phase-4-validation.md) for limits and picker checks.

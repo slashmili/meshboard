@@ -1,3 +1,7 @@
+> Current status: Phase 3 CI is green (user-confirmed). Phase 4 is in progress.
+> See the [Phase 4 validation ledger](phase-4-validation.md) for current work and
+> remaining platform checks. Phase 1–3 entries below are historical records.
+
 # Delivery checkpoints
 
 Pause for the user to try the app after each runnable checkpoint. Do not continue
@@ -242,21 +246,100 @@ six Pixel Tablet UI tests, three additional repeat runs per new recovery scenari
 `pnpm test`, `pnpm build`, and targeted interop TypeScript checks. No retries were
 enabled. macOS/CI validation of this new checkpoint remains pending.
 
+**2k — Default-app migration.** Normal web, desktop, Android and iOS builds use
+Yjs/yrs and y-webrtc. The app controllers and server no longer select Phase 1
+networking. Desktop distributions bundle their JNI library; Android debug/release
+APKs bundle both supported 64-bit ABIs; iOS device/simulator builds link yrs.
+Deployment routing now serves `/signal-y-webrtc`. Old invites are rejected.
+See [the validation ledger](phase-2-validation.md) for actual results and remaining
+Apple checks; do not infer an Apple pass from the earlier preview milestones.
+
 ## Phase 3
 
-Implement application-layer AES-256-GCM, secret-bearing URL fragments/QR codes,
-authenticated peer admission, and the agreed certificate verification design.
-Verify tampered messages and wrong-key joins fail. Inspect signaling/TURN
-traffic and confirm that secrets and recoverable board content are absent.
+**3a — Encryption foundations (implemented; not active in sessions).** Web Crypto
+and JVM/Android record ciphers have matching ciphertext vectors, replay/tamper
+rejection, bounded frames and nonce budgets. All 37 web tests, seven desktop cipher
+tests and seven Android-emulator cipher tests pass. See the [security design and
+validation ledger](phase-3-security.md). The replacement of the literal
+creator pin was approved on 2026-11-04. This foundation is now integrated below.
 
-Before implementation, resolve how a creator fingerprint carried in a static
-invitation authenticates additional peers and late joins after the creator
-leaves. Each peer has its own certificate; one creator fingerprint cannot
-directly pin every mesh connection. Document a design satisfying the intended
-trust model and creator-independent operation, including native feasibility,
-before treating the requirement as met.
+**3b — Authenticated sessions.** Normal web, desktop and Android sessions require
+secret-bearing invites, authenticate both DTLS fingerprints with fresh challenges,
+and encrypt all CRDT/awareness frames. Plaintext peers are rejected. Verified by
+42 web unit tests, 41 desktop tests, 12 Android crypto tests, production browser
+security tests, mixed-peer convergence/reconnect/TURN tests and Android release
+compilation. Tests cover wrong keys, reflected/stale proofs, substituted
+fingerprints, tampering, replay, limits and queued handshake flooding.
+
+**3c — Apple integration (execution pending).** Swift CryptoKit implements the
+same record cipher and uses the shared Kotlin handshake. Controller callbacks are
+gated on authenticated admission. Added standalone CryptoKit vectors/security
+tests, CI invocation and updated live rejection tests. Mac compilation, Swift/Kotlin
+bridge checks and iPad execution remain explicitly deferred to the user.
+
+**3d — Wire validation.** Local production-browser PCAP inspection decoded 50
+signaling messages and observed 98 encrypted TURN application records, with no
+board/secret fields in signaling and no board markers in relay payloads. Actual
+browser data-channel capture verifies application encryption before DTLS. No
+independent security audit is claimed. Nothing was pushed or deployed.
+
+Decision (2026-11-04): authenticate every connection's DTLS fingerprints using
+proof of possession of the invitation secret, bound to fresh challenges, room and
+peer identities. This supersedes the static creator certificate pin and preserves
+creator-independent admission. See AGENTS.md and the security design for scope.
 
 ## Phase 4
 
-Expand tools, add CRDT-aware undo/redo, theme support, export/import, and
-presence. Continue to offer small runnable checkpoints for user review.
+Expand tools, add CRDT-aware undo/redo, theme support, export/import, presence,
+pressure-sensitive input, and opt-in device-local recovery. See the
+[implementation and validation ledger](phase-4-validation.md) for the ordered
+increments, approved recovery behavior, and pending hardware checks.
+
+
+**4a — Appearance.** System/Light/Dark controls are implemented on web and shared
+native UI; the canvas keeps paper and stroke colors consistent. Web stores the
+appearance preference; native retains it for the app instance and across Android
+activity recreation. Unit, production-browser, desktop and Android UI checks
+pass. Review the appearance checkpoint; Apple/Windows checks remain in the
+[Phase 4 ledger](phase-4-validation.md). Expanded tools and the remaining
+Phase 4 features have not been implemented yet.
+
+
+**4b — Text boxes and sticky notes.** Shared bounded plain-text schema and tools
+are implemented on web and native. Create/edit/cancel/erase, Unicode wrapping,
+concurrent replacements, remote deletion and encrypted mixed-peer late joins
+are covered. See [the Phase 4 ledger](phase-4-validation.md) for results and Mac/iPad
+checks. Remaining expanded tools, undo/redo, exports, presence, pressure and
+opt-in recovery are still pending.
+
+**4c — Straight arrows.** Shared arrow format, renderer, eraser and tool controls
+are implemented; see the validation ledger for tests and deferred device checks.
+Object-attached connectors and the remaining Phase 4 features are still pending.
+
+**4d — Pen pressure.** Shared pressure samples, stylus capture, variable-width
+rendering and hit testing are implemented. Mouse/touch remain constant-width.
+Hardware and platform checks are tracked in the Phase 4 ledger.
+
+**4e — Multi-select and move.** Local selection, marquee, group movement and
+atomic CRDT commits are implemented on web and native. Cancellation, remote
+deletions and preserving received edits are covered; see the Phase 4 ledger.
+
+**4f — CRDT-aware undo/redo.** Bounded local inverse history and controls are
+implemented on web and native, with web/desktop keyboard shortcuts. Remote
+changes invalidate affected object history; unrelated edits remain undoable.
+Group moves and clears undo atomically. See the Phase 4 ledger for validation
+and remaining Mac/iPad checks. Attached connectors, images, export/import,
+expanded presence and opt-in local recovery remain pending.
+
+**4g — Embedded images.** PNG/JPEG insertion, bounded validation and native/web
+rendering are implemented. Images participate in move, erase, undo/redo and
+creator-independent encrypted synchronization. Platform results and picker/device
+checks are tracked in the Phase 4 ledger. Attached connectors, export/import,
+expanded presence and opt-in recovery remain pending.
+
+**4h — Attached connectors.** The Arrow tool creates and edits endpoint
+attachments to shapes, text, notes and images. Geometry follows targets locally
+from shared references; target deletion hides connectors until restoration.
+Group movement, erasing, undo/redo and encrypted synchronization are covered.
+See the Phase 4 ledger for checks. Export/import, expanded presence and opt-in
+local recovery remain pending.

@@ -1,4 +1,4 @@
-//! Experimental desktop/Android JNI bridge. Opaque IDs, never raw pointers, cross JNI.
+//! Desktop/Android JNI bridge. Opaque IDs, never raw pointers, cross JNI.
 use crate::bridge;
 use jni::objects::{JByteArray, JObject};
 use jni::sys::{jbyteArray, jint, jlong};
@@ -43,7 +43,9 @@ pub extern "system" fn Java_meshboard_crdt_CrdtJni_call(
     input: JByteArray,
 ) -> jbyteArray {
     boundary(&mut env, |env| {
-        if env.get_array_length(&input).map_err(|e| e.to_string())? as usize > bridge::MAX_BYTES {
+        let input_len = usize::try_from(env.get_array_length(&input).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+        if input_len > bridge::MAX_BYTES {
             return Err("CRDT input exceeds 4 MiB".into());
         }
         let input = env.convert_byte_array(&input).map_err(|e| e.to_string())?;

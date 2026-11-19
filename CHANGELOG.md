@@ -1,0 +1,172 @@
+# Changelog
+
+## Unreleased — Phase 4
+
+### Large transport assertion performance
+- Fixed: use a bytewise assertion for the 500 KB transport reassembly test, avoiding the generic matcher's per-property traversal on macOS Intel runners.
+- Tested: all 68 web unit tests and workspace typechecks; the complete patterned payload, size limits and original timeout remain covered.
+
+### iPad diagnostic build correction
+- Fixed: construct traced iOS documents through the existing platform factory; shared iOS sources cannot reference the leaf source set's `AppleCrdtBoard` directly.
+- Verified: four iOS build-configuration checks and five native diagnostic/snapshot tests. Apple compilation remains a CI check.
+
+### iPad convergence diagnostics
+- Added: test-only native CRDT operation counts, input sizes, timings and state vectors, including compact iPad progress events independent of full-board snapshot delivery.
+- Tested: real JNI diagnostic output and repeated four-peer desktop convergence. The remaining iPad convergence failure is under investigation; no production sync fix is claimed.
+
+### iPad incoming-channel initialization
+- Fixed: initialize already-open incoming WebRTC channels synchronously when attaching their delegates, so an immediate authentication frame cannot overtake setup on the main queue.
+- Added: six-cycle iPad rejoin regression and failure-stage diagnostics without keys or payloads. Apple runtime verification remains pending CI.
+
+### iPad test snapshot delivery
+- Fixed: bound the simulator debug adapter to one unacknowledged full-board snapshot and coalesce intermediate states, preventing an unbounded queue during large-board drawing.
+- Tested: stalled-consumer coalescing and fragmented large-snapshot acknowledgments; iPad four-peer CI confirmation remains pending.
+
+### Undo history performance
+- Fixed: cache serialized action sizes instead of repeatedly encoding the entire undo stack, preserving the exact 8 MiB budget and 100-action limit.
+- Tested: large histories, partial remote invalidation, undo/redo stack movement and production-browser undo controls; fixes the web unit-test timeout in the macOS x86_64 CI job.
+
+### Attached connectors
+- Added: Arrow endpoint attachments and draggable endpoint handles across web and native, with reconnect/detach behavior.
+- Changed: connectors follow target geometry without rewriting arrow state; group moves preserve attached anchors and target deletion hides connectors until restoration.
+- Tested: strict shared fixtures, cross-language history, pointer/touch gestures and encrypted target move/delete/undo/reload synchronization; platform results are recorded in the Phase 4 ledger.
+
+### Embedded images
+- Added: PNG/JPEG file insertion on web and native with bounded file/pixel sizes and an eight-image cap within the existing CRDT budget.
+- Added: embedded raster rendering, selection/movement, interior erasing, undo/redo and encrypted late-join/reload synchronization.
+- Fixed: native imports use bounded streams instead of relying on optional or untrusted file-size metadata.
+- Tested: shared schema fixtures, Rust/JNI history, decoder pixels, browser import and native picker callbacks; platform results and deferred device checks are recorded in the Phase 4 ledger.
+
+### CRDT-aware undo and redo
+- Added: local undo/redo on web and native, web/desktop keyboard shortcuts, and atomic group-move/clear history.
+- Added: bounded per-object inverse history that preserves unrelated remote work and invalidates history for objects changed remotely, including identical-value rewrites.
+- Tested: validation rollback, local history isolation, remote conflicts, action/byte limits, UI controls and encrypted peer synchronization. Platform results and deferred Mac/iPad checks are recorded in the Phase 4 ledger.
+
+### Appearance and delivery decisions
+- Added: System, Light and Dark appearance on web and shared native UI. Controls and dialogs follow the selected theme; the shared paper and stroke colors stay consistent across peers.
+- Added: web appearance preference storage with a fallback when storage is blocked; native appearance survives Android activity recreation.
+- Fixed: Share/Help and mobile connection labels now describe the implemented authenticated end-to-end encryption instead of the old Phase 1 prototype.
+- Verified: 44 web unit tests, six production-browser drawing/appearance tests, 44 desktop tests and seven Android tablet UI tests; Android APK build and dark-layout screenshot review. Apple/Windows appearance checks remain tracked.
+- Spec: local board recovery will be opt-in, default off, with a delete action. Record scope, implementation order and deferred Mac/iPad checks in `docs/phase-4-validation.md`.
+
+### Text boxes and sticky notes
+- Added: text (T) and note (N) tools on web, desktop and shared mobile UI, with click/tap creation and editing, cancel, multiline Unicode content, content-sized boxes and whole-area erasing.
+- Added: matching TypeScript/Kotlin/Rust validation, bounded plain-text content, shared fixtures, and encrypted cross-platform edit/late-join scenarios. Edits replace one CRDT element; character-level collaborative editing is not claimed.
+- Fixed: an editor cannot save an object already deleted by another peer; delayed browser dialog-close events cannot clear a newly opened edit. Desktop stroke controls sit beside the expanded toolbar to fit the minimum window height.
+- Verified: workspace unit checks, Rust format/Clippy/tests/docs, 48 desktop tests, eight Android tablet UI tests, eight production-browser tests and 20 repeated text/note runs; eight Yjs/yrs scenarios through Kotlin/JNI and live web↔desktop/web↔Android text scenarios. Expanded pinch checks pass on web and Android. iOS scenario is wired into CI; Mac/iPad execution remains pending.
+
+### iPad convergence investigation
+- Tested: the Linux four-peer regression now includes concurrent edits from both native replicas; ten repeated runs, three single-CPU runs and workspace typechecks pass.
+- Added: element IDs in the iPad convergence assertion and browser-state capture before cleanup. Native failure capture retains errors and omits the invite secret.
+- Pending: iPad CI run `41929821839` lost visibility of the other native peer's edit on both replicas. The cause remains unconfirmed; the original failed job was rerun, with follow-up tracked in `docs/phase-4-validation.md`.
+
+### Straight arrows
+- Added: Arrow (A) on web and native with matching arrowheads, whole-object erasing, bounded short-arrow geometry and desktop/web Shift angle snapping.
+- Tested: shared schema fixtures, native and web geometry/UI tests, Rust round trips, seven production-browser tests and live encrypted web/desktop edit/reload/erase interoperability.
+- Verified: eight Android tablet UI tests and the new encrypted arrow interoperability scenario. iPad execution and physical-device checks remain pending. Object-attached connectors remain separate work.
+
+### Pressure-sensitive pen
+- Added: bounded per-point stylus pressure, matching web/native widths and hit testing, mouse/touch fallback, and lift-off pressure preservation.
+- Tested: schema rejection and CRDT round trips, geometry and native rendering pixels, production-browser synthetic pen events, encrypted native edits/reload, and Android APK compilation.
+- Verified: Android emulator UI suite and live encrypted pressure edit/reload scenario. Physical Apple Pencil/Android stylus/desktop tablet behavior and iPad runtime execution remain pending; recorded in the Phase 4 ledger.
+
+### Multi-select and move
+- Added: Select (V), marquee selection, desktop/web Shift-click toggles and group dragging on web and native, with Escape/pinch cancellation and local selection outlines.
+- Added: atomic CRDT moves that preserve current fields, skip deleted objects and reject an invalid group without partial changes.
+- Tested: geometry, atomic rollback and JNI bindings, 59 desktop/common/JNI tests, eight Android UI tests, production browser flows and bidirectional encrypted web/desktop and web/Android moves during remote edits/deletes.
+- Pending: Mac/iPad runtime and physical-device checks remain in the Phase 4 ledger.
+
+### CI interoperability isolation
+- Fixed: test scenarios no longer share a signaling server's credential budget. Each scenario owns and closes its own local server; production limits remain unchanged.
+- Reproduced: the second budget regression failed with the old shared server. The CI pressure scenario trace showed HTTP 429 before joining.
+- Added: regressions proving each scenario receives its own 30-request budget and still rejects request 31.
+- Verified: all 15 desktop interoperability scenarios, 15 signaling tests and workspace typechecks.
+
+### Native convergence recovery
+- Fixed: native sessions periodically request CRDT state over authenticated channels so a missed update does not leave a connected replica permanently stale.
+- Tested: recovery of deliberately missed inserts and delete-only changes; the regression fails without reconciliation. Apple coverage and CI evidence are recorded in `docs/ci-reconciliation-validation.md`.
+
+## Unreleased — Phase 3
+
+### Added
+- Matching Web Crypto and JVM/Android AES-256-GCM record ciphers with HKDF-SHA-256 derivation, canonical 256-bit key encoding, bounded frames, strict counters and fatal-error disposal.
+- Cross-platform ciphertext vectors and tests for wrong keys/contexts, every-byte tampering, replay, truncation, plaintext, size limits, nonce-budget exhaustion and disposal.
+- A concrete peer-authentication proposal and remaining Apple/live-session validation checklist in `docs/phase-3-security.md`.
+
+### Verified
+- All 37 web unit tests and web/test-harness typechecks.
+- Seven JVM cipher tests and the same seven tests on the Android 35 x86_64 tablet emulator; Android debug/app-test APK builds.
+
+### Security decision and pending verification
+- Approved (2026-11-04): replace the static creator fingerprint with invitation-secret authentication of each connection's DTLS fingerprints; record the new trust model in AGENTS.md.
+- Apple compilation/runtime verification and independent security review. Live-session integration is recorded below. No pushes.
+
+### Phase 3 authenticated sessions
+- Changed: require a secret-bearing invite and an authenticated `meshboard.secure-v1` channel; bind directional keys to room, peer identities, actual DTLS fingerprints and fresh challenges.
+- Added: encrypted admission confirmation, AES-GCM protection for all sync/awareness/fragment traffic, handshake deadlines and bounded input queues.
+- Removed: plaintext upstream-peer compatibility and negotiated plaintext fragmentation fallback.
+- Verified: 42 web unit tests, 41 desktop tests, 12 Android cipher/handshake tests and Android release compilation. Browser/Linux drawing, four-peer convergence, creator departure, reconnect and TURN; wrong-key/plaintext peers are rejected. Production browser tests cover ciphertext-only application frames, secret-free signaling, tampering and replay.
+- Pending: Apple compilation/runtime verification is tracked separately; this is not an independent security audit.
+
+### Apple secure-session integration (execution pending)
+- Added: a CryptoKit record cipher, shared Kotlin fingerprint-bound handshake, secret-bearing invites and authenticated controller admission in the Swift network adapter.
+- Added: standalone Apple crypto vector/tamper/replay/limit tests and iOS CI invocation; updated simulator interoperability expectations to reject plaintext and wrong keys.
+- Verified here: shared handshake/crypto semantics on JVM/Android, test-harness typechecks and shell syntax. Swift compilation, Kotlin/Swift bridging and iOS runtime tests require the user's Mac; tracked explicitly in the security ledger.
+
+### Phase 3 wire validation and handoff
+- Added: a bounded local PCAP checker and capture-image recipe; refreshed the active protocol, security design, README and delivery checkpoints.
+- Verified: final production-browser suite (12), browser/Linux suite (9), and Android mixed-platform suite (7) all pass. Packet inspection decoded 50 signaling messages and 98 encrypted TURN application records; no board/secret fields appeared in signaling and no board markers appeared in relay payloads.
+- Fixed: negative packet tests send one bad record and suppress further traffic, so a valid invite-holder's later authorized resynchronization cannot obscure rejection of the bad record.
+- Handoff: Mac/iPad compile/runtime checks are explicit and reproducible. No pushes or public deployments.
+
+### Phase 3 CI fixes
+- Fixed: implement Swift `doNewKey()` as required by the Kotlin-generated AppleNetwork protocol; the previous name blocked iOS host compilation.
+- Fixed: native plaintext-peer tests allow either authentication rejection or transport closure while retaining no-leakage/no-admission assertions; Linux CI exposed this ordering race.
+- Verified locally: TypeScript checks and ten repeated browser/Linux plaintext-rejection scenarios passed.
+- Recorded: CI run 41798835980 passed both macOS desktop runners, Android, and Apple crypto/Kotlin tests at commit 8f6fc61. The corrected iOS host build still needs Mac/CI verification.
+
+### Android CI disk capacity
+- Fixed: remove unused hosted-runner NDK versions before installing the pinned Android NDK; run 41804767894 exhausted disk while creating emulator userdata, before any Android build or test ran.
+- Verified: eight script tests, including cleanup preservation/idempotency/error cases; a fresh Android 35 Nexus 10 emulator boot and all six Android UI tests passed locally. Hosted-runner headroom requires the next CI run.
+- Recorded: run 41804767894 passed Linux, both macOS desktop runners, and the complete iOS simulator/device-build job. Physical-device checks remain in the security ledger.
+
+## Unreleased — Phase 2
+
+### Changed
+- Make Yjs/y-webrtc the normal web session implementation and enable its signaling endpoint outside development mode.
+- Generate CRDT invites without a preview query flag; reject obsolete Phase 1 invites.
+
+### Fixed
+- Close browser peer connections on page exit and restart a restored back/forward-cache page so departed peers do not linger.
+
+### Verified
+- Production web build and all eight browser drawing/sharing tests, including actual TURN, creator departure, refresh recovery, and session end.
+- All 20 signaling tests, including production configuration and room isolation.
+
+### Native desktop migration
+- Changed: normal desktop sessions use yrs and y-webrtc exclusively; remove the Phase 1 networking path.
+- Added: bundle the JNI library in desktop resources and verify loading from the packaged launcher.
+- Verified: 29 desktop model/UI/JNI tests, six additional checked-JNI tests, nine real browser/desktop scenarios (four mixed peers, creator departure/rejoin, offline edit/delete recovery, TURN, upstream interoperability), and Linux distribution startup.
+
+### Protocol and deployment cleanup
+- Removed: obsolete web session implementation, legacy signaling endpoints and superseded live-protocol test suites.
+- Changed: route production WSS to `/signal-y-webrtc`; run production browser and normal-app CRDT suites in CI; install Rust for release packaging.
+- Fixed: local deployment smoke tests run TURN as the owner of their temporary certificate, matching the production certificate ownership model.
+- Verified: 15 signaling tests, 30 web unit tests, production build and eight browser tests, all test-harness TypeScript checks, plus local HTTPS/WSS and authenticated TURN UDP/TLS data relay.
+
+### Android migration
+- Changed: normal debug/release builds bundle yrs for ARM64 and x86_64 and use CRDT-only networking; remove emulator-only preview gates.
+- Changed: normal interop commands exercise the CRDT suite; obsolete protocol tests are retired.
+- Verified: six tablet UI tests, six JNI tests, seven Yjs/Android compatibility scenarios, seven real mixed-platform/ TURN scenarios, debug/release APK builds and packaged ABI contents.
+
+### iOS migration (Apple execution pending)
+- Changed: normal simulator/device and Debug/Release frameworks link yrs; the Swift/Kotlin controllers now use CRDT-only networking and HTTPS remote origins.
+- Removed: preview factory/build gates and legacy signaling/data-channel branches; debug interop remains simulator-only.
+- Added/updated: normal-factory controller tests, deletion synchronization tests, and build-script tests for all four configuration/platform combinations.
+- Verified here: build-script tests and interop TypeScript checks. Xcode compilation, iOS controller/live tests, physical iPad and packaged macOS checks require the user's Mac; tracked in docs/phase-2-validation.md.
+
+### Phase 2 handoff
+- Added: a validation ledger and explicit macOS/iPad checklist; refreshed platform and protocol documentation.
+- Changed: CI checks normal CRDT apps, production web bundles and Android release compilation.
+- Verified: production-container browser drawing and late joining after creator departure through HTTPS/WSS, in addition to actual TURN UDP/TLS traffic.
+- Scope: no pushes, deployments, encryption, persistence or Phase 4 features. Apple and other hardware-only checks are pending, not claimed complete.
