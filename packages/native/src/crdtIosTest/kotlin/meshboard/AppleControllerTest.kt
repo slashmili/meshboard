@@ -3,6 +3,7 @@ package meshboard
 import kotlin.test.*
 import kotlin.io.encoding.Base64
 import meshboard.crdt.AppleCrdtBoard
+import meshboard.crdt.CrdtBoard
 
 class AppleControllerTest {
     private class Network : AppleNetwork {
@@ -68,6 +69,35 @@ class AppleControllerTest {
                 controller.receivedBinary("good", Base64.encode(YWire.sync(2, remote.update())))
             }
             assertEquals(listOf(stroke), controller.state.value.elements)
+        } finally { controller.close() }
+    }
+    @Test fun presenceUpdatesDoNotDecodeAnUnchangedBoard() {
+        var decodes = 0
+        val net = Network()
+        val controller = AppleBoardController(net) {
+            val board = AppleCrdtBoard()
+            object : CrdtBoard by board { override fun elements() = board.elements().also { decodes++ } }
+        }
+        try {
+            controller.put(stroke)
+            controller.share("https://board.test")
+            controller.opened("peer")
+            val before = decodes
+            val remote = YAwareness()
+            repeat(20) { i ->
+                controller.receivedBinary("peer", Base64.encode(remote.local("peer", stroke.copy(id = "draft-$i"))))
+            }
+            assertTrue(net.rejected.isEmpty())
+            assertEquals(listOf("draft-19"), controller.state.value.previews.map { it.id })
+            assertEquals(listOf(stroke), controller.state.value.elements)
+            assertEquals(before, decodes)
+            // A document change is still decoded and published.
+            AppleCrdtBoard().useBoard { other ->
+                other.put(stroke.copy(id = "remote"))
+                controller.receivedBinary("peer", Base64.encode(YWire.sync(2, other.update())))
+            }
+            assertEquals(listOf("remote", "stroke"), controller.state.value.elements.map { it.id })
+            assertEquals(before + 1, decodes)
         } finally { controller.close() }
     }
 }

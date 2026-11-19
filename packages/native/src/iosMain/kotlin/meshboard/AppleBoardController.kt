@@ -3,6 +3,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlin.io.encoding.Base64
+import meshboard.crdt.CachedCrdtBoard
 import meshboard.crdt.CrdtBoard
 import platform.Foundation.NSUUID
 /** Implemented by the Swift host. All calls and callbacks run on the main thread. */
@@ -26,9 +27,10 @@ interface AppleNetworkEvents {
 }
 /** Shared wire codec/document, with Apple WebRTC and URLSession owned by Swift. */
 class AppleBoardController(private val network: AppleNetwork, private val crdtFactory: () -> CrdtBoard = appleCrdtFactory()) : BoardController, AppleNetworkEvents {
-    private var crdt = crdtFactory()
+    // Presence and connection reports reuse the decoded board until the document changes.
+    private var crdt: CrdtBoard = CachedCrdtBoard(crdtFactory())
     private val elements get() = crdt.elements()
-    private fun resetDocument() { crdt.close(); crdt = crdtFactory() }
+    private fun resetDocument() { crdt.close(); crdt = CachedCrdtBoard(crdtFactory()) }
     private val mutable = MutableStateFlow(BoardState())
     override val state = mutable.asStateFlow()
     private val yReceivers = mutableMapOf<String, YWire.Receiver>()
