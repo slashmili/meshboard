@@ -35,13 +35,14 @@ Shared sessions authenticate every peer using the invitation secret bound to bot
 DTLS fingerprints, then encrypt all sync and preview data with AES-256-GCM. Anyone
 with the full link has access; old/keyless links and plaintext peers are rejected.
 See [the security design and validation ledger](docs/phase-3-security.md), including
-pending Apple verification and the lack of an independent security audit. Export,
-undo and persistence remain future work. There are no accounts or analytics.
+pending physical-device verification and the lack of an independent security audit.
+Undo/redo is available; export and local recovery remain future work. There are no
+accounts or analytics.
 
 ## Switching between development machines
 
 Transfer committed source changes using your chosen Git workflow before switching
-machines. This Phase 2 work was committed locally and was not pushed. Read [AGENTS.md](AGENTS.md), [delivery checkpoints](docs/checkpoints.md),
+machines. Read [AGENTS.md](AGENTS.md), [delivery checkpoints](docs/checkpoints.md),
 and the relevant platform README. Update the checkpoints after validation so the
 next session knows what passed and what remains.
 

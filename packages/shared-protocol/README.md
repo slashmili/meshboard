@@ -6,9 +6,9 @@ Kotlin's counterpart is `packages/native/src/commonMain/kotlin/meshboard/Wire.kt
 
 Normal sessions use **Yjs/yrs binary updates and y-webrtc signaling/awareness**.
 The active protocol is documented in [CRDT session protocol](../../docs/crdt-preview.md).
-The old JSON board-message schemas and fixtures remain useful for local model and
-validation tests; no app controller or signaling endpoint uses them to synchronize
-boards. `/signal` and `/signal-crdt` have been retired.
+Shared element fixtures validate the current atomic CRDT values in TypeScript,
+Kotlin and Rust. Legacy JSON message framing and schemas have been removed.
+`/signal` and `/signal-crdt` have been retired.
 
 Invites use `https://your-app.example/#crdt=<UUID>&key=<base64url-secret>`.
 The UUID identifies the session; the secret authenticates membership and derives

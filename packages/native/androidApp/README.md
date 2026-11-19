@@ -46,8 +46,7 @@ pnpm test:interop:android # Real Android/web/desktop sessions; run pnpm turn fir
 ```
 
 All Android commands use one script, `scripts/android.mjs`, with modes for
-`emulator`, `run`, `build`, `test`, `interop`, `crdt-test`, `crdt-run`, and
-`crdt-interop`. Start the emulator once, then
+`emulator`, `run`, `build`, `test`, `interop`, and `crdt-test`. Start the emulator once, then
 use the app commands repeatedly; rebuilding does not restart Android. The app
 commands also work with a device started from Android Studio or a connected phone.
 

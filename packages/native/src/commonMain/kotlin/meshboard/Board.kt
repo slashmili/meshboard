@@ -17,34 +17,6 @@ enum class Tool(val wire: String, val label: String, val shortcut: String) {
     Arrow("arrow", "Arrow", "A"), Line("line", "Line", "L"), Text("text", "Text", "T"), Sticky("sticky", "Note", "N"), Hand("hand", "Pan", "H")
 }
 data class BoardElement(val id: String, val type: String, val color: String, val width: Double, val points: List<Point>, val text: String? = null, val image: String? = null, val startAttachment: Attachment? = null, val endAttachment: Attachment? = null)
-data class BoardMessage(
-    val type: String, val element: BoardElement? = null, val ids: List<String> = emptyList(),
-    val elements: List<BoardElement> = emptyList(), val removed: List<String> = emptyList(),
-)
-
-class BoardDocument {
-    private var objects = mapOf<String, BoardElement>()
-    private var removed = setOf<String>()
-    val elements get() = objects.values.sortedBy { it.id }
-    fun snapshot() = BoardMessage("snapshot", elements = elements, removed = removed.sorted())
-    fun reset() { objects = emptyMap(); removed = emptySet() }
-    fun apply(message: BoardMessage) {
-        if (message.type == "preview") return
-        val nextObjects = objects.toMutableMap()
-        val nextRemoved = removed.toMutableSet()
-        val deletes = when (message.type) { "remove" -> message.ids; "snapshot" -> message.removed; else -> emptyList() }
-        deletes.forEach { nextRemoved.add(it); nextObjects.remove(it) }
-        val adds = when (message.type) { "put" -> listOf(requireNotNull(message.element)); "snapshot" -> message.elements; else -> emptyList() }
-        adds.forEach { if (it.id !in nextRemoved) nextObjects[it.id] = it }
-        require(nextObjects.values.count { it.type == "image" } <= 8) { "A board supports up to eight images." }
-        require(nextObjects.size <= Wire.MAX_ELEMENTS && nextRemoved.size <= Wire.MAX_REMOVED) { "This prototype board is full. Start a new board." }
-        val snapshot = BoardMessage("snapshot", elements = nextObjects.values.toList(), removed = nextRemoved.toList())
-        require(Wire.encode(snapshot).encodeToByteArray().size <= Wire.MAX_MESSAGE) { "This prototype board is full. Start a new board." }
-        objects = nextObjects
-        removed = nextRemoved
-    }
-}
-
 fun constrained(start: Point, end: Point, type: String): Point {
     val dx = end.x - start.x; val dy = end.y - start.y
     if (type == "line" || type == "arrow") {

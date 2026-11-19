@@ -78,11 +78,9 @@ Shift constrains shapes. Escape cancels a draft. Sharing shows a copyable link a
 Paste links into desktop; native deep-link registration and camera QR scanning are
 not implemented at this checkpoint.
 
-This is a CRDT collaboration prototype. Invites are unauthenticated and there
-is no application-layer encryption yet; WebRTC supplies DTLS transport encryption.
 Normal sessions authenticate peer DTLS fingerprints using the invite secret and
-encrypt all application data. See [the security ledger](../../docs/phase-3-security.md)
-for verified platforms and pending Apple checks.
+encrypt all board updates and presence traffic. See [the security ledger](../../docs/phase-3-security.md)
+for verified platforms and pending physical-device checks.
 
 ## Verify and package
 
