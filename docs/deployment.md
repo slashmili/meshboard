@@ -132,6 +132,47 @@ automatically. Coturn uses a separate Certbot-managed certificate volume.
 If DNS is not ready, correct it and rerun `init`; do not repeatedly retry failed
 issuance because certificate authorities enforce rate limits.
 
+### Deploy with published images
+
+The image workflow reuses the existing **Tests** run for pushes to `main`,
+including the web, signaling, and browser checks. After the full run passes,
+it builds the tested commit and publishes `ghcr.io/slashmili/meshboard-web:main` and
+`ghcr.io/slashmili/meshboard-signaling:main` for Linux x86-64. Compose pulls
+Coturn and Certbot from their existing upstream images.
+
+After the first successful run, open each package on GitHub and choose
+**Package settings → Change visibility → Public**. New GHCR packages start
+private. Once both packages are public, the VPS can pull them without a login.
+See [GitHub's package visibility instructions](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-visibility-of-your-packages).
+
+Use a checkout of `main` that includes the deployment helper. Keep your existing
+`infra/deploy/.env` and set these two values in it:
+
+```dotenv
+MESHBOARD_IMAGE_PREFIX=ghcr.io/slashmili/meshboard
+MESHBOARD_IMAGE_TAG=main
+```
+
+For the first start, or to finish an incomplete installation:
+
+```sh
+sh infra/deploy/manage.sh init-pull
+sh infra/deploy/manage.sh status
+```
+
+For an existing deployment with certificates, update the checkout to match the
+published build, then pull and recreate the services without building:
+
+```sh
+docker compose --env-file infra/deploy/.env pull signaling web turn certbot
+docker compose --env-file infra/deploy/.env up -d --wait --no-build
+```
+
+The `main` tag moves with each successful publish. Record the running image
+digests before upgrading if you need to roll back to a specific build.
+
+### Verify the deployment
+
 **Pause here and test the app before proceeding with new features.** The server
 being healthy is not proof that relay allocations work across networks.
 

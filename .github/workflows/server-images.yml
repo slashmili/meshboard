@@ -1,0 +1,54 @@
+name: Publish server images
+
+on:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: server-images-main
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TESTED_SHA }}
+          persist-credentials: false
+      - name: Build web and signaling images
+        run: |
+          image_prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for target in web signaling; do
+            docker build --pull --file infra/deploy/Dockerfile --target "$target" \
+              --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+              --label "org.opencontainers.image.revision=${TESTED_SHA}" \
+              --tag "${image_prefix}-${target}:main" .
+          done
+      - name: Push images to GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          main_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)
+          if [[ "$main_sha" != "$TESTED_SHA" ]]; then
+            echo 'main advanced while tests or builds were running. Skipping publication.'
+            exit 0
+          fi
+          printf '%s\n' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          image_prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker push "${image_prefix}-web:main"
+          docker push "${image_prefix}-signaling:main"

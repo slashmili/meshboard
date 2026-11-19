@@ -5,10 +5,14 @@ DEPLOY_ENV_FILE=${DEPLOY_ENV_FILE:-$DEPLOY_ROOT/infra/deploy/.env}
 compose() { docker compose --env-file "$DEPLOY_ENV_FILE" -f "$DEPLOY_ROOT/compose.yaml" "$@"; }
 
 case "${1:-}" in
-  init)
+  init|init-pull)
     compose config --quiet
-    compose build --pull
-    compose up -d --wait signaling web
+    if [ "$1" = init-pull ]; then
+      compose pull signaling web turn certbot
+    else
+      compose build --pull
+    fi
+    compose up -d --wait --no-build signaling web
     compose run --rm certbot issue
     # A repeated init may have renewed the certificate; always load it afresh.
     compose up -d --wait --force-recreate turn
@@ -26,5 +30,5 @@ case "${1:-}" in
   check) compose config --quiet;;
   status) compose ps;;
   logs) compose logs --tail=100;;
-  *) echo 'Usage: sh infra/deploy/manage.sh {init|renew|dry-run|check|status|logs}' >&2; exit 1;;
+  *) echo 'Usage: sh infra/deploy/manage.sh {init|init-pull|renew|dry-run|check|status|logs}' >&2; exit 1;;
 esac

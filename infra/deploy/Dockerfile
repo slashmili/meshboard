@@ -16,7 +16,7 @@ COPY packages/shared-protocol packages/shared-protocol
 COPY icons icons
 
 FROM dependencies AS build
-RUN pnpm check && pnpm --filter @meshboard/web build
+RUN pnpm --filter @meshboard/signaling... check && pnpm --filter @meshboard/web build
 RUN pnpm --filter @meshboard/signaling deploy --prod /runtime
 
 FROM ${NODE_IMAGE} AS signaling
