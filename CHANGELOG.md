@@ -2,6 +2,12 @@
 
 ## Unreleased — Phase 4
 
+### Server log privacy
+- Fixed: Caddy discards all runtime logs globally. HTTP handler errors (such as a 502 when signaling is down) and ACME challenge warnings previously recorded visitor addresses, user agents, URIs and headers even with access logging disabled.
+- Fixed: Coturn uses `simple-log`, so `log-file=/dev/null` really discards output. Coturn previously wrote a dated `/dev/null_YYYY-MM-DD.log` inside the container, including TURN usernames from failed authentications. Removed the `no-tlsv1`, `no-tlsv1_1` and `no-dtls` options, which Coturn 4.18 rejects as unknown. Its defaults already require TLS 1.2 or later and start no DTLS listener.
+- Added: `scripts/test-log-privacy.mjs`, a check that runs dummy-IP and marker traffic through Caddy, signaling and Coturn, with control runs. It runs before server images are published.
+- Tested: the privacy check passes, and fails against the previous configs. The existing deployment smoke test passes: TURN UDP/TLS relay and browser drawing. TLS 1.0/1.1 are still rejected by Coturn.
+
 ### Remove obsolete synchronization prototypes
 - Removed unused Phase 1 JSON board framing and temporary Phase 2 JSON/base64 synchronization wrappers; retained encrypted Yjs/yrs transport and ephemeral awareness previews.
 - Migrated shared fixtures to atomic board elements and native UI tests to the real JNI document; removed duplicate preview commands and ignored harness flags.

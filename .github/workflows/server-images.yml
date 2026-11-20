@@ -39,6 +39,15 @@ jobs:
               --label "org.opencontainers.image.revision=${TESTED_SHA}" \
               --tag "${image_prefix}-${target}:main" .
           done
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Check server log privacy
+        run: |
+          pnpm install --frozen-lockfile --filter @meshboard/signaling...
+          SIGNALING_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}-signaling:main" node scripts/test-log-privacy.mjs
       - name: Push images to GitHub Container Registry
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

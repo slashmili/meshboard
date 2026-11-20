@@ -1,6 +1,12 @@
 {
 	email {$ACME_EMAIL}
 	auto_https disable_redirects
+	# Privacy policy: discard every runtime log after the config loads, including
+	# HTTP handler errors (which embed the request) and ACME challenge warnings
+	# (remote address, user agent, URI). Never add a site `log` directive.
+	log default {
+		output discard
+	}
 	# Explicit HTTP listener below also serves the TURN certificate challenge.
 	servers {
 		protocols h1 h2
@@ -13,6 +19,11 @@
 
 http://{$APP_DOMAIN}, http://{$TURN_DOMAIN} {
 	bind 0.0.0.0
+	# Caddy owns the app certificate; Certbot owns the TURN certificate. Caddy
+	# checks every ACME challenge first, finds no state for the TURN host, and
+	# falls through to Certbot's webroot below. Keep it that way: an https:// site
+	# for the TURN host, or disabling distributed ACME solvers, would make Caddy
+	# answer Certbot's challenges itself and break TURN issuance and renewal.
 	handle /.well-known/acme-challenge/* {
 		root * /var/www/acme
 		file_server
