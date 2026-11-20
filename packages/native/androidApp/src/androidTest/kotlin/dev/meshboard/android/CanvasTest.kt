@@ -20,6 +20,24 @@ class CanvasTest {
     }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
+    @Test fun toolbarBoundaryCancelsCapturedGestureUntilAllPointersLift() {
+        for (tool in listOf("pen", "rectangle", "arrow", "text", "sticky")) {
+            rule.onNodeWithTag("mobile-tool-$tool").performClick()
+            canvas().performTouchInput {
+                down(Offset(200f, 100f)); moveTo(Offset(250f, 120f))
+                moveTo(Offset(250f, -20f)); moveTo(Offset(200f, 100f)); up()
+            }
+            count(0)
+            rule.onNodeWithTag("text-editor").assertDoesNotExist()
+        }
+        rule.onNodeWithTag("mobile-tool-pen").performTouchInput {
+            down(center); moveTo(Offset(center.x, height + 200f)); up()
+        }
+        count(0)
+        rule.onNodeWithTag("mobile-tool-pen").performClick()
+        draw(); count(1)
+    }
+
     @Test fun connectorEndpointsCanBeMovedWithoutDuplicateArrows() {
         rule.onNodeWithTag("mobile-tool-rectangle").performClick()
         canvas().performTouchInput { down(Offset(100f,100f)); moveTo(Offset(200f,200f)); up() }; count(1)
