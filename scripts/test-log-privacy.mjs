@@ -53,9 +53,9 @@ const suffix = randomBytes(4).toString('hex')
 const names = []
 const failures = []
 
-async function command(args, timeout = 30_000) {
+async function command(args, { timeout = 30_000, stdoutOnly = false } = {}) {
   const result = await exec(runtime, args, { timeout, maxBuffer: 8 * 1024 * 1024 })
-  return result.stdout + result.stderr
+  return stdoutOnly ? result.stdout : result.stdout + result.stderr
 }
 async function freePort() {
   const server = net.createServer()
@@ -273,9 +273,10 @@ async function turnSuite(label, config, ports) {
 
 try {
   // Effective configuration checks.
+  // Docker may report image pulls on stderr; only Caddy's stdout is JSON.
   const adapted = JSON.parse(await command(['run', '--rm', '-e', 'APP_DOMAIN=board.example.test', '-e', 'TURN_DOMAIN=turn.example.test',
     '-e', 'ACME_EMAIL=ops@example.test', '-v', `${root}/infra/deploy/Caddyfile:/etc/caddy/Caddyfile:ro`, '--entrypoint', 'sh', caddyImage,
-    '-c', 'caddy adapt --config /etc/caddy/Caddyfile 2>/dev/null']))
+    '-c', 'caddy adapt --config /etc/caddy/Caddyfile 2>/dev/null'], { stdoutOnly: true }))
   const discarded = JSON.stringify(adapted.logging) === JSON.stringify({ logs: { default: { writer: { output: 'discard' } } } })
   const accessLogs = Object.entries(adapted.apps.http.servers).filter(([, definition]) => definition.logs).map(([server]) => server)
   if (!discarded) failures.push(`Caddy effective logging is not a single discarded default log: ${JSON.stringify(adapted.logging)}`)
