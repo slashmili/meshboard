@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 const elements = (page: Page) => page.getByTestId('drawing-elements').locator(':scope > *')
 
 async function draw(page: Page, from: [number, number], to: [number, number]) {
+  await expect(page.getByRole('img', { name: 'Drawing canvas' })).toBeVisible()
   await page.mouse.move(...from)
   await page.mouse.down()
   await page.mouse.move(...to, { steps: 8 })

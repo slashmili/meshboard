@@ -18,5 +18,6 @@ export default defineConfig(({ mode }) => {
       server.httpServer.on('close', relay.close)
     },
   }
-  return { publicDir: '../../icons', plugins: [react(), signaling], server: { port: 5173, strictPort: true } }
+  // Pin the policy instead of inheriting a moving Vite default; see docs/support.md.
+  return { build: { target: ['chrome113', 'edge113', 'firefox114', 'safari17', 'ios17'] }, publicDir: '../../icons', plugins: [react(), signaling], server: { port: 5173, strictPort: true } }
 })

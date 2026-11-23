@@ -1,7 +1,9 @@
 import {test,expect} from '@playwright/test'
 async function drag(page:import('@playwright/test').Page,a:number[],b:number[]) {await page.mouse.move(a[0],a[1]);await page.mouse.down();await page.mouse.move(b[0],b[1]);await page.mouse.up()}
 test('arrows attach, follow moved objects, reconnect and detach through endpoint dragging',async({page})=>{
- await page.goto('/');await page.keyboard.press('r')
+ await page.goto('/')
+ await expect(page.getByRole('img', { name: 'Drawing canvas' })).toBeVisible()
+ await page.keyboard.press('r')
  await drag(page,[400,300],[480,380]);await drag(page,[700,300],[780,380])
  await page.keyboard.press('a');await drag(page,[480,340],[700,340])
  const arrow=page.locator('[data-element-type="arrow"]')

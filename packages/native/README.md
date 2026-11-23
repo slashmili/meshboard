@@ -8,7 +8,10 @@ include a Java runtime. This is the approved desktop architecture.
 Checkpoint 04b adds [Android sharing](androidApp/README.md), using the shared model,
 wire codec, and mobile Compose layout with Android-native WebRTC and OkHttp signaling.
 
-The [iPad/iPhone app](iosApp/README.md) adds a SwiftUI/Xcode host for the
+See the [support matrix](../../docs/support.md) for declared/proposed OS and CPU
+floors, packaged availability and remaining boundary checks.
+
+The [iPad app](iosApp/README.md) adds a SwiftUI/Xcode host for the
 same touch UI and native Apple WebRTC sharing. Use `pnpm ios` on an Apple Silicon Mac, or open its Xcode project
 to configure signing and run on your iPad. Physical devices need reachable HTTPS,
 WSS, and TURN addresses.
@@ -102,7 +105,8 @@ Compose tests exercise drawing and invite controls and save a layout image to
 The generated application folder is `build/compose/binaries/main/app/Meshboard/`.
 Run `bin/Meshboard` inside it. The entire folder, including its bundled runtime and
 libraries, must stay together. On macOS the output is `Meshboard.app` instead.
-Windows and Intel Mac execution remain separate validation checkpoints.
+Intel Mac has a CI/DMG packaging job; inspect its run before claiming validation.
+Windows packaging and execution remain separate pending checkpoints.
 
 ## Layout
 

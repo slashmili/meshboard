@@ -4,6 +4,7 @@ async function drag(page: import('@playwright/test').Page, a: number[], b: numbe
 }
 test('select and move a group, cancel a move, and keep the toolbar usable on phones', async ({ page }) => {
   await page.goto('/')
+  await expect(page.getByRole('img', { name: 'Drawing canvas' })).toBeVisible()
   await page.keyboard.press('r')
   await drag(page, [400,300], [480,360]); await drag(page, [600,300], [680,360])
   const rects = page.getByTestId('drawing-elements').locator('rect')

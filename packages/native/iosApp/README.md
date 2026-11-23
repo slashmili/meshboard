@@ -1,4 +1,8 @@
-# Meshboard for iPad and iPhone
+# Meshboard for iPad
+
+Native Apple mobile releases target iPad only; iPhone users use responsive web.
+See the [support matrix](../../../docs/support.md) for native iPadOS 16 versus
+Safari 17 web requirements, toolchain constraints and pending boundary checks.
 
 Kotlin/Compose drawing UI hosted by SwiftUI, with native Apple WebRTC and URLSession
 signaling. iOS can create or join the same CRDT session as web, macOS, and Android.
@@ -7,7 +11,8 @@ directly to every other peer; there is no privileged host. Invites include a QR 
 
 Pen, shapes, whole-object eraser, colors/widths, and two-finger pan/zoom are available.
 Drawing stays in memory through rotation and is lost when the app process ends or
-when you leave. Saving and Apple Pencil pressure/palm rejection remain future work.
+when you leave. Pressure data is implemented; actual Apple Pencil feel and palm
+behavior need physical-device checks. Saving/recovery remains future work.
 The app uses yrs and the y-webrtc sync profile, with invite-secret authentication
 and AES-256-GCM application encryption through CryptoKit. This Phase 3 Apple
 integration requires Mac compilation and runtime verification; see the
