@@ -6,6 +6,8 @@
     <string>Connect directly to nearby Meshboard participants on your local network.</string>
     <key>NSAppTransportSecurity</key>
     <dict><key>NSAllowsLocalNetworking</key><true/></dict>
+    <key>MeshboardAppOrigin</key>
+    <string>$(MESHBOARD_APP_ORIGIN)</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
 </dict>

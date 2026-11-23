@@ -14,8 +14,7 @@ Drawing stays in memory through rotation and is lost when the app process ends o
 when you leave. Pressure data is implemented; actual Apple Pencil feel and palm
 behavior need physical-device checks. Saving/recovery remains future work.
 The app uses yrs and the y-webrtc sync profile, with invite-secret authentication
-and AES-256-GCM application encryption through CryptoKit. This Phase 3 Apple
-integration requires Mac compilation and runtime verification; see the
+and AES-256-GCM application encryption through CryptoKit; see the
 [security checklist](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6). Run
 `bash scripts/test-apple-crypto.sh` from the repo root on macOS before simulator tests.
 
@@ -59,6 +58,19 @@ Set `MESHBOARD_IOS_SIMULATOR` to a simulator UUID to select a specific device.
 `pnpm build:ios` builds without launching. `pnpm build:ios:device` checks an unsigned
 ARM64 device app, which cannot be installed directly without signing.
 
+### Local signing team and app address
+
+Per-developer settings live in `Config/Local.xcconfig`, which Git ignores. Copy
+`Config/Local.xcconfig.example` and set:
+
+- `DEVELOPMENT_TEAM`: your Apple team, for signed device builds. Change the team
+  here; choosing one in Xcode's Signing tab writes it into the project file.
+- `MESHBOARD_APP_ORIGIN`: the default **App address** for new invites, as an HTTPS
+  origin. xcconfig treats `//` as a comment, so write `https:/$()/board.example.com`.
+
+Without the file, simulators default to `http://127.0.0.1:5173` and devices to a
+blank `https://` address.
+
 Apple targets are enabled by `-Pmeshboard.ios=true`; desktop/Android builds remain
 independent of Xcode. Xcode's build phase invokes `embedAndSignAppleFrameworkForXcode`
 and finds mise even when opened from Finder. No CocoaPods or XcodeGen is required.
@@ -92,6 +104,3 @@ Normal `pnpm ios` creates/joins `#crdt=` invites and uses port 5173 for local
 simulator sharing. No preview environment variable is needed. Device builds use
 a reachable HTTPS/WSS origin and TURN service. The test listener remains restricted
 to Debug simulator builds; it is not included on devices or in Release.
-
-The default-app migration must be compiled and run on macOS before Apple validation
-can be marked complete. Follow the [Apple checklist](https://linear.app/slashmili/document/crdt-migration-historical-validation-d1627c4a82e8).
