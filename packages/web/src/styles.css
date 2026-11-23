@@ -69,6 +69,7 @@ button:disabled:hover { background: transparent; }
 .zoom-divider { width: 1px; height: 17px; background: #e6eadf; margin: 0 3px; }
 .navigation-hint { display: flex; align-items: center; gap: 10px; color: #939d8a; font-size: 10px; margin-right: 128px; }
 .navigation-hint > span { color: #b9c1af; }
+.footer-end { display: flex; align-items: center; gap: 8px; }
 .help-button { pointer-events: auto; width: 36px; height: 36px; background: #fff; border: 1px solid #e0e5dc; border-radius: 50%; }
 .status-bar { display: flex; justify-content: space-between; align-items: center; min-height: 35px; background: #fff; border-top: 1px solid #e3e7df; padding: 0 26px; font-size: 10px; gap: 20px; }
 .status-bar > div { display: flex; align-items: center; gap: 15px; }
@@ -166,11 +167,24 @@ kbd { font-family: inherit; color: #8a967c; padding: 2px 5px; border: 1px solid 
 }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 
-/* The shared canvas stays paper-colored; appearance changes local controls only. */
+/* Appearance is local: dark mode darkens the canvas and maps displayed ink (appearance.ts) without changing board data. */
 .theme-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
 .theme-control select { font: inherit; padding: 8px; border: 1px solid #667260; border-radius: 6px; background: inherit; color: inherit; }
 :root[data-theme='dark'] { color-scheme: dark; color: #e4ede1; background: #202922; }
-[data-theme='dark'] .workspace { background: #f8f9f6; color: #2d3d35; }
+[data-theme='dark'] .workspace { background: #161b17; color: #e4ede1; }
+[data-theme='dark'] :is(.empty-state p, .eyebrow, .session-note, .session-note strong, .navigation-hint) { color: #a9b6a3; }
+[data-theme='dark'] .navigation-hint > span { color: #667260; }
+[data-theme='dark'] .start-hint { background: #243024; border-color: #3f4d3c; color: #c8dcb9; }
+[data-theme='dark'] .connection-error { background: #3a3020; border-color: #7a6338; color: #f1dfbd; box-shadow: none; }
+[data-theme='dark'] .connection-error button { color: #f6e3bd; }
+[data-theme='dark'] :is(.header-divider, .zoom-divider) { background: #3f4d3c; }
+[data-theme='dark'] :is(.tool-item-separated, .width-options, .shortcuts > div) { border-color: #3f4d3c; }
+[data-theme='dark'] .tool-panel, [data-theme='dark'] .style-panel, [data-theme='dark'] .zoom-panel, [data-theme='dark'] .help-button { box-shadow: 0 4px 18px #00000040; }
+[data-theme='dark'] .idea-sketch { opacity: 0.85; }
+[data-theme='dark'] .danger-button { background: #c4614f; color: #1d0f0b; }
+[data-theme='dark'] .danger-button:hover { background: #d4735f; }
+[data-theme='dark'] .dialog::backdrop { background: #00000080; }
+[data-theme='dark'] :is(button, a):focus-visible { outline-color: #b5d6ac; }
 [data-theme='dark'] :is(.header, .status-bar, .tool-panel, .style-panel, .zoom-panel, .help-button, .dialog) { background: #202922; color: #e4ede1; border-color: #667260; }
 [data-theme='dark'] :is(.brand, .active-tool) { color: #b5d6ac; }
 [data-theme='dark'] :is(.board-title > span, .tool-button, .panel-caption, .tool-key, .tool-hint, .checkpoint-label, .dialog p, .dialog .eyebrow, .zoom-panel button, .help-button, .dialog-close) { color: #bac6b4; }

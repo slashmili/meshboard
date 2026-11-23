@@ -33,7 +33,8 @@ fun main(args: Array<String>) {
         Window(onCloseRequest = { controller.close(); exitApplication() }, title = "Meshboard", icon = painterResource(Res.drawable.meshboard_icon), state = rememberWindowState(width = 1200.dp, height = 820.dp)) {
             window.minimumSize = Dimension(940, 650)
             val origin = remember { desktopAppOrigin() }
-            MeshboardApp(controller, origin, ::qrImage)
+            val appearance = remember { desktopAppearanceStore() }
+            MeshboardApp(controller, origin, ::qrImage, appearance)
         }
     }
 }

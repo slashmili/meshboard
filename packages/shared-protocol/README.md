@@ -109,3 +109,16 @@ Undo restoring that same target ID makes them visible again. Hidden connectors
 remain in the CRDT and are removed by Clear; deleting is not cascading. Endpoint
 edits use existing atomic whole-element conflict resolution and local history.
 An arrow deleted remotely during endpoint dragging is not recreated on release.
+
+## Appearance (local display only)
+
+System / Light / Dark is a per-device view preference. It is never sent to
+peers, and it never changes element colors, CRDT state, snapshots or history.
+Dark mode renders a dark canvas (`#161b17`) and maps each displayed color with
+`displayColor` (`packages/web/src/appearance.ts`, `DisplayColors.kt`):
+colors already at 4.5:1 against the dark canvas are kept, and others keep
+hue/saturation, mirror HSL lightness and rise in 1% steps until they reach 4.5:1.
+Light mode renders canonical colors. Sticky notes keep their light paper and
+canonical text color, and image pixels are never altered. `appearance.json`
+holds shared TypeScript/Kotlin fixtures for canvas colors and the mapping.
+Export background/color policy is decided separately (MES-2, MES-3).

@@ -31,17 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.*
 
-private val Ink = Color(0xff293b36)
-private val Green = Color(0xff254d3c)
-private val Muted = Color(0xff78866e)
-private val Paper = Color(0xfff8f9f6)
-private val Border = Color(0xffe0e5dc)
 private val Palette = listOf("Ink" to "#293b36", "Fern" to "#387c59", "Blue" to "#4878c8", "Violet" to "#9563be", "Coral" to "#d76857", "Amber" to "#c49226")
-private fun paint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16))
 private fun Point.offset() = Offset(x.toFloat(), y.toFloat())
 
 @Composable
-fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://127.0.0.1:5173", qrImage: (String) -> ImageBitmap? = { null }) {
+fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://127.0.0.1:5173", qrImage: (String) -> ImageBitmap? = { null }, appearanceStore: AppearanceStore? = null) {
     val state by controller.state.collectAsState()
     val images = rememberBoardImages(state.elements)
     val currentState by rememberUpdatedState(state)
@@ -67,10 +61,13 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     fun cancel() { selection = Selection(); draft = null; cancelled++; controller.preview(null) }
     fun zoom(factor: Double) { cancel(); view = view.zoomAt(Point(canvasSize.width / density / 2.0, canvasSize.height / density / 2.0), view.zoom * factor) }
 
-    var appearance by rememberAppearance()
-    val colors = appearanceColors(appearance)
+    val store = remember(appearanceStore) { appearanceStore ?: MemoryAppearanceStore() }
+    var appearance by rememberAppearance(store)
+    val dark = appearance.resolveDark()
+    val colors = appearanceColors(dark)
+    val canvasColors = DisplayColors.canvas(dark)
     BoardTheme(colors) {
-        Column(Modifier.fillMaxSize().background(Paper).onPreviewKeyEvent { event ->
+        Column(Modifier.fillMaxSize().background(colors.background).onPreviewKeyEvent { event ->
             if (dialog != null || textEdit != null || event.isAltPressed) return@onPreviewKeyEvent false
             if ((event.isCtrlPressed || event.isMetaPressed) && event.type == KeyEventType.KeyDown && event.key in listOf(Key.Z, Key.Y)) {
                 cancel(); if (event.isShiftPressed || event.key == Key.Y) controller.redo() else controller.undo()
@@ -89,13 +86,13 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                 VerticalDivider(Modifier.height(28.dp))
                 Column { Text("Untitled board", fontSize = 13.sp, fontWeight = FontWeight.Medium); Text("Desktop · a space for ideas", color = colors.onSurfaceVariant, fontSize = 10.sp) }
                 Spacer(Modifier.weight(1f))
-                Surface(shape = RoundedCornerShape(30.dp), color = colors.primaryContainer, border = BorderStroke(1.dp, Border)) { Text(state.connectionLabel, Modifier.padding(10.dp, 7.dp).testTag("connection-status"), fontSize = 11.sp, color = colors.primary) }
+                Surface(shape = RoundedCornerShape(30.dp), color = colors.primaryContainer, border = BorderStroke(1.dp, colors.outline)) { Text(state.connectionLabel, Modifier.padding(10.dp, 7.dp).testTag("connection-status"), fontSize = 11.sp, color = colors.primary) }
                 TextButton(onClick = { cancel(); dialog = "join" }) { Text("Join", fontSize = 12.sp) }
                 Button(onClick = { cancel(); copied = false; dialog = "share" }, shape = RoundedCornerShape(8.dp)) { Text("Share", fontSize = 12.sp) }
                 TextButton(onClick = { cancel(); dialog = "appearance" }) { Text("Appearance", fontSize = 12.sp) }
                 TextButton(onClick = { cancel(); dialog = "clear" }, enabled = state.elements.isNotEmpty()) { Text("Clear", fontSize = 12.sp) }
             }
-            HorizontalDivider(color = Border)
+            HorizontalDivider(color = colors.outline)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 Canvas(Modifier.fillMaxSize().testTag("drawing-canvas").semantics { contentDescription = "Drawing canvas" }
                     .onSizeChanged { canvasSize = Size(it.width.toFloat(), it.height.toFloat()) }
@@ -185,7 +182,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     val ox = ((view.x * density % spacing + spacing) % spacing).toFloat()
                     val oy = ((view.y * density % spacing + spacing) % spacing).toFloat()
                     var x = ox
-                    while (x < size.width) { var y = oy; while (y < size.height) { drawCircle(Color(0xffcbd3ca), .8f * density, Offset(x, y)); y += spacing }; x += spacing }
+                    while (x < size.width) { var y = oy; while (y < size.height) { drawCircle(hexColor(canvasColors.grid), .8f * density, Offset(x, y)); y += spacing }; x += spacing }
                     withTransform({
                         scale(density, density, Offset.Zero)
                         translate(view.x.toFloat(), view.y.toFloat())
@@ -193,21 +190,21 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     }) {
                         val displayState = selection.display(state.elements)
                         val displayed = resolveConnectors(displayState).filter { it.id != draft?.id }
-                        displayed.forEach { drawElement(it, textMeasurer, images) }
-                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(Color.White, (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(Color(0xff387c59), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
-                        if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
-                        state.previews.mapNotNull { resolveConnector(it,state.elements) }.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, images, .65f) }
-                        draft?.let { resolveConnector(it,displayState) }?.let { drawElement(it, textMeasurer, images) }
+                        displayed.forEach { drawElement(it, textMeasurer, images, dark = dark) }
+                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(hexColor(canvasColors.paper), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(hexColor(canvasColors.handle), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
+                        if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom, dark)
+                        state.previews.mapNotNull { resolveConnector(it,state.elements) }.filter { preview -> state.elements.none { it.id == preview.id } }.forEach { drawElement(it, textMeasurer, images, .65f, dark) }
+                        draft?.let { resolveConnector(it,displayState) }?.let { drawElement(it, textMeasurer, images, dark = dark) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null && state.previews.isEmpty()) Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("A LITTLE SPACE. ENDLESS POSSIBILITIES.", fontSize = 10.sp, letterSpacing = 1.5.sp, color = Muted)
-                    Spacer(Modifier.height(18.dp)); Text("What’s on your mind?", fontSize = 34.sp, color = Ink)
-                    Spacer(Modifier.height(12.dp)); Text("A rough sketch. A big idea. A place to start.", fontSize = 13.sp, color = Muted)
-                    Spacer(Modifier.height(6.dp)); Text("Pick a tool and make it yours.", fontSize = 13.sp, color = Muted)
+                    Text("A LITTLE SPACE. ENDLESS POSSIBILITIES.", fontSize = 10.sp, letterSpacing = 1.5.sp, color = colors.onSurfaceVariant)
+                    Spacer(Modifier.height(18.dp)); Text("What’s on your mind?", fontSize = 34.sp, color = colors.onBackground)
+                    Spacer(Modifier.height(12.dp)); Text("A rough sketch. A big idea. A place to start.", fontSize = 13.sp, color = colors.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp)); Text("Pick a tool and make it yours.", fontSize = 13.sp, color = colors.onSurfaceVariant)
                 }
                 Row(Modifier.align(Alignment.TopStart).padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Surface(shape = RoundedCornerShape(14.dp), shadowElevation = 3.dp, border = BorderStroke(1.dp, Border)) {
+                    Surface(shape = RoundedCornerShape(14.dp), shadowElevation = 3.dp, border = BorderStroke(1.dp, colors.outline)) {
                         Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Tool.entries.forEach { item ->
                                 TextButton(onClick = { cancel(); tool = item }, modifier = Modifier.width(125.dp).height(42.dp).testTag("tool-${item.wire}"), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.textButtonColors(containerColor = if (tool == item) colors.primaryContainer else Color.Transparent, contentColor = if (tool == item) colors.onPrimaryContainer else colors.onSurfaceVariant)) {
@@ -216,13 +213,13 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                             }
                         }
                     }
-                    Surface(shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Border)) {
+                    Surface(shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, colors.outline)) {
                         Column(Modifier.width(137.dp).padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                             Text("STROKE", fontSize = 9.sp, letterSpacing = 1.sp, color = colors.onSurfaceVariant)
                             Palette.chunked(3).forEach { row -> Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) { row.forEach { (label, hex) ->
-                                Box(Modifier.size(29.dp).border(1.dp, if (color == hex) paint(hex) else Color.Transparent, CircleShape).padding(4.dp).background(paint(hex), CircleShape).clickable { color = hex }.semantics { contentDescription = label })
+                                Box(Modifier.size(29.dp).border(1.dp, if (color == hex) displayPaint(hex, dark) else Color.Transparent, CircleShape).padding(4.dp).background(displayPaint(hex, dark), CircleShape).clickable { color = hex }.semantics { contentDescription = label })
                             } } }
-                            HorizontalDivider(color = Border)
+                            HorizontalDivider(color = colors.outline)
                             Row { listOf(2.0, 3.0, 6.0).forEach { value ->
                                 Box(Modifier.size(34.dp, 29.dp).background(if (width == value) colors.primaryContainer else Color.Transparent, RoundedCornerShape(5.dp)).clickable { width = value }.semantics { contentDescription = "Stroke width ${value.toInt()}" }, contentAlignment = Alignment.Center) { Box(Modifier.size(17.dp, value.dp).background(colors.onSurfaceVariant, CircleShape)) }
                             } }
@@ -230,10 +227,10 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     }
                 }
                 Column(Modifier.align(Alignment.TopEnd).padding(25.dp), horizontalAlignment = Alignment.End) {
-                    Text(if (state.invite.isEmpty()) "Just this window, just for now." else "Shared live. Never saved.", color = Muted, fontSize = 11.sp)
-                    Text(if (state.invite.isEmpty()) "Closing discards your board." else "Gone when everyone leaves.", color = Muted, fontSize = 11.sp)
+                    Text(if (state.invite.isEmpty()) "Just this window, just for now." else "Shared live. Never saved.", color = colors.onSurfaceVariant, fontSize = 11.sp)
+                    Text(if (state.invite.isEmpty()) "Closing discards your board." else "Gone when everyone leaves.", color = colors.onSurfaceVariant, fontSize = 11.sp)
                 }
-                Row(Modifier.align(Alignment.BottomStart).padding(24.dp).background(colors.surface, RoundedCornerShape(10.dp)).border(1.dp, Border, RoundedCornerShape(10.dp)).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.align(Alignment.BottomStart).padding(24.dp).background(colors.surface, RoundedCornerShape(10.dp)).border(1.dp, colors.outline, RoundedCornerShape(10.dp)).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { zoom(1 / 1.2) }, enabled = view.zoom > .25, modifier = Modifier.width(40.dp)) { Text("−") }
                     Text("${(view.zoom * 100).roundToInt()}%", fontSize = 11.sp, modifier = Modifier.testTag("zoom"))
                     TextButton(onClick = { zoom(1.2) }, enabled = view.zoom < 4, modifier = Modifier.width(40.dp)) { Text("+") }
@@ -244,12 +241,12 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                     TextButton(onClick = { cancel(); controller.undo() }, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
                     TextButton(onClick = { cancel(); controller.redo() }, enabled = state.canRedo, modifier = Modifier.testTag("redo")) { Text("Redo") }
                 }
-                TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp), colors = ButtonDefaults.textButtonColors(contentColor = Green)) { Text("Help") }
-                state.error?.let { error -> Surface(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).widthIn(max = 480.dp), color = Color(0xfffff9ee), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xffe0c89e))) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(error, Modifier.weight(1f), fontSize = 12.sp, color = Ink); if (state.invite.isNotEmpty()) TextButton(onClick = controller::retry) { Text("Retry") } }
+                TextButton(onClick = { cancel(); dialog = "help" }, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp), colors = ButtonDefaults.textButtonColors(contentColor = colors.primary)) { Text("Help") }
+                state.error?.let { error -> Surface(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).widthIn(max = 480.dp), color = colors.errorContainer, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, if (dark) Color(0xff7a6338) else Color(0xffe0c89e))) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(error, Modifier.weight(1f), fontSize = 12.sp, color = colors.onErrorContainer); if (state.invite.isNotEmpty()) TextButton(onClick = controller::retry) { Text("Retry") } }
                 } }
             }
-            HorizontalDivider(color = Border)
+            HorizontalDivider(color = colors.outline)
             Row(Modifier.fillMaxWidth().height(34.dp).background(colors.surface).padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (space) "Pan" else tool.label, color = colors.primary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(16.dp)); Text("V select · P pen · E eraser · R rectangle · O ellipse · L line · A arrow · T text · N note · H pan · Shift constrains shapes", color = colors.onSurfaceVariant, fontSize = 10.sp)
@@ -293,10 +290,10 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
     }
 }
 
-private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f) {
+private fun DrawScope.drawElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f, dark: Boolean = false) {
     if (element.image != null) { drawImageElement(element, images, alpha); return }
-    if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
-    val color = paint(element.color).copy(alpha = alpha)
+    if (element.text != null) { drawTextElement(element, textMeasurer, alpha, dark); return }
+    val color = displayPaint(element.color, dark).copy(alpha = alpha)
     if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }
     val points = element.points
     if (points.size == 1) { drawCircle(color, element.width.toFloat() / 2, points.first().offset()); return }

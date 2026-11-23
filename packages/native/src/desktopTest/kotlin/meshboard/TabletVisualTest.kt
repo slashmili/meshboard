@@ -40,7 +40,7 @@ class TabletVisualTest {
                     save("dark")
                     val root = onRoot().captureToImage().toAwtImage()
                     assertEquals(0x202922,root.getRGB(5,5) and 0xffffff)
-                    assertEquals(0xf8f9f6,root.getRGB(root.width / 2,65) and 0xffffff)
+                    assertEquals(0x161b17,root.getRGB(root.width / 2,65) and 0xffffff, "Dark mode includes the drawing canvas")
                     if (name == "landscape") {
                         settings(); onNodeWithTag("mobile-dock-right").performScrollTo().performClick(); onNodeWithText("Done").performClick()
                         val bounds = onNodeWithTag("tablet-side-dock").fetchSemanticsNode().boundsInRoot
@@ -56,7 +56,7 @@ class TabletVisualTest {
         for ((width,height) in listOf(1024 to 768,768 to 1024,540 to 720,360 to 520)) {
             runDesktopComposeUiTest(width = width,height = height) {
                 LocalBoardController { "unused" }.use { board ->
-                    setContent { MobileBoardApp(board) }
+                    setContent { MobileBoardApp(board, appearanceStore = lightAppearance()) }
                     for ((tool,key) in Tool.entries.zip(shortcuts)) {
                         onNodeWithTag("mobile-canvas").performKeyInput { pressKey(key) }
                         onNodeWithTag("mobile-width").assertDoesNotExist()
