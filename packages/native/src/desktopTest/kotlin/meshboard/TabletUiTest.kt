@@ -183,14 +183,11 @@ class TabletUiTest {
         val fill = selected.getRGB(8,8)
         assertNotEquals(unselected.getRGB(8,8),fill,"The selected tool must retain its highlight")
         for (x in 14..33) assertEquals(fill,selected.getRGB(x,42),"The highlight must have no selected-tool underline")
-        toolProperties()
-        rule.onNodeWithContentDescription("Fern stroke").performScrollTo().performClick()
-        rule.onNodeWithText("Done").performClick()
+        rule.onNodeWithContentDescription("Fern stroke").assertIsDisplayed().performClick()
         rule.onNodeWithTag("mobile-width").assertDoesNotExist()
         draw()
         rule.runOnIdle { assertEquals("#387c59",board.state.value.elements.single().color) }
         rule.onNodeWithTag("mobile-tool-text").performClick().assertIsSelected().assertContentDescriptionEquals("Text")
-        toolProperties()
         rule.onNodeWithContentDescription("Fern stroke").assertIsSelected()
     }
 
