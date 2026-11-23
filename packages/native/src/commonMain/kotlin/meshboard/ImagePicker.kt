@@ -10,12 +10,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 
 @Composable
-fun InsertImageButton(controller: DrawingController, center: () -> Point, cancel: () -> Unit, modifier: Modifier = Modifier) {
+fun InsertImageButton(controller: DrawingController, center: () -> Point, cancel: () -> Unit, modifier: Modifier = Modifier, label: String = "Image", onComplete: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val latestController by rememberUpdatedState(controller)
     val latestCenter by rememberUpdatedState(center)
+    val latestComplete by rememberUpdatedState(onComplete)
     val launcher = rememberFilePickerLauncher(type = PickerType.File(extensions = listOf("png","jpg","jpeg"))) { file ->
         if (file != null) scope.launch {
             busy = true
@@ -23,13 +24,14 @@ fun InsertImageButton(controller: DrawingController, center: () -> Point, cancel
                 val bytes = readImageFile(file)
                 decodeBoardImage(bytes) // A valid header alone is insufficient for a local import.
                 latestController.put(imageElement(latestController.newId(),bytes,latestCenter()))
+                latestComplete()
             } catch (e: CancellationException) { throw e }
             catch (_: Exception) { error = IMAGE_HELP }
             finally { busy = false }
-        }
+        } else latestComplete()
     }
-    TextButton(enabled = !busy, onClick = { cancel(); launcher.launch() }, modifier = modifier.testTag("insert-image")) { Text(if (busy) "Loading…" else "Image") }
-    if (error != null) AlertDialog(onDismissRequest = { error = null }, title = { Text("Cannot insert image") }, text = { Text(error!!) }, confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } })
+    TextButton(enabled = !busy, onClick = { cancel(); launcher.launch() }, modifier = modifier.testTag("insert-image")) { Text(if (busy) "Loading…" else label) }
+    if (error != null) AlertDialog(onDismissRequest = { error = null; latestComplete() }, title = { Text("Cannot insert image") }, text = { Text(error!!) }, confirmButton = { TextButton(onClick = { error = null; latestComplete() }) { Text("OK") } })
 }
 
 /** Providers may omit file size; never trust metadata to bound the read. */
