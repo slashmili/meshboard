@@ -1,6 +1,7 @@
 package dev.meshboard.android
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -241,6 +242,49 @@ class CanvasTest {
         rule.onNodeWithText("Back to the board").performClick()
         canvas().assertIsDisplayed()
     }
+    @Test fun systemAppearanceChangesUpdateCanvasAndExplicitModesOverrideThem() {
+        // Shell permission adoption is available from API 29; older boundaries remain manual.
+        org.junit.Assume.assumeTrue(android.os.Build.VERSION.SDK_INT >= 29)
+        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        val manager = rule.activity.getSystemService(android.app.UiModeManager::class.java)
+        val original = manager.nightMode
+        fun choose(mode: String) {
+            rule.onNodeWithTag("mobile-more").performClick()
+            rule.onNodeWithText("Settings").performClick()
+            rule.onNodeWithText(mode).performClick()
+            rule.onNodeWithText("Done").performClick()
+        }
+        fun night(dark: Boolean) {
+            manager.setNightMode(if (dark) android.app.UiModeManager.MODE_NIGHT_YES else android.app.UiModeManager.MODE_NIGHT_NO)
+            rule.waitUntil(10_000) {
+                val mode = rule.activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                mode == if (dark) android.content.res.Configuration.UI_MODE_NIGHT_YES else android.content.res.Configuration.UI_MODE_NIGHT_NO
+            }
+            rule.waitForIdle()
+        }
+        fun shows(dark: Boolean) {
+            val image = canvas().captureToImage().toPixelMap()
+            val pixel = image[image.width * 3 / 4, image.height / 4]
+            val expected = if (dark) androidx.compose.ui.graphics.Color(0xff161b17) else androidx.compose.ui.graphics.Color(0xfff8f9f6)
+            kotlin.test.assertEquals(expected, pixel, "Canvas should follow the resolved appearance")
+            count(1)
+        }
+        instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.MODIFY_DAY_NIGHT_MODE")
+        try {
+            choose("System"); draw(); count(1)
+            night(false); shows(false)
+            night(true); shows(true)
+            choose("Light"); shows(false)
+            night(false); shows(false)
+            choose("Dark"); shows(true)
+            night(true); shows(true)
+            choose("System"); shows(true)
+        } finally {
+            manager.setNightMode(original)
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+        }
+    }
+
     @Test fun appearanceOverrideSurvivesActivityRecreation() {
         draw(); count(1)
         rule.onNodeWithTag("mobile-more").performClick()
