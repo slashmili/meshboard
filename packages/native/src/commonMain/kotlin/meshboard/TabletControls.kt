@@ -3,6 +3,9 @@ package meshboard
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -126,10 +129,37 @@ internal fun TabletDock(layout: TabletLayout, tool: Tool, choose: (Tool) -> Unit
             }
         }
         DockButton("hand", "Pan", tool == Tool.Hand, "mobile-tool-hand") { choose(Tool.Hand) }
+
     }
     TabletSurface(Modifier.testTag(if (wide) "tablet-side-dock" else "tablet-bottom-dock").semantics { isTraversalGroup = true; traversalIndex = 1f }) {
         if (wide) Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { slots() }
         else Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { slots() }
+    }
+}
+
+@Composable
+internal fun TabletPaintBar(layout: TabletLayout, palette: List<Pair<String, String>>, color: String, width: Double,
+    dark: Boolean, chooseColor: (String) -> Unit, openWidth: () -> Unit) {
+    TabletSurface(Modifier.testTag("tablet-paint-bar").semantics { isTraversalGroup = true; traversalIndex = 2f }) {
+        Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                palette.chunked(if (layout == TabletLayout.Minimal) 3 else 6).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.selectableGroup()) {
+                        row.forEach { (name, hex) ->
+                            Box(Modifier.tabletFocus().size(48.dp).selectable(color == hex, role = Role.RadioButton, onClick = { chooseColor(hex) })
+                                .semantics { contentDescription = "$name stroke" }, contentAlignment = Alignment.Center) {
+                                Box(Modifier.size(26.dp).background(displayPaint(hex, dark), CircleShape)
+                                    .border(if (color == hex) 3.dp else 1.dp, MaterialTheme.colorScheme.onSurface, CircleShape))
+                            }
+                        }
+                    }
+                }
+            }
+            TextButton(openWidth, Modifier.tabletFocus().size(48.dp).testTag("mobile-stroke-width").semantics {
+                contentDescription = "Stroke width"
+                stateDescription = "${width.toInt()} px stroke"
+            }, contentPadding = PaddingValues(0.dp)) { Text("${width.toInt()} px") }
+        }
     }
 }
 

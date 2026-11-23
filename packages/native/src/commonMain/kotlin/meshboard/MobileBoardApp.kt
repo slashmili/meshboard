@@ -306,11 +306,16 @@ fun MobileBoardApp(
                             }
                         }
                     }
-                    CanvasControl("view", controls, Modifier.align(if (wide) Alignment.BottomEnd else Alignment.TopEnd).padding(16.dp)) {
+                    CanvasControl("paint", controls, Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = if (wide && dockRight) 96.dp else 16.dp)) {
+                        TabletPaintBar(layout, MobilePalette, color, width, dark, { cancel(); color = it }, { open("width") })
+                    }
+                    val zoomTop = if (layout == TabletLayout.Minimal) 138.dp else 88.dp
+                    CanvasControl("view", controls, Modifier.align(if (wide) Alignment.BottomEnd else Alignment.TopEnd)
+                        .padding(start = 16.dp, end = 16.dp, top = if (wide) 16.dp else zoomTop, bottom = 16.dp)) {
                         TabletZoom(view.zoom, { zoom(1 / 1.2) }, { open("view") }, { zoom(1.2) })
                     }
                     if (feedback.isNotEmpty()) CanvasControl("feedback", controls, Modifier.align(Alignment.TopCenter).padding(top = 8.dp)) { Text(feedback, Modifier.semantics { liveRegion = LiveRegionMode.Polite }.background(colors.surface, RoundedCornerShape(6.dp)).padding(6.dp), color = colors.onSurface, fontSize = 12.sp) }
-                    if (dialog in listOf("board", "settings", "session", "properties", "shapes", "insert", "tools", "objects", "view")) {
+                    if (dialog in listOf("board", "settings", "session", "width", "properties", "shapes", "insert", "tools", "objects", "view")) {
                         TabletSheet(dialog!!, wide, { dialog = null }) {
                             when (dialog) {
                                 "board" -> {
@@ -360,6 +365,16 @@ fun MobileBoardApp(
                                         TabletMenuAction("Tool properties") { open("properties") }
                                     }
                                 }
+                                "width" -> {
+                                    Text("Stroke width", style = MaterialTheme.typography.titleMedium)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(2.0, 3.0, 6.0).forEach { value ->
+                                            Box(Modifier.weight(1f)) {
+                                                TabletMenuAction("${value.toInt()} px", "mobile-stroke-width-${value.toInt()}", selected = width == value) { width = value; dialog = null }
+                                            }
+                                        }
+                                    }
+                                }
                                 "properties" -> {
                                     Text(tool.label, style = MaterialTheme.typography.titleMedium)
                                     when (tool) {
@@ -374,17 +389,8 @@ fun MobileBoardApp(
                                         Tool.Eraser -> Text("Removes whole objects. Use Undo to restore an erased object.")
                                         Tool.Hand -> { Text("Drag with one finger to pan. Pinch with two fingers to zoom."); TabletMenuAction("View controls") { open("view") } }
                                         else -> {
-                                            Text("Color for new marks")
-                                            MobilePalette.forEach { (name, hex) ->
-                                                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(color == hex, role = Role.RadioButton, onClick = { color = hex }).semantics { contentDescription = "$name stroke" }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                    Box(Modifier.size(24.dp).background(displayPaint(hex, dark), CircleShape).border(if (color == hex) 3.dp else 1.dp, colors.onSurface, CircleShape))
-                                                    Text(name, Modifier.weight(1f)); if (color == hex) Text("Selected", style = MaterialTheme.typography.labelSmall)
-                                                }
-                                            }
-                                            if (tool != Tool.Text && tool != Tool.Sticky) {
-                                                Text("Stroke width")
-                                                listOf(2.0, 3.0, 6.0).forEach { value -> TabletMenuAction("${value.toInt()} px stroke", selected = width == value) { width = value } }
-                                            } else TabletMenuAction("Add ${if (tool == Tool.Text) "text" else "note"} at center") { dialog = null; editingExisting = false; textEdit = textElement(controller.newId(), tool.wire, view.world(Point(canvasSize.width / density / 2, canvasSize.height / density / 2)), color, "") }
+                                            TabletMenuAction("Stroke width") { open("width") }
+                                            if (tool == Tool.Text || tool == Tool.Sticky) TabletMenuAction("Add ${if (tool == Tool.Text) "text" else "note"} at center") { dialog = null; editingExisting = false; textEdit = textElement(controller.newId(), tool.wire, view.world(Point(canvasSize.width / density / 2, canvasSize.height / density / 2)), color, "") }
                                         }
                                     }
                                 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.*
 import org.junit.Test
@@ -38,6 +39,11 @@ class TabletVisualTest {
                     save("light")
                     settings(); onNodeWithText("Dark").performClick(); onNodeWithText("Done").performClick()
                     save("dark")
+                    val swatch = onNodeWithContentDescription("Ink stroke").captureToImage().toAwtImage()
+                    val expected = displayPaint("#293b36", true)
+                    assertEquals(expected.toArgb() and 0xffffff, swatch.getRGB(swatch.width / 2, swatch.height / 2) and 0xffffff)
+                    onNodeWithContentDescription("Fern stroke").performClick()
+                    save("palette-dark")
                     val root = onRoot().captureToImage().toAwtImage()
                     assertEquals(0x202922,root.getRGB(5,5) and 0xffffff)
                     assertEquals(0x161b17,root.getRGB(root.width / 2,65) and 0xffffff, "Dark mode includes the drawing canvas")
@@ -46,14 +52,17 @@ class TabletVisualTest {
                         val bounds = onNodeWithTag("tablet-side-dock").fetchSemanticsNode().boundsInRoot
                         assertTrue(bounds.left > 900)
                         save("right-dark")
+                            onNodeWithContentDescription("Coral stroke").assertIsDisplayed().performClick().assertIsSelected()
+                        val bar = onNodeWithTag("tablet-paint-bar").fetchSemanticsNode().boundsInRoot
+                        assertTrue(bar.right < bounds.left, "The palette must not overlap the right dock")
                     }
                 }
             }
         }
     }
-    @Test fun everyToolHasNoFloatingSummaryInEveryTabletWindowClass() {
+    @Test fun visiblePaletteChangesNewMarksWithEveryToolAndTabletWindowClass() {
         val shortcuts = listOf(Key.V,Key.P,Key.E,Key.R,Key.O,Key.A,Key.L,Key.T,Key.N,Key.H)
-        for ((width,height) in listOf(1024 to 768,768 to 1024,540 to 720,360 to 520)) {
+        for ((width,height) in listOf(1024 to 768,768 to 1024,540 to 720,400 to 600,360 to 520,700 to 400)) {
             runDesktopComposeUiTest(width = width,height = height) {
                 LocalBoardController { "unused" }.use { board ->
                     setContent { MobileBoardApp(board, appearanceStore = lightAppearance()) }
@@ -65,6 +74,23 @@ class TabletVisualTest {
                         onNodeWithText(tool.label, useUnmergedTree = true).assertIsDisplayed()
                         onNodeWithText("Done").performClick()
                         onNodeWithTag("mobile-width").assertDoesNotExist()
+                        for (name in listOf("Ink", "Fern", "Blue", "Violet", "Coral", "Amber")) {
+                            onNodeWithContentDescription("$name stroke").assertIsDisplayed().assertWidthIsEqualTo(androidx.compose.ui.unit.Dp(48f))
+                        }
+                        onNodeWithContentDescription("Fern stroke").performClick().assertIsSelected()
+                        onNodeWithTag("mobile-stroke-width").performClick()
+                        onNodeWithTag("mobile-stroke-width-6").performClick()
+                        onNodeWithTag("tablet-panel-width").assertDoesNotExist()
+                        onNodeWithTag("mobile-stroke-width").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "6 px stroke"))
+                    }
+                    onNodeWithTag("mobile-canvas").performKeyInput { pressKey(Key.P) }
+                    onNodeWithTag("mobile-canvas").performTouchInput {
+                        down(androidx.compose.ui.geometry.Offset(width * .3f, height * .5f))
+                        moveTo(androidx.compose.ui.geometry.Offset(width * .4f, height * .55f)); up()
+                    }
+                    runOnIdle {
+                        assertEquals("#387c59",board.state.value.elements.single().color)
+                        assertEquals(6.0,board.state.value.elements.single().width)
                     }
                 }
             }

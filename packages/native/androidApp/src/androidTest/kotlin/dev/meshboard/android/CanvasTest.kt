@@ -159,14 +159,15 @@ class CanvasTest {
         }
     }
 
-    @Test fun ellipsePropertiesCanBeChangedAndDismissed() {
+    @Test fun toolbarPaletteChangesEllipseColorAndWidth() {
         mobileTool("ellipse")
-        toolProperties()
-        rule.onNodeWithText("Ellipse", useUnmergedTree = true).assertIsDisplayed()
-        rule.onNodeWithContentDescription("Fern stroke").performScrollTo().performClick()
-        rule.onNodeWithText("Done").performClick()
-        rule.onNodeWithTag("tablet-panel-properties").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Fern stroke").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("mobile-stroke-width").performClick()
+        rule.onNodeWithTag("mobile-stroke-width-6").performScrollTo().performClick()
+        rule.onNodeWithTag("tablet-panel-width").assertDoesNotExist()
         rule.onNodeWithTag("mobile-width").assertDoesNotExist()
+        rule.onNodeWithTag("mobile-stroke-width").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "6 px stroke"))
+        rule.onNodeWithContentDescription("Fern stroke").assertIsSelected()
         draw(); count(1)
     }
 
