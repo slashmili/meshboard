@@ -14,6 +14,7 @@ import java.nio.ByteBuffer
 import java.time.Duration
 import java.util.UUID
 import meshboard.crypto.JvmSessionCrypto
+import meshboard.crdt.CachedCrdtBoard
 import meshboard.crdt.CrdtBoard
 import meshboard.crdt.JvmCrdtBoard
 import java.util.concurrent.*
@@ -24,10 +25,12 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
     private val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(8)).build()
     private val mutable = MutableStateFlow(BoardState())
     override val state = mutable.asStateFlow()
-    private var crdt = crdtFactory()
+    // Awareness and connection callbacks also report state. Decode an unchanged
+    // board once instead of blocking the session executor on every such report.
+    private var crdt: CrdtBoard = CachedCrdtBoard(crdtFactory())
     private val elements get() = crdt.elements()
     private val channelLabel get() = SecureWire.CHANNEL
-    private fun resetDocument() { crdt.close(); crdt = crdtFactory() }
+    private fun resetDocument() { crdt.close(); crdt = CachedCrdtBoard(crdtFactory()) }
     private var awareness = YAwareness()
     private var awarenessTask: ScheduledFuture<*>? = null
     private val previews = mutableMapOf<String, BoardElement>()

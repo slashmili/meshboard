@@ -63,7 +63,7 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
 
     val store = remember(appearanceStore) { appearanceStore ?: MemoryAppearanceStore() }
     var appearance by rememberAppearance(store)
-    val dark = appearance.resolveDark()
+    val dark = appearance.isDark(rememberDesktopSystemDark())
     val colors = appearanceColors(dark)
     val canvasColors = DisplayColors.canvas(dark)
     BoardTheme(colors) {

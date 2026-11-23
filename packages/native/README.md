@@ -95,6 +95,23 @@ pnpm test:interop
 ./packages/native/gradlew -p packages/native createDistributable
 ```
 
+Appearance defaults to **System**; choose **Appearance** in the desktop header
+for a persistent Light or Dark override. System changes refresh while the app is
+open. The preference changes only local rendering, including the canvas.
+
+On a Linux graphical session with a working appearance portal, this opt-in test
+checks actual OS changes against canvas pixels and unchanged board state. It
+temporarily changes GNOME's `color-scheme` preference and restores its original
+value in `finally`; ordinary native tests never change desktop settings.
+
+```sh
+MESHBOARD_TEST_LINUX_APPEARANCE=1 mise exec java@temurin-21 -- ./packages/native/gradlew -p packages/native desktopTest --tests meshboard.DesktopAppearanceTest
+```
+
+This Linux check does not verify macOS/Windows OS changes or physical-tablet
+appearance. Android instrumentation separately checks live system appearance,
+explicit overrides and activity recreation on its selected tablet.
+
 Interop tests require the local TURN relay and Playwright Chromium. They run the
 actual desktop transport in a separate Java process, controlled by a test-only
 stdin/stdout adapter, against the real browser app. The adapter is not packaged.
