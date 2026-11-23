@@ -45,6 +45,26 @@ class AppTest {
     private fun drag() = rule.onNodeWithTag("drawing-canvas").performMouseInput {
         moveTo(Offset(350f, 250f)); press(); moveTo(Offset(460f, 330f)); release()
     }
+    private fun mobileTool(wire: String) {
+        if (rule.onAllNodesWithTag("mobile-tool-$wire").fetchSemanticsNodes().isEmpty()) {
+            val opener = when {
+                rule.onAllNodesWithTag("mobile-tools").fetchSemanticsNodes().isNotEmpty() -> "mobile-tools"
+                wire in listOf("rectangle", "ellipse", "line", "arrow") -> "mobile-shapes"
+                else -> "mobile-insert"
+            }
+            rule.onNodeWithTag(opener).performClick()
+        }
+        rule.onNodeWithTag("mobile-tool-$wire").performScrollToIfPossible().performClick()
+    }
+    private fun SemanticsNodeInteraction.performScrollToIfPossible(): SemanticsNodeInteraction {
+        // Dock buttons are no longer in a scrolling row; only tool sheets scroll.
+        if (rule.onAllNodesWithTag("tablet-scrim").fetchSemanticsNodes().isNotEmpty()) performScrollTo()
+        return this
+    }
+    private fun toolProperties() {
+        rule.onNodeWithTag("mobile-more").performClick()
+        rule.onNodeWithTag("mobile-tool-properties").performScrollTo().performClick()
+    }
     @Test fun desktopHistoryControlsRestoreDrawingAndClearRedoOnNewEdit() {
         val controller = LocalController(); render(controller)
         rule.onNodeWithTag("undo").assertIsNotEnabled()
@@ -62,7 +82,7 @@ class AppTest {
         val controller = localBoard { "boundary-${++next}" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
         for (tool in listOf("pen", "rectangle", "arrow", "text", "sticky", "hand")) {
-            rule.onNodeWithTag("mobile-tool-$tool").performClick()
+            mobileTool(tool)
             rule.onNodeWithTag("mobile-canvas").performTouchInput {
                 down(Offset(200f, 100f)); moveTo(Offset(250f, 120f))
                 moveTo(Offset(250f, -20f)); moveTo(Offset(200f, 100f)); up()
@@ -70,7 +90,7 @@ class AppTest {
             rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty(), tool) }
             rule.onNodeWithTag("text-editor").assertDoesNotExist()
         }
-        rule.onNodeWithTag("mobile-tool-pen").performClick()
+        mobileTool("pen")
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(100f, 100f)); moveTo(Offset(150f, 120f)); cancel()
         }
@@ -88,12 +108,12 @@ class AppTest {
             listOf(Point(500.0, -50.0), Point(600.0, -50.0)))
         controller.put(hidden)
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
-        rule.onNodeWithTag("mobile-tool-eraser").performClick()
+        mobileTool("eraser")
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(500f, 100f)); moveTo(Offset(500f, -50f)); up()
         }
         rule.runOnIdle { assertEquals(listOf(hidden), controller.state.value.elements) }
-        rule.onNodeWithTag("mobile-tool-pen").performClick()
+        mobileTool("pen")
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(0, Offset(100f, 100f)); down(1, Offset(200f, 200f))
             moveTo(1, Offset(200f, -10f)); moveTo(1, Offset(200f, 200f)); up(1)
@@ -117,7 +137,7 @@ class AppTest {
             down(Offset(200f, 20f)); moveTo(Offset(200f, 350f)); up()
         }
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
-        rule.onNodeWithTag("mobile-width").performClick()
+        toolProperties()
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(200f, 200f)); moveTo(Offset(300f, 250f)); up()
         }
@@ -240,7 +260,7 @@ class AppTest {
         var next = 0
         val controller = localBoard { "local-${++next}" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
-        rule.onNodeWithTag("mobile-connection-status").assertTextEquals("Local only")
+        rule.onNodeWithTag("mobile-connection-status", useUnmergedTree = true).assertTextEquals("Local only")
         rule.onNodeWithTag("mobile-join").assertDoesNotExist()
         rule.onNodeWithTag("mobile-share").assertDoesNotExist()
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
@@ -292,8 +312,8 @@ class AppTest {
     @Test fun mobileSelectionMovesGroupsAndPinchCancelsMovement() {
         val controller = localBoard { "unused" }
         for ((id,x) in listOf("one" to 100.0, "two" to 240.0)) controller.put(BoardElement(id,"rectangle","#293b36",3.0,listOf(Point(x,100.0),Point(x+40,140.0))))
-        rule.setContent { Box(Modifier.requiredSize(390.dp,844.dp)) { MobileBoardApp(controller) } }
-        rule.onNodeWithTag("mobile-tool-select").performScrollTo().performClick()
+        rule.setContent { Box(Modifier.requiredSize(540.dp,720.dp)) { MobileBoardApp(controller) } }
+        mobileTool("select")
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(80f,80f)); moveTo(Offset(300f,160f)); up() }
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(120f,120f)); moveTo(Offset(140f,150f)); up() }
         rule.runOnIdle { assertEquals(listOf(120.0,260.0), controller.state.value.elements.map { it.points.first().x }) }
@@ -308,7 +328,7 @@ class AppTest {
         val controller = localBoard { "arrow" }
         controller.put(BoardElement("box","rectangle","#123456",3.0,listOf(Point(100.0,100.0),Point(200.0,200.0))))
         rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
-        rule.onNodeWithTag("mobile-tool-arrow").performClick()
+        mobileTool("arrow")
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(200f,150f)); moveTo(Offset(400f,150f)); up() }
         rule.runOnIdle { assertEquals("box",controller.state.value.elements.first { it.id=="arrow" }.startAttachment?.id) }
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(200f,150f)); moveTo(Offset(300f,300f)); up() }
@@ -322,12 +342,14 @@ class AppTest {
         val bytes = File(System.getProperty("meshboard.fixtures"),"image.png").readBytes()
         controller.put(imageElement("image",bytes,Point(200.0,200.0)))
         rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
+        rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithTag("insert-image").assertIsDisplayed()
+        rule.onNodeWithText("Done").performClick()
         val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
         val scale = image.width / 1024.0
         val pixel = java.awt.Color(image.getRGB((200*scale).toInt(),(200*scale).toInt()))
         assertTrue(pixel.red > 180 && pixel.green < 80, "Embedded image must paint its pixels")
-        rule.onNodeWithTag("mobile-tool-eraser").performClick()
+        mobileTool("eraser")
         rule.onNodeWithTag("mobile-canvas").performTouchInput { click(Offset(200f,200f)) }
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
         rule.onNodeWithTag("mobile-undo").performClick()
@@ -347,17 +369,17 @@ class AppTest {
     }
     @Test fun mobileArrowsDrawAndEraseWithTouch() {
         val controller = localBoard { "mobile-arrow" }
-        rule.setContent { Box(Modifier.requiredSize(390.dp, 844.dp)) { MobileBoardApp(controller) } }
-        rule.onNodeWithTag("mobile-tool-arrow").performScrollTo().performClick()
+        rule.setContent { Box(Modifier.requiredSize(540.dp, 720.dp)) { MobileBoardApp(controller) } }
+        mobileTool("arrow")
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(100f, 100f)); moveTo(Offset(250f, 100f)); up()
         }
         rule.runOnIdle { assertEquals("arrow", controller.state.value.elements.single().type) }
         val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
-        val scale = image.width / 390.0
+        val scale = image.width / 540.0
         val wing = java.awt.Color(image.getRGB((238 * scale).toInt(), (106 * scale).toInt()))
         assertTrue(wing.red < 150 && wing.green < 150, "The mobile canvas must render the arrowhead, not just the shaft")
-        rule.onNodeWithTag("mobile-tool-eraser").performScrollTo().performClick()
+        mobileTool("eraser")
         rule.onNodeWithTag("mobile-canvas").performTouchInput { click(Offset(250f, 100f)) }
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
     }
@@ -365,7 +387,7 @@ class AppTest {
         val controller = localBoard { "theme-stroke" }
         rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
         rule.onNodeWithTag("mobile-more").performClick()
-        rule.onNodeWithText("Appearance").performClick()
+        rule.onNodeWithText("Settings").performClick()
         rule.onNodeWithText("Dark").performClick()
         rule.onNodeWithText("Dark").assertIsSelected()
         rule.onNodeWithText("Done").performClick()
