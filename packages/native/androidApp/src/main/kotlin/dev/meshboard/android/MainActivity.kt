@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import meshboard.KeyValueAppearanceStore
 import meshboard.MobileBoardApp
 import meshboard.TabletUiState
 import androidx.compose.ui.graphics.asImageBitmap
@@ -30,12 +31,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Only the local appearance choice is persisted; board data stays in memory.
+        val preferences = getSharedPreferences("meshboard.preferences", MODE_PRIVATE)
+        val appearance = KeyValueAppearanceStore(read = { preferences.getString(it, null) }, write = { key, value -> preferences.edit().putString(key, value).apply() })
         setContent {
             val board: BoardViewModel = viewModel()
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                 MobileBoardApp(board.controller,
                     boardTitle = "Meshboard",
                     uiState = board.tabletUi,
+                    appearanceStore = appearance,
                     backHandler = { enabled, onBack -> BackHandler(enabled, onBack) },
                     shareInvite = { invite ->
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, invite) }

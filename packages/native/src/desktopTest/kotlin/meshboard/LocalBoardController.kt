@@ -28,3 +28,6 @@ class LocalBoardController(private val createId: () -> String) : DrawingControll
         }
     }
 }
+
+/** Pixel tests pin Light so results do not depend on the host OS appearance. */
+fun lightAppearance(): AppearanceStore = MemoryAppearanceStore(Appearance.Light)

@@ -36,7 +36,7 @@ class TabletUiTest {
         rule.onNodeWithText("Done").performClick()
     }
     @Test fun wideDockCapturesInputAndModalDismissalNeverDraws() {
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("tablet-side-dock").assertIsDisplayed().assertWidthIsEqualTo(64.dp).assertHeightIsEqualTo(456.dp)
         val canvasBounds = canvas().fetchSemanticsNode().boundsInRoot
         val dock = rule.onNodeWithTag("tablet-side-dock").fetchSemanticsNode().boundsInRoot
@@ -61,7 +61,7 @@ class TabletUiTest {
         var width by mutableStateOf(1024)
         var height by mutableStateOf(768)
         board.put(BoardElement("center","rectangle","#293b36",3.0,listOf(Point(462.0,306.0), Point(562.0,406.0))))
-        rule.setContent { Box(Modifier.requiredSize(width.dp,height.dp)) { MobileBoardApp(board) } }
+        rule.setContent { Box(Modifier.requiredSize(width.dp,height.dp)) { MobileBoardApp(board, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-zoom-in").performClick()
         rule.onNodeWithTag("mobile-tool-select").performClick()
         canvas().performTouchInput { click(Offset(512f,356f)) }
@@ -90,7 +90,7 @@ class TabletUiTest {
         var undoCalls = 0
         val controls = object : DrawingController by board { override fun undo() { undoCalls++; board.undo() } }
         board.put(textElement("note","sticky",Point(350.0,250.0),"#293b36","Review this"))
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controls) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controls, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-tool-select").performClick()
         rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithTag("mobile-objects").performScrollTo().performClick()
@@ -106,7 +106,7 @@ class TabletUiTest {
     }
 
     @Test fun fingerNavigationAndKeyboardCommandsKeepDrawingIntentExplicit() {
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board, appearanceStore = lightAppearance()) } }
         settings()
         rule.onNodeWithTag("mobile-finger-drawing").performScrollTo().performClick()
         rule.onNodeWithText("Done").performClick()
@@ -128,7 +128,7 @@ class TabletUiTest {
 
     @Test fun fitContentRevealsOffscreenObjectsWithoutChangingTheDocument() {
         board.put(BoardElement("far","rectangle","#293b36",3.0,listOf(Point(2400.0,1800.0),Point(2600.0,2000.0))))
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board, appearanceStore = lightAppearance()) } }
         val before = board.state.value.elements
         rule.onNodeWithTag("mobile-zoom").performClick()
         rule.onNodeWithText("Fit content").performClick()
@@ -162,7 +162,7 @@ class TabletUiTest {
 
     @Test fun incomingObjectsDoNotCancelAnActiveSelectionMove() {
         board.put(BoardElement("local","rectangle","#293b36",3.0,listOf(Point(350.0,200.0),Point(450.0,300.0))))
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-tool-select").performClick()
         canvas().performTouchInput { down(Offset(400f,230f)); moveTo(Offset(450f,250f)) }
         val incoming = BoardElement("incoming","rectangle","#4878c8",3.0,listOf(Point(650.0,200.0),Point(750.0,300.0)))
@@ -175,7 +175,7 @@ class TabletUiTest {
     }
 
     @Test fun selectedToolsKeepHighlightWithoutTheAdjacentSummaryPill() {
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(board, appearanceStore = lightAppearance()) } }
         val pen = rule.onNodeWithTag("mobile-tool-pen").assertIsSelected().assertContentDescriptionEquals("Pen")
         rule.onNodeWithTag("mobile-width").assertDoesNotExist()
         val selected = pen.captureToImage().toAwtImage()

@@ -40,7 +40,7 @@ class AppTest {
         override fun retry() {}
     }
     private fun render(controller: BoardController, height: Int = 768) {
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, height.dp)) { MeshboardApp(controller, qrImage = ::qrImage) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, height.dp)) { MeshboardApp(controller, qrImage = ::qrImage, appearanceStore = lightAppearance()) } }
     }
     private fun drag() = rule.onNodeWithTag("drawing-canvas").performMouseInput {
         moveTo(Offset(350f, 250f)); press(); moveTo(Offset(460f, 330f)); release()
@@ -80,7 +80,7 @@ class AppTest {
     @Test fun mobileCapturedGesturesCancelAtCanvasBoundaryAndRecoverAfterLift() {
         var next = 0
         val controller = localBoard { "boundary-${++next}" }
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         for (tool in listOf("pen", "rectangle", "arrow", "text", "sticky", "hand")) {
             mobileTool(tool)
             rule.onNodeWithTag("mobile-canvas").performTouchInput {
@@ -107,7 +107,7 @@ class AppTest {
         val hidden = BoardElement("hidden", "pen", "#293b36", 3.0,
             listOf(Point(500.0, -50.0), Point(600.0, -50.0)))
         controller.put(hidden)
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         mobileTool("eraser")
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(500f, 100f)); moveTo(Offset(500f, -50f)); up()
@@ -129,7 +129,7 @@ class AppTest {
     @Test fun mobileControlGesturesCannotEnterCanvasAndMenuBlocksDrawing() {
         var next = 0
         val controller = localBoard { "controls-${++next}" }
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-tool-pen").performTouchInput {
             down(center); moveTo(Offset(center.x, height + 200f)); up()
         }
@@ -147,7 +147,7 @@ class AppTest {
     @Test fun mobileErrorOverlayStopsCapturedDrawingAndDialogsBlockCanvas() {
         val controller = LocalController()
         controller.state.value = controller.state.value.copy(error = "Connection unavailable")
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(512f, 100f)); moveTo(Offset(512f, 5f));
             moveTo(Offset(512f, 100f)); up()
@@ -170,7 +170,7 @@ class AppTest {
 
     @Test fun mobileRenderingClipsRemoteInkAtToolbarBoundary() {
         val controller = localBoard { "unused" }
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         val before = rule.onRoot().captureToImage().toAwtImage()
         rule.runOnIdle {
             controller.put(BoardElement("outside", "pen", "#ff0000", 32.0,
@@ -205,7 +205,7 @@ class AppTest {
     @Test fun mobileHistoryControlsUndoAndRedoTouchDrawing() {
         var next = 0
         val controller = localBoard { "history-${++next}" }
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-undo").assertIsNotEnabled()
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(200f, 200f)); moveTo(Offset(300f, 280f)); up()
@@ -259,7 +259,7 @@ class AppTest {
     @Test fun localMobileCanvasDrawsAndConfirmsClearWithoutSharing() {
         var next = 0
         val controller = localBoard { "local-${++next}" }
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-connection-status", useUnmergedTree = true).assertTextEquals("Local only")
         rule.onNodeWithTag("mobile-join").assertDoesNotExist()
         rule.onNodeWithTag("mobile-share").assertDoesNotExist()
@@ -277,22 +277,41 @@ class AppTest {
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
     }
     @Test fun desktopAppearanceChangesWithoutDiscardingDrawing() {
-        val controller = LocalController(); render(controller); drag()
+        val controller = LocalController(); val store = MemoryAppearanceStore(Appearance.Light)
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MeshboardApp(controller, qrImage = ::qrImage, appearanceStore = store) } }
+        drag()
         val before = controller.state.value.elements
+        fun canvas() = rule.onNodeWithTag("drawing-canvas").captureToImage().toAwtImage()
+        fun brightness(image: java.awt.image.BufferedImage, x: Int, y: Int): Int { val scale = image.width / 1024.0; val c = java.awt.Color(image.getRGB((x * scale).toInt(), (y * scale).toInt())); return (c.red + c.green + c.blue) / 3 }
+        val light = canvas()
+        assertTrue(brightness(light, 405, 290) < 120, "Light mode renders canonical dark ink")
+        assertTrue(brightness(light, 700, 560) > 230, "Light mode keeps a paper canvas")
         rule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
         rule.onNodeWithText("Dark").performClick()
         rule.onNodeWithText("Dark").assertIsSelected()
         rule.onNodeWithText("Done").performClick()
+        rule.runOnIdle { assertEquals(Appearance.Dark, store.load()) }
         val dark = rule.onRoot().captureToImage().toAwtImage()
         assertEquals(0x202922, dark.getRGB(5, 5) and 0xffffff)
+        val darkCanvas = canvas()
+        assertTrue(brightness(darkCanvas, 405, 290) > 150, "Dark mode lightens dark ink for display")
+        assertTrue(brightness(darkCanvas, 700, 560) < 40, "Dark mode darkens the canvas")
         val file = File("build/test-artifacts/desktop-dark.png"); file.parentFile.mkdirs(); ImageIO.write(dark, "png", file)
+        rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
         rule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
         rule.onNodeWithText("Light").performClick()
         rule.onNodeWithText("Light").assertIsSelected()
         rule.onNodeWithText("System").performClick()
         rule.onNodeWithText("System").assertIsSelected()
         rule.onNodeWithText("Done").performClick()
-        rule.runOnIdle { assertEquals(before, controller.state.value.elements) }
+        rule.runOnIdle { assertEquals(before, controller.state.value.elements); assertEquals(Appearance.System, store.load()) }
+    }
+
+    @Test fun desktopRestoresPersistedAppearance() {
+        val store = MemoryAppearanceStore(Appearance.Dark)
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MeshboardApp(LocalController(), qrImage = ::qrImage, appearanceStore = store) } }
+        val image = rule.onRoot().captureToImage().toAwtImage()
+        assertEquals(0x202922, image.getRGB(5, 5) and 0xffffff)
     }
 
     @Test fun desktopSelectionMovesGroupsAndEscapeCancelsDraftMove() {
@@ -312,7 +331,7 @@ class AppTest {
     @Test fun mobileSelectionMovesGroupsAndPinchCancelsMovement() {
         val controller = localBoard { "unused" }
         for ((id,x) in listOf("one" to 100.0, "two" to 240.0)) controller.put(BoardElement(id,"rectangle","#293b36",3.0,listOf(Point(x,100.0),Point(x+40,140.0))))
-        rule.setContent { Box(Modifier.requiredSize(540.dp,720.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(540.dp,720.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         mobileTool("select")
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(80f,80f)); moveTo(Offset(300f,160f)); up() }
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(120f,120f)); moveTo(Offset(140f,150f)); up() }
@@ -327,7 +346,7 @@ class AppTest {
     @Test fun mobileArrowEndpointsAttachAndDetachWithoutCreatingDuplicates() {
         val controller = localBoard { "arrow" }
         controller.put(BoardElement("box","rectangle","#123456",3.0,listOf(Point(100.0,100.0),Point(200.0,200.0))))
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         mobileTool("arrow")
         rule.onNodeWithTag("mobile-canvas").performTouchInput { down(Offset(200f,150f)); moveTo(Offset(400f,150f)); up() }
         rule.runOnIdle { assertEquals("box",controller.state.value.elements.first { it.id=="arrow" }.startAttachment?.id) }
@@ -341,7 +360,7 @@ class AppTest {
         val controller = localBoard { "unused" }
         val bytes = File(System.getProperty("meshboard.fixtures"),"image.png").readBytes()
         controller.put(imageElement("image",bytes,Point(200.0,200.0)))
-        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp,768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithTag("insert-image").assertIsDisplayed()
         rule.onNodeWithText("Done").performClick()
@@ -360,7 +379,7 @@ class AppTest {
         val controller = localBoard { "pressure" }
         controller.put(BoardElement("pressure", "pen", "#293b36", 8.0, listOf(
             Point(100.0,100.0,0.0), Point(200.0,100.0,0.0), Point(300.0,100.0,1.0), Point(400.0,100.0,1.0))))
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
         val scale = image.width / 1024.0
         fun pixel(x: Int, y: Int) = java.awt.Color(image.getRGB((x * scale).toInt(), (y * scale).toInt()))
@@ -369,7 +388,7 @@ class AppTest {
     }
     @Test fun mobileArrowsDrawAndEraseWithTouch() {
         val controller = localBoard { "mobile-arrow" }
-        rule.setContent { Box(Modifier.requiredSize(540.dp, 720.dp)) { MobileBoardApp(controller) } }
+        rule.setContent { Box(Modifier.requiredSize(540.dp, 720.dp)) { MobileBoardApp(controller, appearanceStore = lightAppearance()) } }
         mobileTool("arrow")
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(100f, 100f)); moveTo(Offset(250f, 100f)); up()
@@ -384,8 +403,8 @@ class AppTest {
         rule.runOnIdle { assertTrue(controller.state.value.elements.isEmpty()) }
     }
     @Test fun mobileAppearanceIsAvailableInOverflow() {
-        val controller = localBoard { "theme-stroke" }
-        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller) } }
+        val controller = localBoard { "theme-stroke" }; val store = MemoryAppearanceStore()
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) { MobileBoardApp(controller, appearanceStore = store) } }
         rule.onNodeWithTag("mobile-more").performClick()
         rule.onNodeWithText("Settings").performClick()
         rule.onNodeWithText("Dark").performClick()
@@ -394,7 +413,13 @@ class AppTest {
         rule.onNodeWithTag("mobile-canvas").performTouchInput {
             down(Offset(200f, 200f)); moveTo(Offset(300f, 280f)); up()
         }
-        rule.runOnIdle { assertEquals("#293b36", controller.state.value.elements.single().color) }
+        rule.runOnIdle { assertEquals("#293b36", controller.state.value.elements.single().color); assertEquals(Appearance.Dark, store.load()) }
+        val image = rule.onNodeWithTag("mobile-canvas").captureToImage().toAwtImage()
+        val scale = image.width / 1024.0
+        fun brightness(x: Int, y: Int) = java.awt.Color(image.getRGB((x * scale).toInt(), (y * scale).toInt())).let { (it.red + it.green + it.blue) / 3 }
+        assertTrue(brightness(600, 500) < 40, "Dark mode darkens the tablet canvas")
+        assertTrue(brightness(250, 240) > 150, "Dark mode lightens dark ink for display")
+        val file = File("build/test-artifacts/mobile-dark.png"); file.parentFile.mkdirs(); ImageIO.write(rule.onRoot().captureToImage().toAwtImage(), "png", file)
     }
 
     @Test fun nativeTextAndNotesCanBeEditedAndErased() {

@@ -2,7 +2,7 @@ import { resolveConnector } from './connectors'
 import { importImage } from './images'
 import { marquee, selectionBounds } from './selection'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ImagePlus, Undo2, Redo2, ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
+import { ImagePlus, Undo2, Redo2, ArrowDownLeft, ArrowUpRight, Circle, CircleHelp, Eraser, Hand, Minus, Monitor, Moon, Sun, MousePointer2, Type, StickyNote, Pencil, Plus, RotateCcw, Share2, Slash, Square, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Element } from './Element'
 import { MAX_ZOOM, MIN_ZOOM, hitsElement, type Point, type BoardElement, type Tool } from './board'
 import { textElement } from './textElements'
@@ -10,7 +10,8 @@ import { useBoard } from './useBoard'
 import { CrdtDocument } from './sync/CrdtDocument'
 import { useSession } from './sync/useSession'
 import { ShareDialog } from './ShareDialog'
-import { useTheme, type ThemeMode } from './useTheme'
+import { THEME_MODES, useTheme, type ThemeMode } from './useTheme'
+import { CANVAS, displayColor } from './appearance'
 
 const TOOLS: { id: Tool; label: string; key: string; icon: LucideIcon }[] = [
   { id: 'select', label: 'Select', key: 'V', icon: MousePointer2 },
@@ -45,8 +46,17 @@ const HINTS: Record<Tool, string> = {
   hand: 'Drag to move around. Pinch with two fingers to zoom.',
 }
 
+const THEME_LABELS: Record<ThemeMode, { label: string; icon: LucideIcon }> = {
+  system: { label: 'System', icon: Monitor },
+  light: { label: 'Light', icon: Sun },
+  dark: { label: 'Dark', icon: Moon },
+}
+
 export function App() {
   const theme = useTheme()
+  const canvas = theme.dark ? CANVAS.dark : CANVAS.light
+  const nextTheme = THEME_MODES[(THEME_MODES.indexOf(theme.mode) + 1) % THEME_MODES.length]
+  const ThemeIcon = THEME_LABELS[theme.mode].icon
   const [tool, setTool] = useState<Tool>('pen')
   const [color, setColor] = useState(COLORS[0].value)
   const [width, setWidth] = useState(3)
@@ -138,21 +148,21 @@ export function App() {
         {imageError && <div className="connection-error" role="alert">{imageError}<button onClick={() => setImageError('')}>Dismiss</button></div>}
         {session.error && <div className="connection-error" role="alert"><span>{session.error}</span>{session.room && <button onClick={session.retry}>Retry</button>}</div>}
         <svg ref={board.svgRef} className={`canvas ${board.spaceDown || tool === 'hand' ? 'canvas-pan' : tool === 'eraser' ? 'canvas-eraser' : ''}`} aria-label="Drawing canvas" aria-describedby="canvas-instructions" tabIndex={0} {...board.pointerHandlers} onContextMenu={event => event.preventDefault()}>
-          <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill="#cbd3ca" /></pattern></defs>
+          <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill={canvas.grid} /></pattern></defs>
           <rect width="100%" height="100%" fill="url(#grid)" pointerEvents="none" />
           <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="drawing-elements">
-            {board.elements.map(element => <Element key={element.id} element={element} />)}
-            {board.draft && <Element element={board.draft} />}
+            {board.elements.map(element => <Element key={element.id} element={element} dark={theme.dark} />)}
+            {board.draft && <Element element={board.draft} dark={theme.dark} />}
           </g>
-            {tool === 'arrow' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="connector-handles">{board.elements.filter(e=>e.type==='arrow').flatMap(e=>e.points.map((p,i)=><circle key={e.id+i} cx={p.x} cy={p.y} r={4/zoom} fill="white" stroke="#387c59" strokeWidth={1/zoom}/>))}</g>}
+            {tool === 'arrow' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="connector-handles">{board.elements.filter(e=>e.type==='arrow').flatMap(e=>e.points.map((p,i)=><circle key={e.id+i} cx={p.x} cy={p.y} r={4/zoom} fill={canvas.paper} stroke={canvas.handle} strokeWidth={1/zoom}/>))}</g>}
           {tool === 'select' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="selection-overlay">
             {board.elements.filter(e => board.selection.ids.includes(e.id)).map(e => {
               const box = selectionBounds(e), padding = 4 / zoom
-              return <rect key={e.id} x={box.x-padding} y={box.y-padding} width={box.width+2*padding} height={box.height+2*padding} fill="none" stroke="#4878c8" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />
+              return <rect key={e.id} x={box.x-padding} y={box.y-padding} width={box.width+2*padding} height={box.height+2*padding} fill="none" stroke={canvas.selection} strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />
             })}
-            {marquee(board.selection) && <rect {...marquee(board.selection)!} fill="#4878c815" stroke="#4878c8" strokeWidth={1 / zoom} />}
+            {marquee(board.selection) && <rect {...marquee(board.selection)!} fill={`${canvas.selection}15`} stroke={canvas.selection} strokeWidth={1 / zoom} />}
           </g>}
-          <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} />)}</g>
+          <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} dark={theme.dark} />)}</g>
         </svg>
 
         <div className="tool-panel" role="toolbar" aria-label="Drawing tools">
@@ -164,7 +174,7 @@ export function App() {
         <aside className="style-panel" aria-label="Stroke style">
           <div className="panel-caption">STROKE</div>
           <div className="color-options" role="radiogroup" aria-label="Stroke color">
-            {COLORS.map(item => <button key={item.name} className={`color-button ${color === item.value ? 'active' : ''}`} role="radio" aria-checked={color === item.value} aria-label={item.name} title={item.name} disabled={!drawing} onClick={() => setColor(item.value)} style={{ '--swatch': item.value } as CSSProperties}><span /></button>)}
+            {COLORS.map(item => <button key={item.name} className={`color-button ${color === item.value ? 'active' : ''}`} role="radio" aria-checked={color === item.value} aria-label={item.name} title={item.name} disabled={!drawing} onClick={() => setColor(item.value)} style={{ '--swatch': displayColor(item.value, theme.dark) } as CSSProperties}><span /></button>)}
           </div>
           <div className="width-options" role="radiogroup" aria-label="Stroke width">
             {[{ value: 2, name: 'Fine' }, { value: 3, name: 'Medium' }, { value: 6, name: 'Bold' }].map(item => <button key={item.value} className={width === item.value ? 'active' : ''} role="radio" aria-checked={width === item.value} aria-label={`${item.name} stroke`} title={`${item.name} stroke`} disabled={!drawing || tool === 'text' || tool === 'sticky'} onClick={() => setWidth(item.value)}><span style={{ height: item.value }} /></button>)}
@@ -196,7 +206,10 @@ export function App() {
             <button className="quiet-button history-button" aria-label="Undo" title="Undo (Ctrl/⌘ Z)" disabled={!document.canUndo} onClick={() => { board.cancelGesture(); document.undo() }}><Undo2 size={17} /></button>
             <button className="quiet-button history-button" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" disabled={!document.canRedo} onClick={() => { board.cancelGesture(); document.redo() }}><Redo2 size={17} /></button>
           </div>
-          <button className="help-button" aria-label="Help and keyboard shortcuts" title="Help and keyboard shortcuts" onClick={() => helpDialog.current?.showModal()}><CircleHelp size={20} /></button>
+          <div className="footer-end">
+            <button className="help-button" aria-label={`Appearance: ${THEME_LABELS[theme.mode].label}. Switch to ${THEME_LABELS[nextTheme].label}`} title={`Appearance: ${THEME_LABELS[theme.mode].label} (click for ${THEME_LABELS[nextTheme].label})`} data-testid="appearance-toggle" onClick={() => theme.setMode(nextTheme)}><ThemeIcon size={18} /></button>
+            <button className="help-button" aria-label="Help and keyboard shortcuts" title="Help and keyboard shortcuts" onClick={() => helpDialog.current?.showModal()}><CircleHelp size={20} /></button>
+          </div>
         </div>
       </section>
 

@@ -35,11 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.*
 
-private val MobileInk = Color(0xff293b36)
-private val MobilePaper = Color(0xfff8f9f6)
-private val MobileMuted = Color(0xff617059)
 private val MobilePalette = listOf("Ink" to "#293b36", "Fern" to "#387c59", "Blue" to "#4878c8", "Violet" to "#9563be", "Coral" to "#d76857", "Amber" to "#c49226")
-private fun mobilePaint(hex: String) = Color(0xff000000 or hex.drop(1).toLong(16))
 
 /** Touch layout shared by mobile targets; transport is deliberately independent. */
 @Composable
@@ -50,6 +46,7 @@ fun MobileBoardApp(
     uiState: TabletUiState? = null,
     shareInvite: ((String) -> Unit)? = null,
     backHandler: (@Composable (Boolean, () -> Unit) -> Unit)? = null,
+    appearanceStore: AppearanceStore? = null,
     qrImage: ((String) -> ImageBitmap)? = null,
 ) {
     val sharing = controller as? BoardController
@@ -102,10 +99,13 @@ fun MobileBoardApp(
     LaunchedEffect(state.elements) { selection = selection.copy(ids = selection.ids.filter { id -> state.elements.any { it.id == id } }) }
     val activeTool = if (spacePan) Tool.Hand else tool
 
-    var appearance by rememberAppearance()
-    val colors = appearanceColors(appearance)
+    val store = remember(appearanceStore) { appearanceStore ?: MemoryAppearanceStore() }
+    var appearance by rememberAppearance(store)
+    val dark = appearance.resolveDark()
+    val colors = appearanceColors(dark)
+    val canvasColors = DisplayColors.canvas(dark)
     BoardTheme(colors) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(MobilePaper).focusRequester(focusRequester).onPreviewKeyEvent { event ->
+        BoxWithConstraints(Modifier.fillMaxSize().background(colors.background).focusRequester(focusRequester).onPreviewKeyEvent { event ->
             if (inputBlocked) return@onPreviewKeyEvent false
             if (event.key == Key.Spacebar) { spacePan = event.type == KeyEventType.KeyDown; return@onPreviewKeyEvent true }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -263,29 +263,29 @@ fun MobileBoardApp(
                     var x = ((view.x * density % spacing + spacing) % spacing).toFloat()
                     while (x < size.width) {
                         var y = ((view.y * density % spacing + spacing) % spacing).toFloat()
-                        while (y < size.height) { drawCircle(Color(0xffcbd3ca), .8f * d, Offset(x, y)); y += spacing }
+                        while (y < size.height) { drawCircle(hexColor(canvasColors.grid), .8f * d, Offset(x, y)); y += spacing }
                         x += spacing
                     }
                     withTransform({ scale(d, d, Offset.Zero); translate(view.x.toFloat(), view.y.toFloat()); scale(view.zoom.toFloat(), view.zoom.toFloat(), Offset.Zero) }) {
                         val displayState = selection.display(state.elements)
                         val displayed = resolveConnectors(displayState).filter { it.id != draft?.id }
-                        displayed.forEach { mobileElement(it, textMeasurer, images) }
-                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(Color.White, (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(Color(0xff387c59), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
-                        if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom)
-                        state.previews.forEach { mobileElement(it, textMeasurer, images, .65f) }
-                        draft?.let { resolveConnector(it,displayState) }?.let { mobileElement(it, textMeasurer, images) }
+                        displayed.forEach { mobileElement(it, textMeasurer, images, dark = dark) }
+                        if (tool == Tool.Arrow) displayed.filter { it.type == "arrow" }.flatMap { it.points }.forEach { drawCircle(hexColor(canvasColors.paper), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat())); drawCircle(hexColor(canvasColors.handle), (4/view.zoom).toFloat(), Offset(it.x.toFloat(),it.y.toFloat()), style=Stroke((1/view.zoom).toFloat())) }
+                        if (tool == Tool.Select) drawSelection(selection, displayed, view.zoom, dark)
+                        state.previews.forEach { mobileElement(it, textMeasurer, images, .65f, dark) }
+                        draft?.let { resolveConnector(it,displayState) }?.let { mobileElement(it, textMeasurer, images, dark = dark) }
                     }
                 }
                 if (state.elements.isEmpty() && draft == null) Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("A SPACE FOR IDEAS", fontSize = 10.sp, letterSpacing = 1.5.sp, color = MobileMuted)
+                    Text("A SPACE FOR IDEAS", fontSize = 10.sp, letterSpacing = 1.5.sp, color = colors.onSurfaceVariant)
                     Spacer(Modifier.height(14.dp))
-                    Text("What’s on your mind?", fontSize = 26.sp, color = MobileInk)
+                    Text("What’s on your mind?", fontSize = 26.sp, color = colors.onBackground)
                     Spacer(Modifier.height(10.dp))
-                    Text(if (drawWithFinger) "Draw with one finger. Pan and pinch with two." else "Draw with a stylus. Pan with your fingers.", fontSize = 12.sp, color = MobileMuted)
+                    Text(if (drawWithFinger) "Draw with one finger. Pan and pinch with two." else "Draw with a stylus. Pan with your fingers.", fontSize = 12.sp, color = colors.onSurfaceVariant)
                 }
                 state.error?.let { Text(it, Modifier.align(Alignment.TopCenter).onSizeChanged { errorSize = Size(it.width.toFloat(), it.height.toFloat()) }.pointerInput(Unit) {
                     awaitPointerEventScope { while (true) { awaitPointerEvent().changes.forEach { it.consume() } } }
-                }.background(Color(0xfffff2d9)).padding(12.dp), fontSize = 12.sp, color = MobileInk) }
+                }.background(colors.errorContainer).padding(12.dp), fontSize = 12.sp, color = colors.onErrorContainer) }
                     val wide = layout == TabletLayout.Wide
                     val bottomPadding = 20.dp
                     val dockAlignment = if (dockRight) Alignment.TopEnd else Alignment.TopStart
@@ -377,7 +377,7 @@ fun MobileBoardApp(
                                             Text("Color for new marks")
                                             MobilePalette.forEach { (name, hex) ->
                                                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(color == hex, role = Role.RadioButton, onClick = { color = hex }).semantics { contentDescription = "$name stroke" }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                    Box(Modifier.size(24.dp).background(mobilePaint(hex), CircleShape).border(if (color == hex) 3.dp else 1.dp, colors.onSurface, CircleShape))
+                                                    Box(Modifier.size(24.dp).background(displayPaint(hex, dark), CircleShape).border(if (color == hex) 3.dp else 1.dp, colors.onSurface, CircleShape))
                                                     Text(name, Modifier.weight(1f)); if (color == hex) Text("Selected", style = MaterialTheme.typography.labelSmall)
                                                 }
                                             }
@@ -450,10 +450,10 @@ fun MobileBoardApp(
     }
 }
 
-private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f) {
+private fun DrawScope.mobileElement(element: BoardElement, textMeasurer: TextMeasurer, images: Map<String, ImageBitmap?>, alpha: Float = 1f, dark: Boolean = false) {
     if (element.image != null) { drawImageElement(element, images, alpha); return }
-    if (element.text != null) { drawTextElement(element, textMeasurer, alpha); return }
-    val color = mobilePaint(element.color).copy(alpha = alpha)
+    if (element.text != null) { drawTextElement(element, textMeasurer, alpha, dark); return }
+    val color = displayPaint(element.color, dark).copy(alpha = alpha)
     if (element.type == "pen" && element.points.any { it.pressure != null }) { drawPressurePen(element, color); return }
     val a = element.points.first(); val b = element.points.last()
     if (element.points.size == 1) { drawCircle(color, element.width.toFloat() / 2, Offset(a.x.toFloat(), a.y.toFloat())); return }

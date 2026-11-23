@@ -2,6 +2,12 @@
 
 ## Unreleased — Phase 4
 
+### System, Light and Dark appearance (MES-14)
+- Changed: Dark mode now includes the drawing canvas, replacing the light-paper rule. The canvas, grid, selection and arrow handles use dark colors, and dark ink is lightened for display only by a shared, deterministic contrast mapping. Stored element colors, history and sync are unchanged, so light and dark collaborators see the same board.
+- Added: native appearance choices persist across restarts (desktop Java Preferences, Android SharedPreferences, iOS NSUserDefaults). System remains the default.
+- Added: a web Appearance button in the canvas footer; dark styles for the empty state, hints, error banners and dialogs.
+- Tested: shared fixture parity (TypeScript/Kotlin), preference and persistence unit tests, desktop/tablet dark-canvas pixel checks, and web end-to-end tests covering live system changes, reload persistence, blocked storage, and simultaneous light/dark collaborators.
+
 ### Server log privacy
 - Fixed: Caddy discards all runtime logs globally. HTTP handler errors (such as a 502 when signaling is down) and ACME challenge warnings previously recorded visitor addresses, user agents, URIs and headers even with access logging disabled.
 - Fixed: Coturn uses `simple-log`, so `log-file=/dev/null` really discards output. Coturn previously wrote a dated `/dev/null_YYYY-MM-DD.log` inside the container, including TURN usernames from failed authentications. Removed the `no-tlsv1`, `no-tlsv1_1` and `no-dtls` options, which Coturn 4.18 rejects as unknown. Its defaults already require TLS 1.2 or later and start no DTLS listener.

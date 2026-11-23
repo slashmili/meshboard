@@ -54,10 +54,10 @@ data class Selection(val ids: List<String> = emptyList(), val start: Point? = nu
         return elements.map { moved[it.id] ?: it }
     }
 }
-fun DrawScope.drawSelection(selection: Selection, elements: List<BoardElement>, zoom: Double) {
+fun DrawScope.drawSelection(selection: Selection, elements: List<BoardElement>, zoom: Double, dark: Boolean = false) {
     val boxes = elements.filter { it.id in selection.ids }.map(::selectionBounds) + listOfNotNull(selection.box())
     val padding = 4 / zoom
-    boxes.forEach { b -> drawRect(Color(0xff4878c8), Offset((b.x-padding).toFloat(), (b.y-padding).toFloat()),
+    boxes.forEach { b -> drawRect(hexColor(DisplayColors.canvas(dark).selection), Offset((b.x-padding).toFloat(), (b.y-padding).toFloat()),
         Size((b.width+2*padding).toFloat(), (b.height+2*padding).toFloat()),
         style = Stroke((1.5/zoom).toFloat(), pathEffect = PathEffect.dashPathEffect(floatArrayOf((5/zoom).toFloat(),(3/zoom).toFloat())))) }
 }

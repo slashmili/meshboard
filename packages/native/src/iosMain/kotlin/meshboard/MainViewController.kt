@@ -10,6 +10,7 @@ import kotlin.io.encoding.Base64
 import org.jetbrains.skia.Image
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
+import platform.Foundation.NSUserDefaults
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
 import platform.UIKit.popoverPresentationController
@@ -21,9 +22,14 @@ fun MainViewController(network: AppleNetwork, origin: String): UIViewController 
     lateinit var host: UIViewController
     host = ComposeUIViewController {
         val controller = remember { AppleBoardController(network) }
+        // Only the local appearance choice is persisted; board data stays in memory.
+        val appearance = remember {
+            val defaults = NSUserDefaults.standardUserDefaults
+            KeyValueAppearanceStore(read = { defaults.stringForKey(it) }, write = { key, value -> defaults.setObject(value, key) })
+        }
         DisposableEffect(controller) { onDispose { controller.close() } }
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            MobileBoardApp(controller, origin, boardTitle = "Meshboard", shareInvite = { invite ->
+            MobileBoardApp(controller, origin, boardTitle = "Meshboard", appearanceStore = appearance, shareInvite = { invite ->
                 var presenter = host
                 while (presenter.presentedViewController != null) presenter = presenter.presentedViewController!!
                 val activity = UIActivityViewController(activityItems = listOf(invite), applicationActivities = null)
