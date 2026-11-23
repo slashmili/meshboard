@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { resolve, join } from 'node:path'
@@ -13,7 +13,7 @@ const tasks = {
   'crdt-test': [':androidApp:connectedDebugAndroidTest'],
   'interop': [':androidApp:installDebug', ':androidApp:installDebugAndroidTest', 'prepareCrdtInterop', 'prepareInterop'],
 }
-if (mode !== 'emulator' && !Object.hasOwn(tasks, mode)) throw new Error('Usage: node scripts/android.mjs [emulator|build|test|run|interop|crdt-test]')
+if (!['emulator', 'screenshot'].includes(mode) && !Object.hasOwn(tasks, mode)) throw new Error('Usage: node scripts/android.mjs [emulator|build|test|run|interop|crdt-test|screenshot]')
 const env = { ...process.env, ANDROID_HOME: sdk }
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, env, stdio: 'inherit', shell: windows })
@@ -109,6 +109,14 @@ function startEmulator() {
 
 if (mode === 'emulator') {
   startEmulator()
+} else if (mode === 'screenshot') {
+  const output = resolve(root, 'packages/native/build/test-artifacts/android-tablet.png')
+  mkdirSync(resolve(root, 'packages/native/build/test-artifacts'), { recursive: true })
+  const result = spawnSync(adb, ['-s', serial, 'exec-out', 'screencap', '-p'], { env, maxBuffer: 16 * 1024 * 1024 })
+  if (result.error) throw result.error
+  if (result.status !== 0) throw new Error(result.stderr.toString() || 'Could not capture tablet screenshot.')
+  writeFileSync(output, result.stdout)
+  console.log(output)
 } else {
   if (!existsSync(join(sdk, 'platforms/android-35/android.jar'))) throw new Error('Install Android SDK platform 35 and set ANDROID_HOME. See packages/native/androidApp/README.md.')
   if (mode !== 'build') {
@@ -119,6 +127,7 @@ if (mode === 'emulator') {
     if (online.length !== 1) throw new Error('Keep only the intended test device connected for this command.')
   }
   const properties = [
+    ...(mode === 'test' && process.env.MESHBOARD_ANDROID_TEST_CLASS ? [`-Pandroid.testInstrumentationRunnerArguments.class=${process.env.MESHBOARD_ANDROID_TEST_CLASS}`] : []),
     ...(mode === 'crdt-test' ? ['-Pandroid.testInstrumentationRunnerArguments.class=meshboard.crdt.JvmCrdtBoardTest,meshboard.crypto.JvmFrameCipherTest,meshboard.crypto.SecureChannelTest'] : []),
   ]
   if (mode === 'interop') {
