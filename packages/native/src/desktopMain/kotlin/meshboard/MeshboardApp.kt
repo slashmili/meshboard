@@ -114,18 +114,20 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                 var start: Point? = null
                                 var arrowEndpoint = 1
                                 var editingArrow = false
+                                var pressureInput = StrokePressure(PointerType.Mouse)
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull() ?: continue
                                     val p = Point(change.position.x / density.toDouble(), change.position.y / density.toDouble())
-                                    val world = if (tool == Tool.Pen) penSample(view.world(p), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(p)
+                                    val world = view.world(p)
                                     if (change.pressed && !change.previousPressed) {
+                                        pressureInput = StrokePressure(change.type)
                                         focus.requestFocus()
                                         active = if (space || event.buttons.isTertiaryPressed) Tool.Hand else tool
                                         last = p; start = world
                                         if (active == Tool.Select) selection = selection.begin(resolveConnectors(currentState.elements), world, 6 / view.zoom, event.keyboardModifiers.isShiftPressed)
                                         if (active != Tool.Select && active != Tool.Hand && active != Tool.Eraser && active != Tool.Text && active != Tool.Sticky) {
-                                            draft = BoardElement(controller.newId(), active!!.wire, color, width, if (active == Tool.Pen) listOf(world) else listOf(world, world))
+                                            draft = BoardElement(controller.newId(), active!!.wire, color, width, if (active == Tool.Pen) pressureInput.add(world, change.pressure) else listOf(world, world))
                                             if (tool == Tool.Arrow) { val arrow = beginArrow(currentState.elements, world, 10 / view.zoom, draft!!); draft = arrow.element; arrowEndpoint = arrow.index; editingArrow = arrow.existing } else editingArrow = false
                                             controller.preview(draft)
                                         }
@@ -144,11 +146,12 @@ fun MeshboardApp(controller: BoardController, defaultOrigin: String = "http://12
                                                 if (element != null) {
                                                     if (active == Tool.Arrow) draft = dragArrow(element,arrowEndpoint,if (event.keyboardModifiers.isShiftPressed) constrained(element.points[1-arrowEndpoint],world,"arrow") else world,currentState.elements,10/view.zoom)
                                                     else if (active == Tool.Pen) {
-                                                        if (element.points.last() != world) {
-                                                            if (element.points.size == Wire.MAX_POINTS) {
-                                                                controller.put(element)
-                                                                draft = element.copy(id = controller.newId(), points = listOf(element.points.last(), world))
-                                                            } else draft = element.copy(points = element.points + world)
+                                                        val points = pressureInput.add(world, change.pressure, change.pressed)
+                                                        draft = element.copy(points = points)
+                                                        if (points.size > Wire.MAX_POINTS) {
+                                                            controller.put(element.copy(points = points.take(Wire.MAX_POINTS)))
+                                                            pressureInput.retainLast(2)
+                                                            draft = element.copy(id = controller.newId(), points = points.takeLast(2))
                                                         }
                                                     } else draft = element.copy(points = listOf(start!!, if (event.keyboardModifiers.isShiftPressed) constrained(start!!, world, element.type) else world))
                                                     controller.preview(draft)

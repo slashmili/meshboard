@@ -87,6 +87,7 @@ export function App() {
   const [imageError, setImageError] = useState('')
   const [imageBusy, setImageBusy] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [inputCopyStatus, setInputCopyStatus] = useState('')
   const helpDialog = useRef<HTMLDialogElement>(null)
   const clearDialog = useRef<HTMLDialogElement>(null)
   const leaveDialog = useRef<HTMLDialogElement>(null)
@@ -132,6 +133,17 @@ export function App() {
           <button className="quiet-button clear-button" aria-label="Clear board" disabled={document.getElements().length === 0} onClick={() => clearDialog.current?.showModal()}><Trash2 size={16} /><span>Clear board</span></button>
         </div>
       </header>
+
+      {board.inputTrace && <details open className="input-diagnostics" data-testid="input-diagnostics">
+        <summary>Input diagnostics</summary>
+        <p>Event metadata only. Kept in memory until this page closes.</p>
+        <pre>{board.inputTrace.join('\n') || 'Draw one stroke, then copy the trace.'}</pre>
+        <button type="button" onClick={async () => {
+          try { await navigator.clipboard.writeText(board.inputTrace!.join('\n')); setInputCopyStatus('Copied') }
+          catch { setInputCopyStatus('Could not copy. Select the trace text to copy it.') }
+        }}>Copy input trace</button>
+        {inputCopyStatus && <p role="status">{inputCopyStatus}</p>}
+      </details>}
 
       <section className="workspace" aria-label="Whiteboard workspace">
         <input ref={imageInput} type="file" accept="image/png,image/jpeg" aria-label="Image file" hidden onChange={async event => {

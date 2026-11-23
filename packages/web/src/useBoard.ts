@@ -1,13 +1,14 @@
+import { StrokePressure } from './StrokePressure'
 import { beginArrow, dragArrow, resolveConnectors, resolveConnector } from './connectors'
 import { beginSelection, finishSelection, selectionDelta, translated, type Selection } from './selection'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import { MAX_POINTS } from '@meshboard/shared-protocol'
-import { constrainEnd, penSample, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
+import { constrainEnd, hitsElement, INITIAL_VIEW, toWorld, zoomAt, type BoardElement, type Point, type Tool, type View } from './board'
 import type { SessionDocument } from './sync/SessionDocument'
 
 type Gesture =
   | { type: 'select'; pointer: number }
-  | { type: 'draw'; pointer: number; element: BoardElement; endpoint?: number; existing?: boolean }
+  | { type: 'draw'; pointer: number; element: BoardElement; endpoint?: number; existing?: boolean; pressure: StrokePressure }
   | { type: 'label'; pointer: number; at: Point; kind: 'text' | 'sticky' }
   | { type: 'erase'; pointer: number; last: Point }
   | { type: 'pan'; pointer: number; start: Point; view: View }
@@ -24,7 +25,11 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   const viewRef = useRef(view)
   const gesture = useRef<Gesture | null>(null)
   const pointers = useRef(new Map<number, Point>())
+  const penPointer = useRef<number | null>(null)
+  const suppressed = useRef(new Set<number>())
   const [spaceDown, setSpaceDown] = useState(false)
+  const debugInput = new URLSearchParams(window.location.search).get('input-debug') === '1'
+  const [inputTrace, setInputTrace] = useState<string[]>([])
 
   const setView = useCallback((next: View) => {
     viewRef.current = next
@@ -35,6 +40,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
     gesture.current = null
     setSelection({ ids: [] })
     pointers.current.clear()
+    penPointer.current = null
     setDraft(null)
     preview(null)
   }, [preview])
@@ -61,6 +67,37 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       window.removeEventListener('blur', onBlur)
     }
   }, [cancelGesture])
+
+  useEffect(() => {
+    if (!debugInput) return
+    const svg = svgRef.current
+    if (!svg) return
+    const tracked = new Set<number>()
+    let sequence = 0
+    const observe = (event: Event) => {
+      const pointer = event instanceof PointerEvent ? event : null
+      const global = event.type === 'blur' || event.type === 'error'
+      if (global && event.target !== window) return
+      if (!global && !(event.target instanceof Node && svg.contains(event.target)) && !(pointer && tracked.has(pointer.pointerId))) return
+      if (pointer?.type === 'pointerdown') tracked.add(pointer.pointerId)
+      const metadata = `${++sequence} ${event.type}${pointer ? ` ${pointer.pointerType} id=${pointer.pointerId} buttons=${pointer.buttons}` : ''}`
+      const captured = pointer ? svg.hasPointerCapture(pointer.pointerId) : false
+      // Observe after React handles the event. Never record coordinates, pressure,
+      // element contents, URLs, invitation fragments or persistent diagnostics.
+      const row = `${metadata} | gesture=${gesture.current?.type ?? 'none'} active=${pointers.current.size} saved=${document.getElements().length} capture=${captured} focus=${window.document.hasFocus()}`
+      setInputTrace(rows => [...rows.slice(-39), row])
+      if (pointer && (event.type === 'pointerup' || event.type === 'pointercancel')) tracked.delete(pointer.pointerId)
+    }
+    const types = ['pointerdown', 'pointerup', 'pointercancel', 'gotpointercapture', 'lostpointercapture', 'touchstart', 'touchend', 'touchcancel']
+    for (const type of types) window.addEventListener(type, observe)
+    window.addEventListener('blur', observe)
+    window.addEventListener('error', observe)
+    return () => {
+      for (const type of types) window.removeEventListener(type, observe)
+      window.removeEventListener('blur', observe)
+      window.removeEventListener('error', observe)
+    }
+  }, [debugInput, document])
 
   useEffect(() => {
     const svg = svgRef.current
@@ -92,6 +129,16 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
 
   function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     if (event.button !== 0 && event.button !== 1) return
+    if (penPointer.current !== null && event.pointerType !== 'pen') {
+      suppressed.current.add(event.pointerId)
+      return
+    }
+    if (event.pointerType === 'pen') {
+      // A pen takes precedence over a finger/palm already on the canvas.
+      for (const id of pointers.current.keys()) suppressed.current.add(id)
+      cancelGesture()
+      penPointer.current = event.pointerId
+    }
     event.preventDefault()
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -125,9 +172,10 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       gesture.current = { type: 'select', pointer: event.pointerId }
       return
     }
-    const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? [penSample(world, event.pointerType, event.pressure)] : [world, world] }
+    const pressure = new StrokePressure(event.pointerType)
+    const element: BoardElement = { id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, type: tool, color, width, points: tool === 'pen' ? pressure.add(world, event.pressure) : [world, world] }
     const arrow = tool === 'arrow' ? beginArrow(document.getElements(), world, 10/viewRef.current.zoom, element) : null
-    gesture.current = { type: 'draw', pointer: event.pointerId, element: arrow?.element ?? element, endpoint: arrow?.index, existing: arrow?.existing }
+    gesture.current = { type: 'draw', pointer: event.pointerId, element: arrow?.element ?? element, endpoint: arrow?.index, existing: arrow?.existing, pressure }
     setDraft(gesture.current.element)
     preview(gesture.current.element)
   }
@@ -164,17 +212,15 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       active.element = dragArrow(element, active.endpoint ?? 1, event.shiftKey ? constrainEnd(element.points[active.endpoint === 0 ? 1 : 0], world, 'arrow') : world, document.getElements(), 10/viewRef.current.zoom)
     } else if (element.type === 'pen') {
       const samples = event.nativeEvent.getCoalescedEvents?.() ?? []
-      const newPoints = (samples.length ? samples : [event]).map(sample => {
-        const world = toWorld(localPoint(sample), viewRef.current)
-        // Pointer-up pressure is zero even when the final contact had pressure.
-        const pressure = event.type === 'pointerup' ? element.points.at(-1)?.pressure : sample.pressure
-        return penSample(world, event.pointerType, pressure ?? Number.NaN)
-      })
-      // Split a very long stroke into bounded objects without interrupting input.
-      if (element.points.length + newPoints.length > MAX_POINTS) {
-        document.put(element)
-        active.element = { ...element, id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, points: [element.points.at(-1)!, ...newPoints.slice(0, MAX_POINTS - 1)] }
-      } else active.element = { ...element, points: [...element.points, ...newPoints] }
+      for (const sample of samples.length && event.type !== 'pointerup' ? samples : [event]) {
+        const points = active.pressure.add(toWorld(localPoint(sample), viewRef.current), sample.pressure, event.type !== 'pointerup')
+        active.element = { ...active.element, points }
+        if (points.length > MAX_POINTS) {
+          document.put({ ...active.element, points: points.slice(0, MAX_POINTS) })
+          active.pressure.retainLast(2)
+          active.element = { ...active.element, id: `${Date.now().toString(36)}-${crypto.randomUUID()}`, points: points.slice(-2) }
+        }
+      }
     } else {
       active.element = { ...element, points: [element.points[0], event.shiftKey ? constrainEnd(element.points[0], world, element.type) : world] }
     }
@@ -183,6 +229,8 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   }
 
   function onPointerUp(event: ReactPointerEvent<SVGSVGElement>) {
+    if (suppressed.current.delete(event.pointerId)) return
+    if (penPointer.current === event.pointerId) penPointer.current = null
     const active = gesture.current
     if (active && active.type !== 'pinch' && active.pointer === event.pointerId) {
       if (active.type === 'select') {
@@ -239,6 +287,12 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       displayElements = elements.map(e => moved.get(e.id) ?? e)
     } catch { /* Invalid moves keep their original preview until validation reports the error. */ }
   }
-  return { svgRef, elements: resolveConnectors(displayElements).filter(e=>e.id !== draft?.id), selection, draft: draft ? resolveConnector(draft, displayElements) : null, view, spaceDown, zoomBy, resetView, clear, cancelGesture,
-    pointerHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: cancelGesture, onLostPointerCapture: () => { if (pointers.current.size === 0) gesture.current = null } } }
+  return { inputTrace: debugInput ? inputTrace : null, svgRef, elements: resolveConnectors(displayElements).filter(e=>e.id !== draft?.id), selection, draft: draft ? resolveConnector(draft, displayElements) : null, view, spaceDown, zoomBy, resetView, clear, cancelGesture,
+    pointerHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: (event: ReactPointerEvent<SVGSVGElement>) => {
+      if (suppressed.current.delete(event.pointerId)) return
+      for (const id of pointers.current.keys()) if (id !== event.pointerId) suppressed.current.add(id)
+      cancelGesture()
+    }, onLostPointerCapture: (event: ReactPointerEvent<SVGSVGElement>) => {
+      if (pointers.current.has(event.pointerId)) cancelGesture()
+    } } }
 }

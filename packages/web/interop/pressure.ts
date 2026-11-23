@@ -30,4 +30,16 @@ export async function pressureInterop(page: Page, native: Pick<ReturnType<typeof
   await expect(lines.first()).toHaveAttribute('stroke-width', String(pen.width * 0.625))
   await page.reload()
   await expect(lines.first()).toHaveAttribute('stroke-width', String(pen.width * 0.625), { timeout: 30_000 })
+  const cdp = await page.context().newCDPSession(page)
+  try {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 400, y: 500, force: 0.25 }] })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 550, y: 500, force: 0.75 }] })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  } finally { await cdp.detach() }
+  await expect.poll(() => native.state().elements.length).toBe(2)
+  const finger = native.state().elements.find(e => e.id !== pen.id)!
+  expect(finger.points[0].pressure).toBeCloseTo(0.25)
+  expect(finger.points.at(-1)!.pressure).toBeCloseTo(0.75)
+  expect(finger.points.every(p => p.pressure !== undefined)).toBe(true)
+
 }

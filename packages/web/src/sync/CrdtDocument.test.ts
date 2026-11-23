@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import * as Y from 'yjs'
 import type { BoardElement } from '@meshboard/shared-protocol'
+import { StrokePressure } from '../StrokePressure'
 import { CrdtDocument } from './CrdtDocument'
 
 const shape = (id: string): BoardElement => ({ id, type: 'pen', color: '#123456', width: 3, points: [{ x: 12, y: 34 }] })
@@ -140,4 +141,21 @@ it('images synchronize, move, undo and enforce the eight-image limit atomically'
   expect(a.put({...image,id:'too-many'})).toBe(false)
   expect(a.getElements()).toHaveLength(8)
   a.remove([image.id]); a.undo(); expect(a.getElements()).toHaveLength(8)
+})
+
+it('preserves measured finger pressure and missing samples through a CRDT snapshot', () => {
+  const input = new StrokePressure('touch')
+  input.add({ x: 0, y: 0 }, 0.25)
+  input.add({ x: 1, y: 0 }, Number.NaN)
+  input.add({ x: 2, y: 0 }, 0.75)
+  const points = input.add({ x: 3, y: 0 }, 0, false)
+  const a = new CrdtDocument(), restored = new CrdtDocument()
+  try {
+    expect(a.put({ ...shape('finger'), points })).toBe(true)
+    restored.applyUpdate(Y.encodeStateAsUpdate(a.ydoc))
+    expect(restored.getElements()[0].points).toEqual([
+      { x: 0, y: 0, pressure: 0.25 }, { x: 1, y: 0 },
+      { x: 2, y: 0, pressure: 0.75 }, { x: 3, y: 0, pressure: 0.75 },
+    ])
+  } finally { a.ydoc.destroy(); restored.ydoc.destroy() }
 })
