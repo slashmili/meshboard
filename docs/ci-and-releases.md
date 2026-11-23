@@ -1,5 +1,10 @@
 # CI and desktop releases
 
+The [support matrix](support.md) defines declared/proposed version floors and
+release boundary checks. The runners below describe coverage, not minimum OS
+versions or evidence that the current revision passed. Browser CI uses current
+Playwright Chromium; old browser engines and physical tablets need separate runs.
+
 ## Pull requests and main
 
 The **Web tests** and **Tests** workflows run on pull requests and pushes to

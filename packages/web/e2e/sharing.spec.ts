@@ -3,6 +3,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 const elements = (page: Page) => page.getByTestId('drawing-elements').locator(':scope > *')
 
 async function drag(page: Page, x: number, y: number) {
+  await expect(page.getByRole('img', { name: 'Drawing canvas' })).toBeVisible()
   await page.mouse.move(x, y)
   await page.mouse.down()
   await page.mouse.move(x + 100, y + 60, { steps: 8 })

@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import type { nativePeer } from './peers'
 
 export async function drawPressure(page: Page) {
+  await expect(page.getByRole('img', { name: 'Drawing canvas' })).toBeVisible()
   const cdp = await page.context().newCDPSession(page)
   try {
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 400, y: 300, button: 'left', buttons: 1, pointerType: 'pen', force: 0.1, clickCount: 1 })

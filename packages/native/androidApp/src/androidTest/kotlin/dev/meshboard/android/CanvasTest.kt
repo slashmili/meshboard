@@ -256,18 +256,33 @@ class CanvasTest {
     }
 
     @Test fun touchNotesCanBeEditedAndErased() {
+        val canvasBounds = canvas().fetchSemanticsNode().boundsInRoot
+        fun saveText() {
+            rule.onNodeWithText("Save text").performClick(); count(1)
+            // Object count can update before Android removes the dialog window
+            // and restores the activity's focus/IME-adjusted canvas geometry.
+            rule.waitUntil(5000) {
+                rule.activity.hasWindowFocus() && canvas().fetchSemanticsNode().boundsInRoot == canvasBounds
+            }
+        }
+        fun openEditor(at: Offset) {
+            canvas().performTouchInput { click(at) }
+            rule.waitUntil(5000) {
+                rule.onAllNodesWithTag("text-editor").fetchSemanticsNodes().isNotEmpty()
+            }
+        }
         mobileTool("sticky")
-        canvas().performTouchInput { click(Offset(250f, 250f)) }
+        openEditor(Offset(250f, 250f))
         rule.onNodeWithTag("text-editor").performTextInput("Android note")
-        rule.onNodeWithText("Save text").performClick(); count(1)
-        canvas().performTouchInput { click(Offset(270f, 270f)) }
+        saveText()
+        openEditor(Offset(270f, 270f))
         rule.onNodeWithTag("text-editor").assertTextContains("Android note")
         rule.onNodeWithTag("text-editor").performTextReplacement("Edited Android note")
-        rule.onNodeWithText("Save text").performClick(); count(1)
+        saveText()
         mobileTool("eraser")
         canvas().performTouchInput { click(Offset(270f, 270f)) }; count(0)
         mobileTool("text")
-        canvas().performTouchInput { click(Offset(250f, 250f)) }
+        openEditor(Offset(250f, 250f))
         rule.onNodeWithTag("text-editor").performTextInput("Cancel text")
         rule.onNodeWithText("Cancel").performClick(); count(0)
     }

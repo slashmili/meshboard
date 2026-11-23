@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import type { nativePeer } from './peers'
 export async function historyInterop(page: Page, native: Pick<ReturnType<typeof nativePeer>, 'send' | 'state'>) {
   await page.goto('/')
+  await expect(page.getByRole('img', { name: 'Drawing canvas' })).toBeVisible()
   await page.mouse.move(400,300); await page.mouse.down(); await page.mouse.move(460,360); await page.mouse.up()
   await page.getByRole('button', { name:'Share board', exact:true }).click()
   const invite = await page.getByLabel('Board invite', { exact:true }).inputValue()

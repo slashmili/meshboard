@@ -1,5 +1,9 @@
 # Development
 
+See the [support matrix](support.md) for browser/native version floors, required
+capabilities and boundary checks. CI and simulator coverage are listed separately
+from physical-device acceptance. Native mobile releases target tablets only.
+
 
 Transfer committed source changes using your chosen Git workflow before switching
 machines. Read [AGENTS.md](../AGENTS.md), the assigned Linear issue, and the relevant platform guide. Record validation and remaining checks in Linear.

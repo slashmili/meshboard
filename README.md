@@ -14,6 +14,6 @@ use end-to-end encryption. No accounts, analytics, or cloud storage.
 Boards stay in memory while participants are connected. Export and local recovery
 are still being built.
 
-[Development setup](docs/development.md) · [Self-hosting](docs/deployment.md)
+[Platforms and minimum versions](docs/support.md) · [Development setup](docs/development.md) · [Self-hosting](docs/deployment.md)
 
 Licensed under [MPL-2.0](LICENSE). Third-party components retain their own licenses.

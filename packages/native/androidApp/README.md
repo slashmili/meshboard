@@ -4,7 +4,10 @@ This Android app uses the shared Kotlin Multiplatform drawing model and a Compos
 touch interface. It supports pen, rectangle/ellipse/line, whole-object eraser,
 six colors, three widths, and pan/zoom. Minimum Android version: 8.0 (API 26).
 The default test device is an Android 15 (API 35) x86_64 Pixel Tablet in landscape.
-The earlier Pixel 6 phone profile remains available for phone-specific checks.
+Native releases target tablets only; Android phones use responsive web.
+See the [support matrix](../../../docs/support.md): API 26 is a declared build
+floor, while current CI uses API 35. Minimum-version and physical ARM64 acceptance
+remain pending; emulator results do not establish those checks.
 
 Android can create an invite link/QR or join a web/desktop invite. Native
 `org.webrtc` data channels carry drawings, live previews, erasing, and snapshots;
@@ -48,7 +51,7 @@ pnpm test:interop:android # Real Android/web/desktop sessions; run pnpm turn fir
 All Android commands use one script, `scripts/android.mjs`, with modes for
 `emulator`, `run`, `build`, `test`, `interop`, and `crdt-test`. Start the emulator once, then
 use the app commands repeatedly; rebuilding does not restart Android. The app
-commands also work with a device started from Android Studio or a connected phone.
+commands also work with a tablet started from Android Studio or a connected physical tablet.
 
 Set `ANDROID_SERIAL` for a different device. Keep only the intended device online
 when using these scripts. The APK is
@@ -92,9 +95,10 @@ implemented yet. A QR can open the web fallback on a device that can reach its o
 The ViewModel also retains the connection across activity recreation. Background
 suspension/process death is not a persistent session or background-service guarantee.
 Leaving discards the local board. As elsewhere, there is no host after creation.
-This is still a **connection prototype**, with DTLS transport encryption only:
-no authenticated invitations, application-layer encryption or disk storage.
-Use test drawings, not sensitive information.
+Normal sessions authenticate DTLS fingerprints using the invitation secret and
+encrypt board/awareness traffic with AES-256-GCM. There is no plaintext fallback.
+Device acceptance remains distinct from this implemented protocol; see the
+[security validation record](https://linear.app/slashmili/document/encrypted-sessions-security-design-and-validation-f70efdce32e6).
 
 Interop tests install a separate test APK and control the real Android controller
 through a loopback socket temporarily forwarded by adb. This adapter is not in
@@ -105,7 +109,8 @@ opt-in harness and runs the UI tests without requiring a server. Interop tests
 need Playwright Chromium, just like `test:interop`; a compatible installed browser
 can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 
-Pressure-sensitive stroke widths, saving, undo, and export remain later features.
+Pressure data and undo/redo are implemented; physical stylus acceptance remains
+pending. Saving/recovery and export remain separate pending features.
 
 ## Rust toolchain
 
