@@ -16,5 +16,6 @@ target/
 local.properties
 xcuserdata/
 *.xcuserstate
+packages/native/iosApp/Config/Local.xcconfig
 .android-sdk/
 .android-avd/

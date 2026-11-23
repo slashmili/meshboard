@@ -1,0 +1,9 @@
+// Base configuration for the Meshboard target.
+// Per-developer values (signing team, app address) belong in Local.xcconfig,
+// which Git ignores. Copy Local.xcconfig.example to create it.
+
+// Empty keeps the built-in defaults: the local dev server on simulators and a
+// blank https:// address on devices.
+MESHBOARD_APP_ORIGIN =
+
+#include? "Local.xcconfig"

@@ -17,6 +17,10 @@ struct MeshboardApp: App {
 private struct BoardView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         MainViewControllerKt.MainViewController(network: NativeAppleNetwork(), origin: {
+            // MESHBOARD_APP_ORIGIN build setting; see Config/Local.xcconfig.example.
+            let configured = (Bundle.main.object(forInfoDictionaryKey: "MeshboardAppOrigin") as? String ?? "")
+                .trimmingCharacters(in: .whitespaces)
+            if !configured.isEmpty { return configured.hasSuffix("/") ? String(configured.dropLast()) : configured }
             #if targetEnvironment(simulator)
             return "http://127.0.0.1:5173"
             #else
