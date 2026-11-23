@@ -29,7 +29,7 @@ fun MainViewController(network: AppleNetwork, origin: String): UIViewController 
         }
         DisposableEffect(controller) { onDispose { controller.close() } }
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            MobileBoardApp(controller, origin, boardTitle = "Meshboard", appearanceStore = appearance, shareInvite = { invite ->
+            MobileBoardApp(controller, origin, boardTitle = "Meshboard", appearanceStore = appearance, contactPressure = ::appleContactPressure, shareInvite = { invite ->
                 var presenter = host
                 while (presenter.presentedViewController != null) presenter = presenter.presentedViewController!!
                 val activity = UIActivityViewController(activityItems = listOf(invite), applicationActivities = null)

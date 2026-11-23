@@ -375,6 +375,24 @@ class AppTest {
         rule.runOnIdle { assertEquals(1,controller.state.value.elements.size) }
     }
 
+    @Test fun mobileContactPressureSurvivesInputCommitAndRelease() {
+        val controller = localBoard { "finger-pressure" }
+        rule.setContent { Box(Modifier.requiredSize(1024.dp, 768.dp)) {
+            MobileBoardApp(controller, appearanceStore = lightAppearance(), contactPressure = { _, change ->
+                if (!change.pressed) 0f else if (change.position.x < 200f) .25f else .75f
+            })
+        } }
+        rule.onNodeWithTag("mobile-canvas").performTouchInput {
+            down(Offset(100f, 100f)); moveTo(Offset(150f, 100f)); moveTo(Offset(250f, 100f)); up()
+        }
+        rule.runOnIdle {
+            val points = controller.state.value.elements.single().points
+            assertEquals(.25, points.first().pressure)
+            assertEquals(.75, points.last().pressure)
+            assertTrue(points.all { it.pressure == .25 || it.pressure == .75 })
+        }
+    }
+
     @Test fun mobilePressureStrokePaintsDifferentWidths() {
         val controller = localBoard { "pressure" }
         controller.put(BoardElement("pressure", "pen", "#293b36", 8.0, listOf(

@@ -93,11 +93,7 @@ export function hitsElement(element: BoardElement, from: Point, to: Point, radiu
   })
 }
 
-/** Missing pressure preserves mouse/touch width; contact samples use 25–100%. */
+/** Missing pressure preserves base width; contact samples use 25–100%. */
 export function penWidth(width: number, pressure?: number) {
   return pressure === undefined ? width : width * (0.25 + 0.75 * pressure)
-}
-export function penSample(point: Point, pointerType: string, pressure: number): Point {
-  return pointerType === 'pen' && Number.isFinite(pressure)
-    ? { ...point, pressure: Math.min(1, Math.max(0, pressure)) } : point
 }

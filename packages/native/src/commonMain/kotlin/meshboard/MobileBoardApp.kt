@@ -47,6 +47,7 @@ fun MobileBoardApp(
     shareInvite: ((String) -> Unit)? = null,
     backHandler: (@Composable (Boolean, () -> Unit) -> Unit)? = null,
     appearanceStore: AppearanceStore? = null,
+    contactPressure: (PointerEvent, PointerInputChange) -> Float = { _, change -> change.pressure },
     qrImage: ((String) -> ImageBitmap)? = null,
 ) {
     val sharing = controller as? BoardController
@@ -150,31 +151,38 @@ fun MobileBoardApp(
                                 var start: Point? = null
                                 var arrowEndpoint = 1
                                 var editingArrow = false
+                                var pressureInput = StrokePressure(PointerType.Mouse)
                                 var last: Point? = null
                                 var navigating = false
                                 var suppressed = false
                                 var gestureTool = activeTool
                                 while (true) {
                                     val event = awaitPointerEvent()
-                                    val pressed = event.changes.filter { it.pressed }
+                                    val stylus = event.changes.firstOrNull { it.type == PointerType.Stylus && (it.pressed || it.previousPressed) }
+                                    val changes = if (stylus != null) listOf(stylus) else event.changes
+                                    if (stylus != null && stylus.changedToDown() && !suppressed) {
+                                        selection = Selection(selection.ids); draft = null; pointer = null
+                                        navigating = false; controller.preview(null)
+                                    }
+                                    val pressed = changes.filter { it.pressed }
                                     // Captured pointers continue arriving outside the canvas. Cancel
                                     // before applying coordinates to any tool, and drain the gesture
                                     // so re-entry cannot start another stroke or trigger a text edit.
-                                    val outside = event.changes.any {
+                                    val outside = changes.any {
                                         (it.pressed || it.previousPressed) &&
                                             (it.position.x < 0 || it.position.y < 0 ||
                                                 it.position.x >= size.width || it.position.y >= size.height)
                                     }
-                                    val overControl = event.changes.any { change ->
+                                    val overControl = changes.any { change ->
                                         val at = change.position + canvasBounds.topLeft
                                         controls.values.any { it.contains(at) }
                                     }
-                                    val overError = latest.error != null && event.changes.any {
+                                    val overError = latest.error != null && changes.any {
                                         val left = (size.width - errorSize.width) / 2
                                         it.position.x >= left && it.position.x < left + errorSize.width &&
                                             it.position.y >= 0 && it.position.y < errorSize.height
                                     }
-                                    if (inputBlocked || outside || overError || overControl || event.changes.any { it.isConsumed }) suppressed = true
+                                    if (inputBlocked || outside || overError || overControl || changes.any { it.isConsumed }) suppressed = true
                                     if (suppressed) {
                                         selection = Selection(selection.ids); draft = null; pointer = null
                                         navigating = false; controller.preview(null)
@@ -202,17 +210,18 @@ fun MobileBoardApp(
                                         if (pressed.isEmpty()) navigating = false
                                         event.changes.forEach { it.consume() }; continue
                                     }
-                                    val change = event.changes.firstOrNull { it.id == pointer }
-                                        ?: event.changes.firstOrNull { it.changedToDown() } ?: continue
+                                    val change = changes.firstOrNull { it.id == pointer }
+                                        ?: changes.firstOrNull { it.changedToDown() } ?: continue
                                     val point = Point(change.position.x / density, change.position.y / density)
                                     if (pointer == null && change.pressed) gestureTool = if (!drawWithFinger && change.type == PointerType.Touch) Tool.Hand else activeTool
                                     val tool = gestureTool
-                                    val world = if (tool == Tool.Pen) penSample(view.world(point), change.type, if (change.pressed) change.pressure else (draft?.points?.lastOrNull()?.pressure ?: 1.0).toFloat()) else view.world(point)
+                                    val world = view.world(point)
                                     if (pointer == null && change.pressed) {
+                                        pressureInput = StrokePressure(change.type)
                                         pointer = change.id; start = world; last = point
                                         if (tool == Tool.Select) selection = selection.begin(resolveConnectors(latest.elements), world, 6 / view.zoom)
                                         if (tool != Tool.Select && tool != Tool.Hand && tool != Tool.Eraser && tool != Tool.Text && tool != Tool.Sticky) {
-                                            draft = BoardElement(controller.newId(), tool.wire, color, width, if (tool == Tool.Pen) listOf(world) else listOf(world, world))
+                                            draft = BoardElement(controller.newId(), tool.wire, color, width, if (tool == Tool.Pen) pressureInput.add(world, contactPressure(event, change)) else listOf(world, world))
                                             if (tool == Tool.Arrow) { val arrow = beginArrow(latest.elements, world, 10 / view.zoom, draft!!); draft = arrow.element; arrowEndpoint = arrow.index; editingArrow = arrow.existing } else editingArrow = false
                                         }
                                     }
@@ -227,11 +236,14 @@ fun MobileBoardApp(
                                         }
                                         else -> draft?.let { element ->
                                             if (tool == Tool.Arrow) draft = dragArrow(element,arrowEndpoint,world,latest.elements,10/view.zoom)
-                                            else if (tool == Tool.Pen && element.points.last() != world) {
-                                                if (element.points.size == Wire.MAX_POINTS) {
-                                                    controller.put(element)
-                                                    draft = element.copy(id = controller.newId(), points = listOf(element.points.last(), world))
-                                                } else draft = element.copy(points = element.points + world)
+                                            else if (tool == Tool.Pen) {
+                                                val points = pressureInput.add(world, contactPressure(event, change), change.pressed)
+                                                draft = element.copy(points = points)
+                                                if (points.size > Wire.MAX_POINTS) {
+                                                    controller.put(element.copy(points = points.take(Wire.MAX_POINTS)))
+                                                    pressureInput.retainLast(2)
+                                                    draft = element.copy(id = controller.newId(), points = points.takeLast(2))
+                                                }
                                             } else if (tool != Tool.Pen) draft = element.copy(points = listOf(start!!, world))
                                             controller.preview(draft)
                                         }
@@ -252,6 +264,7 @@ fun MobileBoardApp(
                                             if (element.type == "pen" || hypot(b.x - a.x, b.y - a.y) > 1 / view.zoom) { if (!editingArrow || latest.elements.any { it.id == element.id }) controller.put(element) }
                                         }
                                         draft = null; pointer = null; controller.preview(null)
+                                        if (stylus != null) suppressed = event.changes.any { it.pressed }
                                     }
                                     change.consume()
                                 }

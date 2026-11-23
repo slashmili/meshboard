@@ -200,3 +200,9 @@ kbd { font-family: inherit; color: #8a967c; padding: 2px 5px; border: 1px solid 
 
 .browser-problem { max-width: 36rem; margin: 10vh auto; padding: 24px; line-height: 1.6; }
 .browser-problem h1 { font-size: 1.5rem; }
+
+.input-diagnostics { position: fixed; z-index: 20; right: 14px; bottom: 42px; width: min(640px, calc(100% - 28px)); box-sizing: border-box; padding: 12px; border: 1px solid currentColor; border-radius: 8px; background: Canvas; color: CanvasText; font-size: 12px; }
+.input-diagnostics summary { cursor: pointer; font-weight: 600; }
+.input-diagnostics p { margin: 8px 0; }
+.input-diagnostics pre { max-height: 140px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; user-select: text; }
+.input-diagnostics button { padding: 6px 10px; }
