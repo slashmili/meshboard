@@ -6,7 +6,7 @@ Safari 17 web requirements, toolchain constraints and pending boundary checks.
 
 Kotlin/Compose drawing UI hosted by SwiftUI, with native Apple WebRTC and URLSession
 signaling. iOS can create or join the same CRDT session as web, macOS, and Android.
-Use **Share → Create invite** or **Join** to paste a full invite. Each peer connects
+Use **Share → Create invite**, **Join → Scan QR code**, or paste a full invite. Each peer connects
 directly to every other peer; there is no privileged host. Invites include a QR code.
 
 Pen, shapes, whole-object eraser, colors/widths, and two-finger pan/zoom are available.
@@ -76,8 +76,9 @@ independent of Xcode. Xcode's build phase invokes `embedAndSignAppleFrameworkFor
 and finds mise even when opened from Finder. No CocoaPods or XcodeGen is required.
 SwiftPM pins `stasel/WebRTC` at **153.0.0**, including its binary checksum and resolved
 revision. The XCFramework contains device and simulator slices. The app embeds it
-and uses `@executable_path/Frameworks` at runtime. Only data channels are created;
-the app does not request camera/microphone access or create media tracks.
+and uses `@executable_path/Frameworks` at runtime. WebRTC creates only data channels and does not request camera/microphone access
+or create media tracks. The separate, optional QR scanner requests video-camera
+access only after choosing **Join → Scan QR code**.
 
 ### Build and launch troubleshooting
 
@@ -104,3 +105,26 @@ Normal `pnpm ios` creates/joins `#crdt=` invites and uses port 5173 for local
 simulator sharing. No preview environment variable is needed. Device builds use
 a reachable HTTPS/WSS origin and TURN service. The test listener remains restricted
 to Debug simulator builds; it is not included on devices or in Release.
+
+## Camera and store privacy
+
+The scanner uses AVFoundation QR metadata on the iPad. Frames stay in memory on
+the device; they are not saved, uploaded, shared over WebRTC or analyzed remotely.
+The invitation secret stays local and enters the existing encrypted join path.
+Arbitrary scanned URLs are never opened. The join dialog warns that a valid scan
+immediately replaces the local board; an invalid code leaves it intact.
+
+`NSCameraUsageDescription` explains the scanning purpose. Camera access is
+optional: denial/restriction offers Settings and cancellation back to paste.
+The camera pauses while inactive and stops on cancellation/result/disposal.
+Preview orientation follows the current iPad window. No microphone or photo
+library permission is added.
+
+App Store preparation (MES-18) must describe optional on-device QR scanning and
+review the final release's App Privacy answers; the scanner adds no camera-image
+collection. Apple compilation/simulator checks require macOS/Xcode. Physical
+iPad acceptance must separately cover Pencil/touch interaction, first-use and
+denied/restricted permissions, Settings recovery, portrait/landscape/resizing,
+background/foreground, repeated detections, web/native-displayed QR codes,
+invalid invites and wrong-key rejection. Simulator/synthetic checks cannot
+establish camera acceptance.

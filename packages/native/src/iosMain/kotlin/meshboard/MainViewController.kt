@@ -18,7 +18,7 @@ import platform.CoreGraphics.CGRectMake
 import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
-fun MainViewController(network: AppleNetwork, origin: String): UIViewController {
+fun MainViewController(network: AppleNetwork, origin: String, scanner: QrScanner): UIViewController {
     lateinit var host: UIViewController
     host = ComposeUIViewController {
         val controller = remember { AppleBoardController(network) }
@@ -29,7 +29,12 @@ fun MainViewController(network: AppleNetwork, origin: String): UIViewController 
         }
         DisposableEffect(controller) { onDispose { controller.close() } }
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            MobileBoardApp(controller, origin, boardTitle = "Meshboard", appearanceStore = appearance, contactPressure = ::appleContactPressure, shareInvite = { invite ->
+            MobileBoardApp(controller, origin, boardTitle = "Meshboard", appearanceStore = appearance, scanner = { events ->
+                DisposableEffect(scanner, events) {
+                    scanner.start(events)
+                    onDispose { scanner.stop() }
+                }
+            }, contactPressure = ::appleContactPressure, shareInvite = { invite ->
                 var presenter = host
                 while (presenter.presentedViewController != null) presenter = presenter.presentedViewController!!
                 val activity = UIActivityViewController(activityItems = listOf(invite), applicationActivities = null)

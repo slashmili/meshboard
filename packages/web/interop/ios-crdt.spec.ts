@@ -188,7 +188,7 @@ test('iOS app refuses legacy invites and insecure origins without clearing the b
   ios.send({ type: 'put', element: stroke('keep') })
   await expect.poll(() => ios.state().elements.length).toBe(1)
   ios.send({ type: 'join', invite: 'http://127.0.0.1:5174/#room=12345678-1234-4234-8234-123456789abc' })
-  await expect.poll(() => ios.state(true).error).toContain('another protocol')
+  await expect.poll(() => ios.state(true).error).toBe('Paste the full encrypted invite, including its key.')
   expect(ios.state(true).elements.map(e => e.id)).toEqual(['keep'])
   ios.send({ type: 'share', origin: 'http://example.invalid' })
   await expect.poll(() => ios.state(true).error).toContain('HTTPS')

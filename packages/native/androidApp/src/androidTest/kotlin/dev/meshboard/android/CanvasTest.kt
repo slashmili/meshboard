@@ -235,6 +235,7 @@ class CanvasTest {
         rule.onNodeWithText("Meshboard").assertIsDisplayed()
         rule.onNodeWithContentDescription("Meshboard logo").assertIsDisplayed()
         rule.onNodeWithTag("mobile-header").assertHeightIsEqualTo(56.dp)
+        rule.onNodeWithTag("mobile-header-join").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         rule.onNodeWithTag("mobile-join").assertDoesNotExist()
         rule.onNodeWithTag("mobile-share").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         rule.onNodeWithTag("mobile-help").assertDoesNotExist()

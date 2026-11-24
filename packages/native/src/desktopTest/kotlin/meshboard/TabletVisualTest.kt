@@ -35,10 +35,20 @@ class TabletVisualTest {
                         val file = File("build/test-artifacts/tablet-$name-$suffix.png"); file.parentFile.mkdirs()
                         ImageIO.write(onRoot().captureToImage().toAwtImage(),"png",file)
                     }
+                    fun checkHeader(dark: Boolean) {
+                        val join = onNodeWithTag("mobile-header-join")
+                        val share = onNodeWithTag("mobile-share")
+                        join.assertIsDisplayed(); share.assertIsDisplayed()
+                        assertTrue(join.fetchSemanticsNode().boundsInRoot.right <= share.fetchSemanticsNode().boundsInRoot.left)
+                        val pixels = join.captureToImage().toAwtImage()
+                        assertEquals(if (dark) 0x263f61 else 0xdeebff, pixels.getRGB(10,pixels.height / 2) and 0xffffff)
+                        val sharePixels = share.captureToImage().toAwtImage()
+                        assertNotEquals(pixels.getRGB(10,pixels.height / 2), sharePixels.getRGB(10,sharePixels.height / 2))
+                    }
                     settings(); onNodeWithText("Light").performClick(); onNodeWithText("Done").performClick()
-                    save("light")
+                    checkHeader(false); save("light")
                     settings(); onNodeWithText("Dark").performClick(); onNodeWithText("Done").performClick()
-                    save("dark")
+                    checkHeader(true); save("dark")
                     val swatch = onNodeWithContentDescription("Ink stroke").captureToImage().toAwtImage()
                     val expected = displayPaint("#293b36", true)
                     assertEquals(expected.toArgb() and 0xffffff, swatch.getRGB(swatch.width / 2, swatch.height / 2) and 0xffffff)

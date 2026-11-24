@@ -96,16 +96,13 @@ class AppleBoardController(private val network: AppleNetwork, private val crdtFa
             begin(base, newId(), true)
         }
     }
+    private fun parseInvite(invite: String) = parseEncryptedInvite(invite) {
+        requireNotNull(network.normalizeOrigin(it)) { "Enter a valid HTTPS board invite." }
+    }
+    override fun validInvite(invite: String): Boolean = try { parseInvite(invite); true } catch (_: IllegalArgumentException) { false }
     override fun join(invite: String) = attempt {
-        require(invite.length <= 2048) { "The invite is too long." }
-        val base = requireNotNull(network.normalizeOrigin(invite)) { "Enter a valid HTTPS board invite." }
-        val fragment = invite.trim().substringAfter('#', "")
-        val entries = fragment.split('&')
-        require(entries.size == 2) { "This invite belongs to another protocol or is incomplete. Paste the full encrypted invite." }
-        val params = entries.associate { entry -> val pair = entry.split('=', limit = 2); require(pair.size == 2); pair[0] to pair[1] }
-        require(params.keys == setOf("crdt", "key")) { "Invalid encrypted invite." }
-        val id = params.getValue("crdt").lowercase(); require(SecureWire.validId(id))
-        val key = params.getValue("key"); SecureWire.decodeKey(key); sessionKey = key
+        val (base, id, key) = parseInvite(invite)
+        sessionKey = key
         begin(base, id, false)
     }
     override fun retry() { if (room.isNotEmpty()) begin(origin, room, true) }
