@@ -17,8 +17,11 @@ class CanvasTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>(effectContext = StandardTestDispatcher())
     private fun canvas() = rule.onNodeWithTag("mobile-canvas")
     private fun count(value: Int) {
-        try { rule.waitUntil(5000) { canvas().fetchSemanticsNode().config[SemanticsProperties.StateDescription] == "$value objects" } }
-        catch (error: Throwable) { throw AssertionError("Expected $value objects; actual: ${canvas().fetchSemanticsNode().config[SemanticsProperties.StateDescription]}", error) }
+        // Returning from a stubbed system activity briefly pauses MainActivity and can
+        // detach its Compose root; treat a missing hierarchy as "not yet", not a failure.
+        val description = { runCatching { canvas().fetchSemanticsNode().config[SemanticsProperties.StateDescription] } }
+        try { rule.waitUntil(5000) { description().getOrNull() == "$value objects" } }
+        catch (error: Throwable) { throw AssertionError("Expected $value objects; actual: ${description().getOrElse { "unavailable ($it)" }}", error) }
     }
     private fun draw() = canvas().performTouchInput { swipe(Offset(width * .25f, height * .3f), Offset(width * .7f, height * .65f), 350) }
 
