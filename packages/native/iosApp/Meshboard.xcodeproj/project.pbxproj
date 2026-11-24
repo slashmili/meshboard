@@ -13,6 +13,7 @@
 		B00000000000000000000005 /* Meshboard/AppleNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* Meshboard/AppleNetwork.swift */; };
 		B00000000000000000000007 /* Meshboard/DebugInterop.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* Meshboard/DebugInterop.swift */; };
 		B00000000000000000000009 /* Meshboard/SessionCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* Meshboard/SessionCipher.swift */; };
+		D00000000000000000000002 /* Meshboard/QrScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00000000000000000000001 /* Meshboard/QrScanner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +24,7 @@
 		B00000000000000000000006 /* Meshboard/DebugInterop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meshboard/DebugInterop.swift; sourceTree = "<group>"; };
 		B00000000000000000000008 /* Meshboard/SessionCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meshboard/SessionCipher.swift; sourceTree = "<group>"; };
 		C00000000000000000000001 /* Config/Build.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Build.xcconfig; sourceTree = "<group>"; };
+		D00000000000000000000001 /* Meshboard/QrScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meshboard/QrScanner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +42,7 @@
 		A00000000000000000000003 = {
 			isa = PBXGroup;
 			children = (
+				D00000000000000000000001 /* Meshboard/QrScanner.swift */,
 				B00000000000000000000008 /* Meshboard/SessionCipher.swift */,
 				B00000000000000000000006 /* Meshboard/DebugInterop.swift */,
 				B00000000000000000000004 /* Meshboard/AppleNetwork.swift */,
@@ -147,6 +150,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B00000000000000000000009 /* Meshboard/SessionCipher.swift in Sources */,
+				D00000000000000000000002 /* Meshboard/QrScanner.swift in Sources */,
 				B00000000000000000000007 /* Meshboard/DebugInterop.swift in Sources */,
 				A00000000000000000000024 /* Meshboard/MeshboardApp.swift in Sources */,
 				B00000000000000000000005 /* Meshboard/AppleNetwork.swift in Sources */,

@@ -30,6 +30,8 @@ interface DrawingController {
 
 interface BoardController : DrawingController {
     fun share(origin: String)
+    /** Validation must not change the current board or start networking. */
+    fun validInvite(invite: String): Boolean = false
     fun join(invite: String)
     fun retry()
     fun leave()

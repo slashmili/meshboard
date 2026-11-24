@@ -13,7 +13,6 @@ import okio.ByteString
 import org.webrtc.*
 import java.io.IOException
 import java.net.URI
-import java.net.URLDecoder
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.*
@@ -113,6 +112,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
         }
     }
     override fun share(origin: String) = post { if (room.isEmpty()) { sessionKey = SecureWire.key(JvmSessionCrypto.random32()); begin(validateOrigin(origin), UUID.randomUUID().toString(), true) } }
+    override fun validInvite(invite: String): Boolean = try { parseInvite(invite); true } catch (_: Exception) { false }
     override fun join(invite: String) = post { val (base, id, key) = parseInvite(invite); sessionKey = key; begin(base, id, false) }
     override fun retry() = post { if (room.isNotEmpty()) begin(origin, room, true) }
     override fun leave() = post { disconnect(); room = ""; sessionKey = ""; resetDocument(); mutable.value = BoardState() }
@@ -465,19 +465,7 @@ class AndroidController(context: Context, private val forceRelay: Boolean = fals
             require(uri.scheme == "https" || (BuildConfig.DEBUG && uri.host in listOf("localhost", "127.0.0.1", "10.0.2.2"))) { "Use HTTPS for an app on another computer." }
             return "${uri.scheme}://${uri.rawAuthority}"
         }
-        fun parseInvite(value: String): Triple<String, String, String> {
-            require(value.length <= 2048) { "The invite is too long." }
-            val uri = URI(value.trim()); val base = validateOrigin(value)
-            val entries = uri.rawFragment?.split('&') ?: error("Paste the full encrypted invite.")
-            require(entries.size == 2) { "Paste the full encrypted invite, including its key." }
-            val params = entries.associate { entry ->
-                val pair = entry.split('=', limit = 2); require(pair.size == 2)
-                pair[0] to URLDecoder.decode(pair[1], "UTF-8")
-            }
-            require(params.keys == setOf("crdt", "key")) { "Invalid encrypted invite." }
-            val room = params.getValue("crdt").lowercase(); require(SecureWire.validId(room))
-            val key = params.getValue("key"); SecureWire.decodeKey(key)
-            return Triple(base, room, key)
-        }
+        fun parseInvite(value: String): Triple<String, String, String> =
+            meshboard.parseEncryptedInvite(value, ::validateOrigin)
     }
 }

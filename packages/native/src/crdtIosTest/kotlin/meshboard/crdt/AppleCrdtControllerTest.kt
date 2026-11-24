@@ -100,7 +100,9 @@ class AppleCrdtControllerTest {
         try {
             board.put(stroke)
             board.join("http://127.0.0.1:5174/#room=12345678-1234-4234-8234-123456789abc")
-            assertTrue(board.state.value.error!!.contains("another protocol"))
+            assertEquals("Paste the full encrypted invite, including its key.", board.state.value.error)
+            assertEquals(listOf(stroke), board.state.value.elements)
+            assertEquals(0, net.starts)
             board.share("https://example.invalid")
             assertNull(board.state.value.error)
             assertTrue(board.state.value.invite.startsWith("https://example.invalid/#crdt="))

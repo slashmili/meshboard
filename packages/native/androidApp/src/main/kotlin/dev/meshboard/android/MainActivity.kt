@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
                     boardTitle = "Meshboard",
                     uiState = board.tabletUi,
                     appearanceStore = appearance,
+                    scanner = { events -> AndroidQrScanner(events) },
                     backHandler = { enabled, onBack -> BackHandler(enabled, onBack) },
                     shareInvite = { invite ->
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, invite) }

@@ -48,6 +48,7 @@ fun MobileBoardApp(
     backHandler: (@Composable (Boolean, () -> Unit) -> Unit)? = null,
     appearanceStore: AppearanceStore? = null,
     contactPressure: (PointerEvent, PointerInputChange) -> Float = { _, change -> change.pressure },
+    scanner: (@Composable (QrScanEvents) -> Unit)? = null,
     qrImage: ((String) -> ImageBitmap)? = null,
 ) {
     val sharing = controller as? BoardController
@@ -79,6 +80,7 @@ fun MobileBoardApp(
     var errorSize by remember { mutableStateOf(Size.Zero) }
     var origin by remember { mutableStateOf(defaultOrigin) }
     var inviteInput by remember { mutableStateOf("") }
+    var scanError by remember { mutableStateOf<String?>(null) }
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val density = LocalDensity.current.density.toDouble()
@@ -440,11 +442,35 @@ fun MobileBoardApp(
         if (dialog == "join" && sharing != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Join another board?") }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Joining discards your current local copy. Other participants keep drawing. If you are the last participant, this board is lost. Paste the full invite.")
+                if (scanner != null) {
+                    Text("Scanning a valid board invite joins it immediately and replaces this local copy.")
+                    Button(onClick = { scanError = null; dialog = "scan" }, modifier = Modifier.testTag("mobile-scan-qr")) { Text("Scan QR code") }
+                }
+                scanError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("mobile-scan-error")) }
                 OutlinedTextField(inviteInput, { inviteInput = it }, label = { Text("Board invite") }, modifier = Modifier.testTag("mobile-invite-input"))
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         }, confirmButton = { Button(enabled = inviteInput.isNotBlank(), onClick = { sharing.join(inviteInput); selection = Selection(); view = View(); dialog = null }, modifier = Modifier.testTag("mobile-confirm-join")) { Text("Join board") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } })
+        if (dialog == "scan" && sharing != null && scanner != null) {
+            val attempt = remember {
+                QrScanAttempt(object : QrScanEvents {
+                    override fun found(value: String) {
+                        if (sharing.validInvite(value)) {
+                            sharing.join(value)
+                            selection = Selection(); view = View(); dialog = null
+                        } else {
+                            scanError = "This QR code is not a valid encrypted board invite. Scan another code or paste the full invite."
+                            dialog = "join"
+                        }
+                    }
+                    override fun cancelled() { dialog = "join" }
+                    override fun failed(message: String) { scanError = message; dialog = "join" }
+                })
+            }
+            DisposableEffect(attempt) { onDispose { attempt.close() } }
+            scanner(attempt)
+        }
         if (dialog == "share" && sharing != null && qrImage != null) AlertDialog(onDismissRequest = { dialog = null }, title = { Text(if (state.invite.isEmpty()) "Share this board" else "Invite someone") }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (state.invite.isEmpty()) {

@@ -16,7 +16,8 @@ struct MeshboardApp: App {
 
 private struct BoardView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.MainViewController(network: NativeAppleNetwork(), origin: {
+        let scanner = NativeQrScanner()
+        let controller = MainViewControllerKt.MainViewController(network: NativeAppleNetwork(), origin: {
             // MESHBOARD_APP_ORIGIN build setting; see Config/Local.xcconfig.example.
             let configured = (Bundle.main.object(forInfoDictionaryKey: "MeshboardAppOrigin") as? String ?? "")
                 .trimmingCharacters(in: .whitespaces)
@@ -26,7 +27,9 @@ private struct BoardView: UIViewControllerRepresentable {
             #else
             return "https://"
             #endif
-        }())
+        }(), scanner: scanner)
+        scanner.host = controller
+        return controller
     }
 
     func updateUIViewController(_ controller: UIViewController, context: Context) {}

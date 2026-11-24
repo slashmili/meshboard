@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Scan a Meshboard invitation QR code to join a board. Camera images are processed only on this iPad and are not saved or shared.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Connect directly to nearby Meshboard participants on your local network.</string>
     <key>NSAppTransportSecurity</key>

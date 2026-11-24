@@ -31,7 +31,7 @@ class AppleControllerTest {
             assertEquals(0, net.starts)
             assertNotNull(controller.state.value.error)
             controller.join("https://board.test/#room=12345678-1234-4234-8234-123456789abc")
-            assertTrue(controller.state.value.error!!.contains("another protocol"))
+            assertEquals("Paste the full encrypted invite, including its key.", controller.state.value.error)
             assertEquals(listOf(stroke), controller.state.value.elements)
             assertEquals(0, net.starts)
         } finally { controller.close() }

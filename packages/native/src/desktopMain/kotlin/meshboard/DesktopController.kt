@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
 import java.net.URI
-import java.net.URLDecoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -125,6 +124,7 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
         sessionKey = SecureWire.key(JvmSessionCrypto.random32())
         begin(base, UUID.randomUUID().toString(), keepDrawing = true)
     }
+    override fun validInvite(invite: String): Boolean = try { parseInvite(invite); true } catch (_: Exception) { false }
     override fun join(invite: String) = post {
         val parsed = parseInvite(invite)
         sessionKey = parsed.third
@@ -486,18 +486,7 @@ class DesktopController(private val forceRelay: Boolean = false, private val crd
             require(uri.scheme == "https" || uri.host in listOf("localhost", "127.0.0.1", "[::1]")) { "Use HTTPS for an app on another computer." }
             return "${uri.scheme}://${uri.rawAuthority}"
         }
-        fun parseInvite(value: String): Triple<String, String, String> {
-            val uri = URI(value.trim()); val base = validateOrigin(value)
-            require(uri.rawFragment?.split('&')?.size == 2) { "Paste the full encrypted invite, including its key." }
-            val params = uri.rawFragment?.split('&')?.associate { entry ->
-                val pair = entry.split('=', limit = 2)
-                require(pair.size == 2) { "The invite must include #crdt=…" }
-                pair[0] to URLDecoder.decode(pair[1], Charsets.UTF_8)
-            } ?: error("Paste the full invite link, including #crdt=…")
-            val key = "crdt"
-            require(params.size == 2 && params.keys == setOf(key, "key") && uuidPattern.matches(params.getValue(key))) { "This invite belongs to another protocol or is invalid. Create a new board and share its invite." }
-            val secret = params.getValue("key"); SecureWire.decodeKey(secret)
-            return Triple(base, params.getValue(key).lowercase(), secret)
-        }
+        fun parseInvite(value: String): Triple<String, String, String> =
+            meshboard.parseEncryptedInvite(value, ::validateOrigin)
     }
 }

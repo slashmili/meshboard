@@ -12,7 +12,7 @@ remain pending; emulator results do not establish those checks.
 Android can create an invite link/QR or join a web/desktop invite. Native
 `org.webrtc` data channels carry drawings, live previews, erasing, and snapshots;
 OkHttp carries only connection metadata to signaling. TURN fallback is wired in.
-Only Internet/network-state permissions are requested, not camera, microphone, or storage.
+Internet/network-state permissions support sharing. Camera access is requested only after choosing **Join → Scan QR code**; microphone and storage permissions are not requested.
 The ViewModel keeps drawings through screen recreation/rotation. There is no disk
 storage: finishing the activity or process death discards the board.
 
@@ -89,8 +89,7 @@ need to expose the development services to your LAN or configure `adb reverse`.
 Cleartext traffic is allowed only for these three local hosts in debug builds.
 Release builds require HTTPS/WSS. Physical devices require a reachable HTTPS
 app origin and TURN service; loopback invites/QR codes will not work on a phone.
-Paste invites into Android; camera QR scanning and native deep links are not
-implemented yet. A QR can open the web fallback on a device that can reach its origin.
+Choose **Join → Scan QR code** to scan a Meshboard invite in the app, or paste the full link. A valid scan immediately joins the board after the join dialog warns that the local copy will be replaced. Invalid codes keep the current board and return to the paste/scan flow. Native deep links remain separate work.
 
 The ViewModel also retains the connection across activity recreation. Background
 suspension/process death is not a persistent session or background-service guarantee.
@@ -128,3 +127,22 @@ and cross-language compatibility through the emulator. `pnpm test:interop:androi
 runs normal-app UI and Android/web/desktop tests, including reconnect recovery.
 No preview flag is needed. Physical devices require reachable HTTPS/WSS/TURN;
 manual ARM64 and restrictive-network checks remain in the validation checklist.
+
+## Camera and store privacy
+
+The optional scanner uses ZXing locally. Camera frames are decoded in memory,
+never saved, uploaded, sent over WebRTC, or included in analytics. The decoded
+invitation stays local; only the existing authenticated encrypted session flow
+uses it. It never opens arbitrary scanned URLs. Camera permission is optional
+for installation and joining by pasted link. Denial offers app Settings and
+paste fallback; camera errors offer retry/cancel. Leaving the scanner releases
+the camera; backgrounding pauses it. Activity recreation cancels the scanner
+and retains the ViewModel's board.
+
+Google Play preparation (MES-19) must describe this on-device scanning purpose
+and the optional CAMERA permission. This feature adds no camera-image collection
+or photo-library access. Final Data safety answers must cover the whole release,
+not just this scanner. Physical tablet checks must cover first-use permission,
+denial/restriction, Settings recovery, rotation/backgrounding, QR codes displayed
+by web/native, malformed invites and wrong-key rejection. Emulator and synthetic
+QR tests do not establish physical-camera acceptance.
