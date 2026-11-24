@@ -159,23 +159,25 @@ export function App() {
         }} />
         {imageError && <div className="connection-error" role="alert">{imageError}<button onClick={() => setImageError('')}>Dismiss</button></div>}
         {session.error && <div className="connection-error" role="alert"><span>{session.error}</span>{session.room && <button onClick={session.retry}>Retry</button>}</div>}
-        <svg ref={board.svgRef} className={`canvas ${board.spaceDown || tool === 'hand' ? 'canvas-pan' : tool === 'eraser' ? 'canvas-eraser' : ''}`} aria-label="Drawing canvas" aria-describedby="canvas-instructions" tabIndex={0} {...board.pointerHandlers} onContextMenu={event => event.preventDefault()}>
-          <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill={canvas.grid} /></pattern></defs>
-          <rect width="100%" height="100%" fill="url(#grid)" pointerEvents="none" />
-          <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="drawing-elements">
-            {board.elements.map(element => <Element key={element.id} element={element} dark={theme.dark} />)}
-            {board.draft && <Element element={board.draft} dark={theme.dark} />}
-          </g>
-            {tool === 'arrow' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="connector-handles">{board.elements.filter(e=>e.type==='arrow').flatMap(e=>e.points.map((p,i)=><circle key={e.id+i} cx={p.x} cy={p.y} r={4/zoom} fill={canvas.paper} stroke={canvas.handle} strokeWidth={1/zoom}/>))}</g>}
-          {tool === 'select' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="selection-overlay">
-            {board.elements.filter(e => board.selection.ids.includes(e.id)).map(e => {
-              const box = selectionBounds(e), padding = 4 / zoom
-              return <rect key={e.id} x={box.x-padding} y={box.y-padding} width={box.width+2*padding} height={box.height+2*padding} fill="none" stroke={canvas.selection} strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />
-            })}
-            {marquee(board.selection) && <rect {...marquee(board.selection)!} fill={`${canvas.selection}15`} stroke={canvas.selection} strokeWidth={1 / zoom} />}
-          </g>}
-          <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} dark={theme.dark} />)}</g>
-        </svg>
+        <div className="canvas-surface">
+          <svg ref={board.svgRef} className={`canvas ${board.spaceDown || tool === 'hand' ? 'canvas-pan' : tool === 'eraser' ? 'canvas-eraser' : ''}`} aria-label="Drawing canvas" aria-describedby="canvas-instructions" tabIndex={0} {...board.pointerHandlers} onContextMenu={event => event.preventDefault()}>
+            <defs><pattern id="grid" width={24 * zoom} height={24 * zoom} patternUnits="userSpaceOnUse" x={x} y={y}><circle cx={1} cy={1} r={0.8} fill={canvas.grid} /></pattern></defs>
+            <rect width="100%" height="100%" fill="url(#grid)" pointerEvents="none" />
+            <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="drawing-elements">
+              {board.elements.map(element => <Element key={element.id} element={element} dark={theme.dark} />)}
+              {board.draft && <Element element={board.draft} dark={theme.dark} />}
+            </g>
+              {tool === 'arrow' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="connector-handles">{board.elements.filter(e=>e.type==='arrow').flatMap(e=>e.points.map((p,i)=><circle key={e.id+i} cx={p.x} cy={p.y} r={4/zoom} fill={canvas.paper} stroke={canvas.handle} strokeWidth={1/zoom}/>))}</g>}
+            {tool === 'select' && <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" data-testid="selection-overlay">
+              {board.elements.filter(e => board.selection.ids.includes(e.id)).map(e => {
+                const box = selectionBounds(e), padding = 4 / zoom
+                return <rect key={e.id} x={box.x-padding} y={box.y-padding} width={box.width+2*padding} height={box.height+2*padding} fill="none" stroke={canvas.selection} strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${3 / zoom}`} />
+              })}
+              {marquee(board.selection) && <rect {...marquee(board.selection)!} fill={`${canvas.selection}15`} stroke={canvas.selection} strokeWidth={1 / zoom} />}
+            </g>}
+            <g transform={`translate(${x} ${y}) scale(${zoom})`} pointerEvents="none" opacity={0.65} data-testid="remote-drafts">{remoteDrafts.map(element => <Element key={element.id} element={element} dark={theme.dark} />)}</g>
+          </svg>
+        </div>
 
         <div className="tool-panel" role="toolbar" aria-label="Drawing tools">
           {TOOLS.map(({ id, label, key, icon: Icon }) => <div key={id} className={id === 'hand' ? 'tool-item tool-item-separated' : 'tool-item'}>

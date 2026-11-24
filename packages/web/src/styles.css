@@ -28,6 +28,7 @@ button:disabled:hover { background: transparent; }
 .quiet-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; background: transparent; border-radius: 8px; padding: 9px 10px; font-size: 12px; }
 .quiet-button:hover { background: #f0f3ed; }
 .workspace { position: relative; flex: 1; min-height: 0; isolation: isolate; }
+.canvas-surface { width: 100%; height: 100%; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; user-select: none; outline: none; }
 .canvas:focus-visible { box-shadow: inset 0 0 0 2px #7b9867; }
 .canvas-pan { cursor: grab; }

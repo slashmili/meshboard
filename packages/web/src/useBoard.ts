@@ -80,7 +80,7 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       if (global && event.target !== window) return
       if (!global && !(event.target instanceof Node && svg.contains(event.target)) && !(pointer && tracked.has(pointer.pointerId))) return
       if (pointer?.type === 'pointerdown') tracked.add(pointer.pointerId)
-      const metadata = `${++sequence} ${event.type}${pointer ? ` ${pointer.pointerType} id=${pointer.pointerId} buttons=${pointer.buttons}` : ''}`
+      const metadata = `${++sequence} ${event.type}${pointer ? ` ${pointer.pointerType} id=${pointer.pointerId} buttons=${pointer.buttons}` : ''} prevented=${event.defaultPrevented} cancelable=${event.cancelable}`
       const captured = pointer ? svg.hasPointerCapture(pointer.pointerId) : false
       // Observe after React handles the event. Never record coordinates, pressure,
       // element contents, URLs, invitation fragments or persistent diagnostics.
@@ -102,6 +102,14 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
+    // iPad Safari can hand the parallel TouchEvent stream to a browser gesture
+    // and cancel the PointerEvent stroke. Pointer-event preventDefault alone
+    // does not claim that stream. Keep this native, non-passive and canvas-only.
+    const preventCanvasTouch = (event: TouchEvent) => {
+      if (event.cancelable) event.preventDefault()
+    }
+    svg.addEventListener('touchstart', preventCanvasTouch, { passive: false })
+    svg.addEventListener('touchmove', preventCanvasTouch, { passive: false })
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       if (gesture.current) return
@@ -115,7 +123,11 @@ export function useBoard(tool: Tool, color: string, width: number, document: Ses
       }
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
-    return () => svg.removeEventListener('wheel', onWheel)
+    return () => {
+      svg.removeEventListener('wheel', onWheel)
+      svg.removeEventListener('touchstart', preventCanvasTouch)
+      svg.removeEventListener('touchmove', preventCanvasTouch)
+    }
   }, [setView])
 
   function localPoint(event: { clientX: number; clientY: number }): Point {
