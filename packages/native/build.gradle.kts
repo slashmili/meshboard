@@ -188,7 +188,7 @@ tasks.withType<Test>().configureEach {
 
 if (crdtIosEnabled) {
     tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest>().configureEach {
-        // The ordinary iOS tests run afterwards; preserve binding reports separately.
+        // Keep Kotlin simulator reports separate from the standalone compatibility harness.
         reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/crdt-ios/$name"))
         reports.html.outputLocation.set(layout.buildDirectory.dir("reports/tests/crdt-ios/$name"))
     }
