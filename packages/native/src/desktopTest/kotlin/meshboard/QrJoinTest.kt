@@ -49,8 +49,7 @@ class QrJoinTest {
         }
     }
     private fun scan() {
-        rule.onNodeWithTag("mobile-more").performClick()
-        rule.onNodeWithTag("mobile-join").performScrollTo().performClick()
+        rule.onNodeWithTag("mobile-header-join").assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
         rule.onNodeWithTag("mobile-scan-qr").performScrollTo().performClick()
         rule.waitForIdle()
     }

@@ -77,7 +77,7 @@ private fun TabletSurface(modifier: Modifier = Modifier, content: @Composable ()
 }
 
 @Composable
-internal fun TabletHeader(title: String, status: String, wide: Boolean, sharing: Boolean, onSession: () -> Unit, onShare: () -> Unit, onMenu: () -> Unit) {
+internal fun TabletHeader(title: String, status: String, wide: Boolean, sharing: Boolean, joining: Boolean, dark: Boolean, onSession: () -> Unit, onJoin: () -> Unit, onShare: () -> Unit, onMenu: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).background(colors.surface).padding(horizontal = 12.dp).testTag("mobile-header").semantics { isTraversalGroup = true; traversalIndex = 0f },
         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -87,19 +87,22 @@ internal fun TabletHeader(title: String, status: String, wide: Boolean, sharing:
             Text(status, Modifier.testTag("mobile-connection-status"), color = colors.onSurfaceVariant, fontSize = 10.sp, lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (wide) HeaderAction("Session details", false, "mobile-session", onSession)
+        if (joining) HeaderAction("Join", true, "mobile-header-join", onJoin,
+            container = if (dark) Color(0xff263f61) else Color(0xffdeebff),
+            content = if (dark) Color(0xffcee2ff) else Color(0xff214b83))
         if (sharing) HeaderAction("Share", true, "mobile-share", onShare)
         IconButton(onMenu, Modifier.tabletFocus().size(48.dp).testTag("mobile-more").semantics { contentDescription = "Board options" }) { TabletIcon("menu", colors.onSurface) }
     }
 }
 
 @Composable
-private fun HeaderAction(label: String, primary: Boolean, tag: String, onClick: () -> Unit) {
+private fun HeaderAction(label: String, primary: Boolean, tag: String, onClick: () -> Unit, container: Color? = null, content: Color? = null) {
     val colors = MaterialTheme.colorScheme
     // Visual surfaces remain compact; the independent 48-unit button owns touch/focus.
     TextButton(onClick, Modifier.tabletFocus().heightIn(min = 48.dp).testTag(tag), contentPadding = PaddingValues(horizontal = if (primary) 4.dp else 2.dp), shape = RoundedCornerShape(6.dp)) {
-        Box(Modifier.widthIn(min = if (primary) 70.dp else 0.dp).heightIn(min = 32.dp).background(if (primary) colors.primaryContainer else colors.surfaceVariant.copy(alpha = .3f), RoundedCornerShape(6.dp))
+        Box(Modifier.widthIn(min = if (primary) 70.dp else 0.dp).heightIn(min = 32.dp).background(container ?: if (primary) colors.primaryContainer else colors.surfaceVariant.copy(alpha = .3f), RoundedCornerShape(6.dp))
             .then(if (primary) Modifier else Modifier.border(1.dp, colors.outline, RoundedCornerShape(6.dp))).padding(horizontal = 12.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
-            Text(label, fontSize = 12.sp, color = if (primary) colors.onPrimaryContainer else colors.onSurface, fontWeight = FontWeight.Medium)
+            Text(label, fontSize = 12.sp, color = content ?: if (primary) colors.onPrimaryContainer else colors.onSurface, fontWeight = FontWeight.Medium)
         }
     }
 }

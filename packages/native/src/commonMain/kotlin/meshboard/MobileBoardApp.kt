@@ -129,8 +129,8 @@ fun MobileBoardApp(
         }.focusable()) {
             val layout = tabletLayout(maxWidth.value / LocalDensity.current.fontScale, maxHeight.value)
             Column(Modifier.fillMaxSize()) {
-                TabletHeader(boardTitle, state.connectionLabel, layout == TabletLayout.Wide, sharing != null && qrImage != null,
-                    onSession = { open("session") }, onShare = { copied = false; open("share") }, onMenu = { open("board") })
+                TabletHeader(boardTitle, state.connectionLabel, layout == TabletLayout.Wide, sharing != null && qrImage != null, sharing != null, dark,
+                    onSession = { open("session") }, onJoin = { open("join") }, onShare = { copied = false; open("share") }, onMenu = { open("board") })
                 HorizontalDivider(color = colors.outline.copy(alpha = .5f))
                 Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
                 Canvas(Modifier.fillMaxSize().clipToBounds().testTag("mobile-canvas").semantics {
