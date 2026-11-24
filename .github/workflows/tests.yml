@@ -147,12 +147,12 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.konan
-          key: konan-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.apple-toolchain.outputs.id }}-${{ hashFiles('packages/native/**/*.gradle.kts', 'packages/native/gradle.properties', 'packages/native/gradle/wrapper/gradle-wrapper.properties') }}
+          key: konan-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.apple-toolchain.outputs.id }}-${{ hashFiles('packages/native/build.gradle.kts', 'packages/native/settings.gradle.kts', 'packages/native/gradle.properties', 'packages/native/gradle/wrapper/gradle-wrapper.properties') }}
       - name: Cache Swift package checkouts and binary artifacts
         uses: actions/cache@v5
         with:
           path: packages/native/build/SourcePackages
-          key: swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.apple-toolchain.outputs.id }}-${{ hashFiles('packages/native/iosApp/**/Package.resolved', 'packages/native/iosApp/Meshboard.xcodeproj/project.pbxproj') }}
+          key: swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.apple-toolchain.outputs.id }}-${{ hashFiles('packages/native/iosApp/**/Package.resolved') }}
       - name: Install dependencies and inspect Apple toolchain
         run: |
           test "$(uname -m)" = arm64
@@ -166,7 +166,6 @@ jobs:
           rustup default stable
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim
       - name: Run Kotlin iOS tests, iPad/Web/macOS interoperability and device compilation
-        # Binding checks and ordinary app builds use the same CRDT implementation.
         run: bash scripts/ci-tests.sh ios
       - uses: actions/upload-artifact@v6
         if: always()
