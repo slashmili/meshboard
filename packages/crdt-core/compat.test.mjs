@@ -45,7 +45,8 @@ async function native(request) {
   const result = spawnSync(ios ? 'xcrun' : jvm ? jvm.java : binary,
     ios ? ['simctl', 'spawn', process.env.MESHBOARD_IOS_SIMULATOR, ios]
       : jvm ? ['-Xcheck:jni', `-Dmeshboard.crdt.library=${jvm.library}`, '-cp', jvm.classpath, 'meshboard.crdt.CrdtCompatKt'] : [],
-    { input: JSON.stringify(request) + '\n', encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 })
+    // Debug Kotlin/Native in a CI simulator needs ~15s for the 12k-point board; leave headroom.
+    { input: JSON.stringify(request) + '\n', encoding: 'utf8', timeout: ios ? 90_000 : 30_000, maxBuffer: 8 * 1024 * 1024 })
   if (result.error) throw result.error
   strictEqual(result.status, 0, result.stderr)
   return JSON.parse(result.stdout)

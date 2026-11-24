@@ -42,6 +42,12 @@ if (action === 'crdt-test') {
     'linkCrdtCompatDebugExecutableIosSimulatorArm64', 'linkDebugFrameworkIosArm64'])
   process.env.MESHBOARD_IOS_SIMULATOR = simulator.udid
   process.env.MESHBOARD_CRDT_IOS_BINARY = join(root, 'packages/native/build/bin/iosSimulatorArm64/crdtCompatDebugExecutable/crdtCompat.kexe')
+  // The first spawn of a freshly linked binary on a newly booted CI simulator can
+  // take over 30s (launch services/code-signing caches). Pay that once here so the
+  // compat tests' per-request timeout only measures CRDT work.
+  const warmup = spawnSync('xcrun', ['simctl', 'spawn', simulator.udid, process.env.MESHBOARD_CRDT_IOS_BINARY],
+    { cwd: root, input: '{"clientId":1}\n', encoding: 'utf8', timeout: 180_000 })
+  if (warmup.error || warmup.status !== 0) throw new Error(`iOS CRDT harness warm-up failed: ${warmup.error?.message ?? warmup.stderr}`)
   run('node', ['--test', 'packages/crdt-core/compat.test.mjs'])
   console.log('iOS CRDT bindings and controller tests passed.')
   process.exit(0)
