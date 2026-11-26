@@ -38,10 +38,12 @@ interop checks on an x86_64 emulator. `pnpm test:crdt:android` tests JNI and Yjs
 compatibility; `pnpm test:interop:android` exercises live Android/browser/desktop
 sessions. ARM64 physical-device execution is not claimed.
 
-The iOS job builds simulator and device bindings. `pnpm test:crdt:ios` checks the
-Kotlin/Native boundary and Yjs/yrs compatibility; `pnpm test:interop:ios` exercises
+The iOS job runs the full Kotlin simulator suite, including controller tests,
+through `pnpm test:ios`. Separately, `pnpm test:crdt:ios` builds simulator/device
+bindings and checks the Kotlin/Native boundary and Yjs/yrs compatibility;
+`pnpm test:interop:ios` exercises
 live browser/iPad/desktop sessions with the normal encrypted CRDT implementation.
-The job also runs controller tests and device compilation. See the security ledger
+The job also compiles the unsigned device app. See the security ledger
 and delivery checkpoints for Apple results and outstanding verification; simulator
 coverage does not establish physical-device behavior.
 
@@ -69,8 +71,8 @@ failed pull request.
   configuration, including the Kotlin version.
 - The iOS job also caches `packages/native/build/SourcePackages`, matching the
   Swift package checkout and binary-artifact directory used by `scripts/ios.mjs`.
-  Its key includes OS/architecture, Xcode/SDK builds, `Package.resolved` and the
-  Xcode project. Simulator and physical-device builds use that same directory.
+  Its key includes OS/architecture, Xcode/SDK builds and `Package.resolved`.
+  Simulator and physical-device builds use that same directory.
 
 The first successful run populates the new iOS caches. Later runs of the same PR
 can restore them; a successful `main` run seeds caches that other branches and

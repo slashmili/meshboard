@@ -4,8 +4,8 @@ import { join } from 'node:path'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const action = process.argv[2] || 'run'
-if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop', 'crdt-test'].includes(action)) {
-  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop|crdt-test]')
+if (process.platform !== 'darwin' || !['run', 'build', 'device-build', 'interop', 'test', 'crdt-test'].includes(action)) {
+  console.error('Usage on macOS: node scripts/ios.mjs [run|build|device-build|interop|test|crdt-test]')
   process.exit(1)
 }
 function run(command, args, capture = false) {
@@ -33,12 +33,19 @@ if (!deviceBuild) {
   if (!simulator) throw new Error('Install an iPad simulator in Xcode, or set MESHBOARD_IOS_SIMULATOR to an available simulator UUID.')
   console.log(`Building for ${simulator.name} (${simulator.udid})`)
 }
-if (action === 'crdt-test') {
-  // Standalone simulator executable: no app install, live transport, or signing changes.
+if (action === 'test' || action === 'crdt-test') {
   if (simulator.state !== 'Booted') run('xcrun', ['simctl', 'boot', simulator.udid])
   run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b'])
+}
+if (action === 'test') {
   run('./packages/native/gradlew', ['-p', 'packages/native', '-Pmeshboard.ios=true',
-    `-Pmeshboard.iosTestDevice=${simulator.udid}`, 'iosSimulatorArm64Test',
+    `-Pmeshboard.iosTestDevice=${simulator.udid}`, 'iosSimulatorArm64Test'])
+  console.log('iOS Kotlin simulator tests passed.')
+  process.exit(0)
+}
+if (action === 'crdt-test') {
+  // Standalone binding/compatibility harness; full Kotlin tests use the test action.
+  run('./packages/native/gradlew', ['-p', 'packages/native', '-Pmeshboard.ios=true',
     'linkCrdtCompatDebugExecutableIosSimulatorArm64', 'linkDebugFrameworkIosArm64'])
   process.env.MESHBOARD_IOS_SIMULATOR = simulator.udid
   process.env.MESHBOARD_CRDT_IOS_BINARY = join(root, 'packages/native/build/bin/iosSimulatorArm64/crdtCompatDebugExecutable/crdtCompat.kexe')
@@ -49,7 +56,7 @@ if (action === 'crdt-test') {
     { cwd: root, input: '{"clientId":1}\n', encoding: 'utf8', timeout: 180_000 })
   if (warmup.error || warmup.status !== 0) throw new Error(`iOS CRDT harness warm-up failed: ${warmup.error?.message ?? warmup.stderr}`)
   run('node', ['--test', 'packages/crdt-core/compat.test.mjs'])
-  console.log('iOS CRDT bindings and controller tests passed.')
+  console.log('iOS CRDT binding compatibility tests passed.')
   process.exit(0)
 }
 const output = join(root, 'packages/native/build', deviceBuild ? 'ios-device' : 'ios')

@@ -96,7 +96,8 @@ Every simulator/device and Debug/Release build links yrs. Install stable Rust:
 
 ```sh
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-pnpm test:crdt:ios
+pnpm test:ios # full Kotlin simulator suite, including controller tests
+pnpm test:crdt:ios # standalone Rust binding and Yjs/yrs compatibility checks
 pnpm test:interop:ios # keep pnpm turn running
 pnpm build:ios:device
 ```
